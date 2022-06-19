@@ -1,0 +1,129 @@
+diff --git a/src/AS5600.cpp b/src/AS5600.cpp
+index bc206dd..c856c9c 100644
+--- a/src/AS5600.cpp
++++ b/src/AS5600.cpp
+@@ -17,7 +17,6 @@
+ 
+ #include "Arduino.h"
+ #include "AS5600.h"
+-#include "Wire.h"
+ 
+ /****************************************************
+   Method: AMS_5600
+@@ -25,8 +24,9 @@
+   Out: none
+   Description: constructor class for AMS 5600
+ *****************************************************/
+-AMS_5600::AMS_5600()
++AMS_5600::AMS_5600(TwoWire *wire)
+ {
++  _wire = wire;
+ }
+ 
+ /* mode = 0, output PWM, mode = 1 output analog (full range from 0% to 100% between GND and VDD */
+@@ -59,6 +59,18 @@ int AMS_5600::getAddress()
+   return _ams5600_Address;
+ }
+ 
++/****************************************************
++  Method: AMS_5600
++  In: none
++  Out: true if i2c ack test is successful
++  Description: returns true if device is present
++****************************************************/
++bool AMS_5600::isConnected()
++{
++  _wire->beginTransmission(_ams5600_Address);
++  return (_wire->endTransmission() == 0);
++}
++
+ /*******************************************************
+   Method: setMaxAngle
+   In: new maximum angle to set OR none
+@@ -372,13 +384,13 @@ int AMS_5600::burnMaxAngleAndConfig()
+ int AMS_5600::readOneByte(int in_adr)
+ {
+   int retVal = -1;
+-  Wire.beginTransmission(_ams5600_Address);
+-  Wire.write(in_adr);
+-  Wire.endTransmission();
+-  Wire.requestFrom(_ams5600_Address, (uint8_t) 1);
+-  while (Wire.available() == 0)
++  _wire->beginTransmission(_ams5600_Address);
++  _wire->write(in_adr);
++  _wire->endTransmission();
++  _wire->requestFrom(_ams5600_Address, (uint8_t) 1);
++  while (_wire->available() == 0)
+     ;
+-  retVal = Wire.read();
++  retVal = _wire->read();
+ 
+   return retVal;
+ }
+@@ -411,15 +423,15 @@ word AMS_5600::readTwoBytesTogether(int addr_in)
+   // the address pointer is set to the high byte of the register.
+ 
+   /* Read 2 Bytes */
+-  Wire.beginTransmission(_ams5600_Address);
+-  Wire.write(addr_in);
+-  Wire.endTransmission();
+-  Wire.requestFrom(_ams5600_Address, (uint8_t) 2);
+-  while (Wire.available() < 2)
++  _wire->beginTransmission(_ams5600_Address);
++  _wire->write(addr_in);
++  _wire->endTransmission();
++  _wire->requestFrom(_ams5600_Address, (uint8_t) 2);
++  while (_wire->available() < 2)
+     ;
+   
+-  int highByte = Wire.read();
+-  int lowByte  = Wire.read();
++  int highByte = _wire->read();
++  int lowByte  = _wire->read();
+ 
+   // in case newer version of IC used the same address to
+   //    store something else, get only the 3 bits
+@@ -451,10 +463,10 @@ word AMS_5600::readTwoBytesSeparately(int addr_in)
+ *******************************************************/
+ void AMS_5600::writeOneByte(int adr_in, int dat_in)
+ {
+-  Wire.beginTransmission(_ams5600_Address);
+-  Wire.write(adr_in);
+-  Wire.write(dat_in);
+-  Wire.endTransmission();
++  _wire->beginTransmission(_ams5600_Address);
++  _wire->write(adr_in);
++  _wire->write(dat_in);
++  _wire->endTransmission();
+ }
+ 
+ /**********  END OF AMS 5600 CALSS *****************/
+diff --git a/src/AS5600.h b/src/AS5600.h
+index 7c8f5c2..714587c 100644
+--- a/src/AS5600.h
++++ b/src/AS5600.h
+@@ -19,13 +19,15 @@
+ #define AMS_5600_h
+ 
+ #include <Arduino.h>
++#include "Wire.h"
+ 
+ class AMS_5600
+ {
+ public:
+ 
+-  AMS_5600(void);
++  AMS_5600(TwoWire *wire = &Wire);
+   int getAddress();
++  bool isConnected();
+ 
+   word setMaxAngle(word newMaxAngle = -1);
+   word getMaxAngle();
+@@ -52,6 +54,7 @@ public:
+   void setOutPut(uint8_t mode);
+ 
+ private:
++  TwoWire *_wire;
+ 
+   // i2c address
+   static const uint8_t _ams5600_Address = 0x36;
