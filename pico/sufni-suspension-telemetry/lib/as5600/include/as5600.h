@@ -23,7 +23,6 @@
 #ifndef _AS5600_H
 #define _AS5600_H
 
-#include "class/cdc/cdc.h"
 #include <pico/stdlib.h>
 #include <hardware/i2c.h>
 
