@@ -122,7 +122,7 @@ void data_storage_core1() {
 
     struct record *buffer;
     struct record b[BUFFER_SIZE];
-    while (1) {
+    while (true) {
         buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
 
         //TODO: Need this memcpy, otherwise write is not happening. Reason?
@@ -198,19 +198,32 @@ void setup_sensors(ssd1306_t *disp) {
     ssd1306_show(disp);
 }
 
+void setup_display(ssd1306_t *disp) {
+    disp->external_vcc = false;
+    ssd1306_init(disp, 128, 32, 0x3C, i2c1);
+    ssd1306_clear(disp);
+    ssd1306_show(disp);
+}
+
+// ----------------------------------------------------------------------------
+// Helper functions
+
+void display_message(ssd1306_t *disp, char *message) {
+    ssd1306_clear(disp);
+    ssd1306_draw_string(disp, 8, 8, 2, message);
+    ssd1306_show(disp);
+}
+
 // ----------------------------------------------------------------------------
 // Entry point 
 
 int main() {
     setup_i2c();
-    ssd1306_t disp;
-    disp.external_vcc = false;
-    ssd1306_init(&disp, 128, 32, 0x3C, i2c1);
-    ssd1306_clear(&disp);
-    ssd1306_show(&disp);
-
     board_init();
     tusb_init();
+
+    ssd1306_t disp;
+    setup_display(&disp);
 
     // Wait for a maximum of 1 second for USB MSC to initialize
     uint32_t t = time_us_32();
@@ -219,12 +232,8 @@ int main() {
     }
 
     if (tud_ready()) {
-        ssd1306_draw_string(&disp, 8, 8, 2, "MSC MODE");
-        ssd1306_show(&disp);
-
-        while(1) {
-            tud_task();
-        }
+        display_message(&disp, "MSC MODE");
+        while(true) { tud_task(); }
     } else {
         // Setup AS5600 encoder(s)
         setup_sensors(&disp);
@@ -236,28 +245,18 @@ int main() {
         if (index < 0) {
             char s[10];
             sprintf(s, "0x%x", index);
-            ssd1306_clear(&disp);
-            ssd1306_draw_string(&disp, 8, 8, 2, s);
-            ssd1306_show(&disp);
-            while(1) {
-                tight_loop_contents();
-            }
+            display_message(&disp, s);
+            while(true) { tight_loop_contents(); }
         }
 
         // Start collection timer
         repeating_timer_t data_acquisition_timer;
         if (!add_repeating_timer_us(-200, data_acquisition_cb, NULL, &data_acquisition_timer)) {
-            ssd1306_clear(&disp);
-            ssd1306_draw_string(&disp, 8, 8, 2, "TIMER ERR");
-            ssd1306_show(&disp);
-            while(1) {
-                tight_loop_contents();
-            }
+            display_message(&disp, "TIMER ERR");
+            while(true) { tight_loop_contents(); }
         }
 
-        while (1) {
-            tight_loop_contents();
-        }
+        while (true) { tight_loop_contents(); }
     }
 
     return 0;
