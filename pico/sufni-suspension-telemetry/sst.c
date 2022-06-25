@@ -1,3 +1,4 @@
+#include "device/usbd.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
@@ -214,6 +215,25 @@ void display_message(ssd1306_t *disp, char *message) {
     ssd1306_show(disp);
 }
 
+bool msc_present() {
+    // GPIO24 is VBUS sense. GPIO24 low -> no USB cable -> no MSC.
+    gpio_init(24);
+    gpio_set_dir(24, GPIO_IN);
+    if (gpio_get(24)) {
+        // Wait for a maximum of 1 second for USB MSC to initialize
+        uint32_t t = time_us_32();
+        while (!tud_ready()) {
+            if (time_us_32() - t > 1000000) {
+                return false;
+            }
+            tud_task();
+        }
+        return true;
+    }
+
+    return false;
+}
+
 // ----------------------------------------------------------------------------
 // Entry point 
 
@@ -225,13 +245,19 @@ int main() {
     ssd1306_t disp;
     setup_display(&disp);
 
+    /*
     // Wait for a maximum of 1 second for USB MSC to initialize
-    uint32_t t = time_us_32();
-    while (!tud_ready() && (time_us_32() - t) < 1000000) {
-        tud_task();
+    gpio_init(24);
+    gpio_set_dir(24, GPIO_IN);
+    if (gpio_get(24)) {
+        uint32_t t = time_us_32();
+        while (!tud_ready() && (time_us_32() - t) < 1000000) {
+            tud_task();
+        }
     }
+    */
 
-    if (tud_ready()) {
+    if (msc_present()) {
         display_message(&disp, "MSC MODE");
         while(true) { tud_task(); }
     } else {
