@@ -9,21 +9,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 pico_sdk_init()
 
-add_subdirectory(lib/FatFs_SPI build)
-add_subdirectory(lib/as5600)
+add_subdirectory(lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(lib/pico-as5600)
 
 add_executable(sufni-suspension-telemetry
 	sst.c
     hw_config.c
     msc_disk.c
     sst_usb_descriptors.c
-    lib/ssd1306/ssd1306.c
+    lib/pico-ssd1306/ssd1306.c
 )
 
 target_include_directories(sufni-suspension-telemetry
     PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/include/
-        ${CMAKE_CURRENT_LIST_DIR}/lib/ssd1306/
+        ${CMAKE_CURRENT_LIST_DIR}/lib/pico-ssd1306/
 )
 
 target_link_libraries(sufni-suspension-telemetry
