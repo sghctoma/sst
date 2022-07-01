@@ -7,3 +7,7 @@
 [submodule "pico/sufni-suspension-telemetry/lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
 	path = pico/sufni-suspension-telemetry/lib/no-OS-FatFS-SD-SPI-RPi-Pico
 	url = https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico
+[submodule "pico/sufni-suspension-telemetry/lib/pico-ssd1306-spi"]
+	path = pico/sufni-suspension-telemetry/lib/pico-ssd1306-spi
+	url = https://github.com/sghctoma/pico-ssd1306
+	branch = spi-submodule

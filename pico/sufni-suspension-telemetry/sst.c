@@ -3,9 +3,10 @@
 #include "pico/multicore.h"
 #include "hardware/timer.h"
 #include "hardware/i2c.h"
+#include "hardware/spi.h"
 #include "bsp/board.h"
 #include "tusb.h"
-#include "ssd1306.h"
+#include "ssd1306_spi.h"
 #include "as5600.h"
 
 #include "ff.h"
@@ -200,8 +201,16 @@ void setup_sensors(ssd1306_t *disp) {
 }
 
 void setup_display(ssd1306_t *disp) {
+    spi_init(spi1, 1000000);
+    gpio_set_function(14, GPIO_FUNC_SPI); // SCK
+    gpio_set_function(15, GPIO_FUNC_SPI); // MOSI
+
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 32, 0x3C, i2c1);
+    ssd1306_init(disp, 128, 32, spi1,
+            13,  // CS
+            12,  // DC
+            11); // RST
+            
     ssd1306_clear(disp);
     ssd1306_show(disp);
 }
@@ -244,18 +253,6 @@ int main() {
 
     ssd1306_t disp;
     setup_display(&disp);
-
-    /*
-    // Wait for a maximum of 1 second for USB MSC to initialize
-    gpio_init(24);
-    gpio_set_dir(24, GPIO_IN);
-    if (gpio_get(24)) {
-        uint32_t t = time_us_32();
-        while (!tud_ready() && (time_us_32() - t) < 1000000) {
-            tud_task();
-        }
-    }
-    */
 
     if (msc_present()) {
         display_message(&disp, "MSC MODE");
