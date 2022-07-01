@@ -147,7 +147,7 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buff
 // Invoked to check if device is writable as part of SCSI WRITE10
 bool tud_msc_is_writable_cb (uint8_t lun)
 {
-    return false;
+    return true;
 }
 
 // Invoked when received SCSI WRITE10 command
@@ -164,6 +164,15 @@ bool tud_msc_is_writable_cb (uint8_t lun)
 //                       and return failed status in command status wrapper phase.
 int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize)
 {
+    (void) lun;
+    (void) offset; // ignored because CFG_TUD_MSC_EP_BUFSIZE == BLOCK_SIZE
+
+    uint32_t block_count = bufsize / BLOCK_SIZE;
+    int status = sd_write_blocks(sd, buffer, lba, block_count);
+    if (status != SD_BLOCK_DEVICE_ERROR_NONE) {
+        return status;
+    }
+
     return bufsize;
 }
 
