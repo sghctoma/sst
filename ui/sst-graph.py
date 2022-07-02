@@ -143,11 +143,9 @@ def create_graphs(content_list, filename_list):
 
 def do_fft(f, travel):
     wf = np.kaiser(len(travel), 10)
-    travel_f = rfft(travel * wf)
-    spectrum = np.abs(travel_f)
 
     balanced_travel = travel - np.mean(travel)
-    balanced_travel_f = rfft(balanced_travel)
+    balanced_travel_f = rfft(balanced_travel * wf)
     balanced_spectrum = np.abs(balanced_travel_f)
 
     #max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
