@@ -29,8 +29,6 @@ DEFAULT_SHOCK_MAX_TRAVEL   = 65
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-telemetry_data = list()
-
 pio.templates.default = "plotly_dark"
 CHART_COLORS = px.colors.qualitative.Prism
 
@@ -64,8 +62,12 @@ app.layout = html.Div([
         style={'background-color': 'rgba(32, 32, 32, 0.9)'},
     ),
     dcc.Store(
+        id='telemetry-data',
+        storage_type='memory',
+    ),
+    dcc.Store(
         id='calibration',
-        storage_type='session',
+        storage_type='memory',
         data={
             'fork': {
                 'arm': DEFAULT_FORK_ARM,
@@ -83,13 +85,17 @@ app.layout = html.Div([
     ),
     html.Div(
         children=[
-            html.H5('Calibration', style={'grid-row': '1', 'grid-column': '1 / span 5'}),
-            html.H5('Leverage', style={'grid-row': '1', 'grid-column': '5'}),
+            html.Div(
+                children=[
+                    html.H5('Calibration (?)'),
+                    html.Img(src="assets/explanation.png", className="tooltiptext tooltip-bottom"),
+                ],
+                className="tooltipx",
+                style={'grid-row': '1', 'grid-column': '1'}),
             
             html.B('Fork', style={'grid-row': '2', 'grid-column': '2'}),
             html.B('Shock', style={'grid-row': '2', 'grid-column': '3'}),
-            html.B('Explanation', style={'grid-row': '2', 'grid-column': '4'}),
-            html.P('(Load Leverage Ratio data by clicking on graph)', style={'grid-row': '2', 'grid-column': '5'}),
+            html.P('Load Leverage Ratio data by clicking on graph', style={'grid-row': '2', 'grid-column': '4'}),
 
             html.P('Maximum travel (mm):',   style={'grid-row': '3', 'grid-column': '1'}),
             html.P('Arm length (mm):',       style={'grid-row': '4', 'grid-column': '1'}),
@@ -148,18 +154,15 @@ app.layout = html.Div([
                 id='apply-calibration',
                 style={'grid-row': '7', 'grid-column': '1 / span 3'}),
 
-            html.Div(html.Img(src="assets/explanation.png", style={'height': '20vh'}),
-                    style={'textAlign': 'left', 'grid-row': '3 / span 6', 'grid-column': '4'}),
-
             html.Div(dcc.Upload(
                         id='upload-lr-curve',
                         multiple=False,
                         children=html.Div(id='lr-graph-container'),
-                    ), style={'grid-row': '3 / span 6', 'grid-column': '5'})
+                    ), style={'grid-row': '3 / span 6', 'grid-column': '4'})
         ],
         style={
             'display': 'grid',
-            'grid-template-columns': '200px 100px 100px auto auto',
+            'grid-template-columns': '200px 100px 100px 450px auto',
             'grid-template-rows': '30px 30px 30px 30px 30px 30px 30px',
             'grid-gap': '5px',
             'borderWidth': '1px',
@@ -177,25 +180,24 @@ def graph_leverage(lr_function, max_travel):
     y = [lr_function(t) for t in x]
     fig.add_trace(go.Scatter(x=x, y=y, name="leverage", line_color=CHART_COLORS[-1]))
     fig.update_xaxes(title_text="Shock travel", fixedrange=True)
-    fig.update_yaxes(title_text="Rear wheel travel", fixedrange=True)
+    fig.update_yaxes(title_text="Rear wheel travel", tick0=0, dtick=y[-1]/5, fixedrange=True)
     fig.update_layout(margin=dict(l=70, r=10, t=10, b=10, autoexpand=True))
 
     return dcc.Graph(
         config={'displayModeBar': False},
         responsive=True,
-        style={'height': '20vh'},
+        style={'height': '19vh'},
         figure=fig)
 
-def graph_travel(row, fork_max, shock_max):
-    td = telemetry_data[row]
+def graph_travel(row, data, fork_max, shock_max):
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    if td['fork_travel'] is not None:
-        fig.add_trace(go.Scatter(x=td['time'], y=td['fork_travel'],
-            name=f"fork-{td['name']}",
+    if data['fork_travel'] is not None:
+        fig.add_trace(go.Scatter(x=data['time'], y=data['fork_travel'],
+            name=f"fork-{data['name']}",
             line_color=CHART_COLORS[row%len(CHART_COLORS)]), secondary_y=False)
-    if td['shock_travel'] is not None:
-        fig.add_trace(go.Scatter(x=td['time'], y=td['shock_travel'],
-            name=f"shock-{td['name']}",
+    if data['shock_travel'] is not None:
+        fig.add_trace(go.Scatter(x=data['time'], y=data['shock_travel'],
+            name=f"shock-{data['name']}",
             line_color=CHART_COLORS[row%len(CHART_COLORS)+1]), secondary_y=True)
     fig.update_xaxes(title_text="Elapsed time (s)")
     fig.update_yaxes(title_text="Fork travel (mm)", secondary_y=False,
@@ -203,7 +205,7 @@ def graph_travel(row, fork_max, shock_max):
     fig.update_yaxes(title_text="Shock travel (mm)", secondary_y=True,
             fixedrange=True, range=[shock_max, 0], tick0=shock_max, dtick=shock_max/10)
     fig.update_layout(
-        title=td['name'],
+        title=data['name'],
         margin=dict(l=100, r=10, t=50, b=50, autoexpand=True),
         legend=dict(yanchor='bottom', y=1.0, xanchor='right', x=1.0, orientation='h'))
 
@@ -213,7 +215,7 @@ def graph_travel(row, fork_max, shock_max):
         style={'width': '70%', 'height': '30vh', 'display': 'inline-block'},
         figure=fig)
 
-def figure_fft(dataset, row, limits=None):
+def figure_fft(telemetry_data, dataset, row, limits=None):
     data = telemetry_data[row][dataset]
 
     fig = go.Figure()
@@ -292,26 +294,28 @@ def shock_arm_changed(arm, max):
         Output({'type': 'fork-fft', 'index': MATCH}, 'figure'),
         Output({'type': 'shock-fft', 'index': MATCH}, 'figure'),
         Input({'type': 'travel', 'index': MATCH}, 'relayoutData'),
-        State({'type': 'travel', 'index': MATCH}, 'id'), prevent_initial_call=True)
-def recalculate_ffts(relayoutData, id):
+        State({'type': 'travel', 'index': MATCH}, 'id'),
+        State('telemetry-data', 'data'), prevent_initial_call=True)
+def recalculate_ffts(relayoutData, id, telemetry_data):
     if not relayoutData:
         raise PreventUpdate
 
     row = id['index']
     if 'autosize' in relayoutData or 'xaxis.autorange' in relayoutData:
         return [
-            figure_fft('fork_travel', row),
-            figure_fft('shock_travel', row)]
+            figure_fft(telemetry_data, 'fork_travel', row),
+            figure_fft(telemetry_data, 'shock_travel', row)]
     else:
         start = int(relayoutData['xaxis.range[0]'] / TIME_STEP)
         stop  = int(relayoutData['xaxis.range[1]'] / TIME_STEP)
         return [
-            figure_fft('fork_travel', row, (start, stop)),
-            figure_fft('shock_travel', row, (start, stop))]
+            figure_fft(telemetry_data, 'fork_travel', row, (start, stop)),
+            figure_fft(telemetry_data, 'shock_travel', row, (start, stop))]
 
 @app.callback(
         Output('graph-container', 'children'),
         Output('lr-graph-container', 'children'),
+        Output('telemetry-data', 'data'),
         Output('loading-upload-output', 'children'),
         Input('calibration', 'data'),
         Input('upload-lr-curve', 'contents'),
@@ -338,17 +342,19 @@ def create_graphs(calibration, lr_curve, content_list, filename_list):
     fork_max_travel = calibration['fork']['max_travel']
     shock_max_travel = lr_f(calibration['shock']['max_travel'])
 
+    telemetry_data = list()
     if content_list:
-        telemetry_data.clear()
         row = 0
         for c,f in zip(content_list, filename_list):
-            parse_data(c, f, calibration, lr_f)
-            graphs.append(graph_travel(row, fork_max_travel, shock_max_travel))
+            telemetry_data.append(parse_data(c, f, calibration, lr_f))
+            graphs.append(graph_travel(row, telemetry_data[row], fork_max_travel, shock_max_travel))
             graphs.append(graph_fft('fork-fft', row))
             graphs.append(graph_fft('shock-fft', row))
             row += 1
 
-    return html.Div(graphs), graph_leverage(lr_f, calibration['shock']['max_travel']), None
+    lr_graph = graph_leverage(lr_f, calibration['shock']['max_travel'])
+
+    return html.Div(graphs), lr_graph, telemetry_data, None
 
 def do_fft(f, travel):
     wf = np.kaiser(len(travel), 5)
@@ -372,7 +378,7 @@ def parse_data(content, filename, calibration, lr_function):
     data = base64.b64decode(encoded)
 
     '''
-    Data is a stream of "records" defined as the following struct
+    Data is a stream of "records" defined as the following  from 142.251.36.142: icmp_seq=955 ttl=58 time=35.762 mstruct
     in the MCU code:
     
     struct record {
@@ -392,15 +398,13 @@ def parse_data(content, filename, calibration, lr_function):
     logger.debug(f"record count: {record_count}")
     logger.debug(f"sample rate:  {record_count / elapsed_seconds} sample/s")
 
-    fork_travel = (np.array([r[1] for r in unpacked])) if first_record[0] != 0xFFFF else None
-    shock_travel = (np.array([r[2] for r in unpacked])) if first_record[1] != 0xFFFF else None
+    fork_travel = [r[1] for r in unpacked] if first_record[0] != 0xFFFF else None
+    shock_travel = [r[2] for r in unpacked] if first_record[1] != 0xFFFF else None
 
-    telemetry_data.append({
+    return {
         'name': filename,
         'time': [TIME_STEP * i for i in range(len(unpacked))], # could also use the stored value
         'fork_travel': fork_travel,
-        'shock_travel': shock_travel})
-
-    return telemetry_data[-1]
+        'shock_travel': shock_travel}
 
 app.run_server(debug=True)
