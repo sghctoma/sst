@@ -378,8 +378,7 @@ def parse_data(content, filename, calibration, lr_function):
     data = base64.b64decode(encoded)
 
     '''
-    Data is a stream of "records" defined as the following  from 142.251.36.142: icmp_seq=955 ttl=58 time=35.762 mstruct
-    in the MCU code:
+    Data is a stream of "records" defined as the following struct in the MCU code:
     
     struct record {
         uint32_t micros;
