@@ -93,9 +93,20 @@ app.layout = html.Div([
                 className="tooltipx",
                 style={'grid-row': '1', 'grid-column': '1'}),
             
+            html.Div(
+                children=[
+                    html.H5('Leverage (?)'),
+                    html.Div("TODO: leverage ratio explanation...",
+                        className="tooltiptext tooltip-bottom",
+                        style={"height":"240"}),
+                ],
+                className="tooltipx",
+                style={'grid-row': '1', 'grid-column': '4'}),
+            
             html.B('Fork', style={'grid-row': '2', 'grid-column': '2'}),
             html.B('Shock', style={'grid-row': '2', 'grid-column': '3'}),
-            html.P('Load Leverage Ratio data by clicking on graph', style={'grid-row': '2', 'grid-column': '4'}),
+            html.P('Levarage ratio', style={'grid-row': '2', 'grid-column': '4'}),
+            html.P('Shock-Wheel Travel', style={'grid-row': '2', 'grid-column': '5'}),
 
             html.P('Maximum travel (mm):',   style={'grid-row': '3', 'grid-column': '1'}),
             html.P('Arm length (mm):',       style={'grid-row': '4', 'grid-column': '1'}),
@@ -158,11 +169,15 @@ app.layout = html.Div([
                         id='upload-lr-curve',
                         multiple=False,
                         children=html.Div(id='lr-graph-container'),
-                    ), style={'grid-row': '3 / span 6', 'grid-column': '4'})
+                    ), style={'grid-row': '3 / span 6', 'grid-column': '4'}),
+
+            html.Div(
+                id='travel-graph-container',
+                style={'grid-row': '3 / span 6', 'grid-column': '5'}),
         ],
         style={
             'display': 'grid',
-            'grid-template-columns': '200px 100px 100px 450px auto',
+            'grid-template-columns': '200px 100px 100px 450px 450px',
             'grid-template-rows': '30px 30px 30px 30px 30px 30px 30px',
             'grid-gap': '5px',
             'borderWidth': '1px',
@@ -174,13 +189,28 @@ app.layout = html.Div([
     ),
 ])
 
-def graph_leverage(lr_function, max_travel):
+def graph_shock_wheel(sw_function, max_travel):
     fig = go.Figure()
     x = list(range(max_travel+1))
-    y = [lr_function(t) for t in x]
-    fig.add_trace(go.Scatter(x=x, y=y, name="leverage", line_color=CHART_COLORS[-1]))
+    y = [sw_function(t) for t in x]
+    fig.add_trace(go.Scatter(x=x, y=y, name="travel", line_color=CHART_COLORS[-1]))
     fig.update_xaxes(title_text="Shock travel", fixedrange=True)
     fig.update_yaxes(title_text="Rear wheel travel", tick0=0, dtick=y[-1]/5, fixedrange=True)
+    fig.update_layout(margin=dict(l=70, r=10, t=10, b=10, autoexpand=True))
+
+    return dcc.Graph(
+        config={'displayModeBar': False},
+        responsive=True,
+        style={'height': '19vh'},
+        figure=fig)
+
+def graph_leverage_ratio(lr):
+    fig = go.Figure()
+    x = lr[:, 0]
+    y = lr[:, 1]
+    fig.add_trace(go.Scatter(x=x, y=y, name="leverage ratio", line_color=CHART_COLORS[-1]))
+    fig.update_xaxes(title_text="Rear wheel travel", fixedrange=True)
+    fig.update_yaxes(title_text="Leverage ratio", tick0=0, dtick=y[-1]/5, fixedrange=True)
     fig.update_layout(margin=dict(l=70, r=10, t=10, b=10, autoexpand=True))
 
     return dcc.Graph(
@@ -315,6 +345,7 @@ def recalculate_ffts(relayoutData, id, telemetry_data):
 @app.callback(
         Output('graph-container', 'children'),
         Output('lr-graph-container', 'children'),
+        Output('travel-graph-container', 'children'),
         Output('telemetry-data', 'data'),
         Output('loading-upload-output', 'children'),
         Input('calibration', 'data'),
@@ -322,39 +353,26 @@ def recalculate_ffts(relayoutData, id, telemetry_data):
         Input('upload-data', 'contents'),
         State('upload-data', 'filename'))
 def create_graphs(calibration, lr_curve, content_list, filename_list):
-    graphs = []
-    if lr_curve:
-        _, encoded = lr_curve.split(',')
-        raw_data = base64.b64decode(encoded).decode('utf-8')
-        data = np.array([list(map(float, line.rstrip().split(','))) for line in raw_data.splitlines() if
-            line and not line.startswith('#')])
+    lr_data, sw_f = parse_leverage_data(calibration, lr_curve)
+    sw_graph = graph_shock_wheel(sw_f, calibration['shock']['max_travel'])
+    lr_graph = graph_leverage_ratio(lr_data)
 
-        wheel_travel = data[:, 0]
-        inverse = [1.0/f for f in data[:, 1]]
-        shock_travel = [0.0]
-        for f in inverse[:-1]:
-            shock_travel.append(shock_travel[-1]+f)
-        p = np.polyfit(shock_travel, wheel_travel, 3)
-        lr_f = np.poly1d(p)
-    else:
-        lr_f = lambda x: x
+    travel_graphs = []
 
     fork_max_travel = calibration['fork']['max_travel']
-    shock_max_travel = lr_f(calibration['shock']['max_travel'])
+    shock_max_travel = sw_f(calibration['shock']['max_travel'])
 
     telemetry_data = list()
     if content_list:
         row = 0
         for c,f in zip(content_list, filename_list):
-            telemetry_data.append(parse_data(c, f, calibration, lr_f))
-            graphs.append(graph_travel(row, telemetry_data[row], fork_max_travel, shock_max_travel))
-            graphs.append(graph_fft('fork-fft', row))
-            graphs.append(graph_fft('shock-fft', row))
+            telemetry_data.append(parse_data(c, f, calibration, sw_f))
+            travel_graphs.append(graph_travel(row, telemetry_data[row], fork_max_travel, shock_max_travel))
+            travel_graphs.append(graph_fft('fork-fft', row))
+            travel_graphs.append(graph_fft('shock-fft', row))
             row += 1
 
-    lr_graph = graph_leverage(lr_f, calibration['shock']['max_travel'])
-
-    return html.Div(graphs), lr_graph, telemetry_data, None
+    return html.Div(travel_graphs), lr_graph, sw_graph, telemetry_data, None
 
 def do_fft(f, travel):
     wf = np.kaiser(len(travel), 5)
@@ -373,7 +391,27 @@ def angle_to_travel(record, calibration):
     total_distance = 2 * calibration['arm'] * math.cos(angle + calibration['start_angle'])
     return calibration['max_distance'] - total_distance
 
-def parse_data(content, filename, calibration, lr_function):
+def parse_leverage_data(calibration, lr_curve):
+    if lr_curve:
+        _, encoded = lr_curve.split(',')
+        raw_data = base64.b64decode(encoded).decode('utf-8')
+        lr_data = np.array([list(map(float, line.rstrip().split(','))) for line in raw_data.splitlines() if
+            line and not line.startswith('#')])
+
+        wheel_travel = lr_data[:, 0]
+        inverse = [1.0/f for f in lr_data[:, 1]]
+        shock_travel = [0.0]
+        for f in inverse[:-1]:
+            shock_travel.append(shock_travel[-1]+f)
+        p = np.polyfit(shock_travel, wheel_travel, 3)
+        sw_f = np.poly1d(p)
+    else:
+        lr_data = np.array([[float(i), 1.0] for i in range(calibration['shock']['max_travel'])])
+        sw_f = lambda x: x
+
+    return lr_data, sw_f
+
+def parse_data(content, filename, calibration, sw_function):
     _, encoded = content.split(',')
     data = base64.b64decode(encoded)
 
@@ -390,7 +428,7 @@ def parse_data(content, filename, calibration, lr_function):
     unpacked = [(
         r[0],
         angle_to_travel(r[1], calibration['fork']),
-        lr_function(angle_to_travel(r[2], calibration['shock']))) for r in struct.iter_unpack('<LHH', data)]
+        sw_function(angle_to_travel(r[2], calibration['shock']))) for r in struct.iter_unpack('<LHH', data)]
     elapsed_seconds = (unpacked[-1][0] - unpacked[1][0]) / 1000000
     record_count = len(unpacked)
     logger.debug(f"elapsed time: {elapsed_seconds} s")
