@@ -96,10 +96,17 @@ app.layout = html.Div([
             html.Div(
                 children=[
                     html.H5('Leverage (?)'),
-                    html.Div("TODO: leverage ratio explanation...",
-                        className="tooltiptext tooltip-bottom",
-                        style={"height":"240"}),
-                ],
+                    html.Div(children=[
+                                html.P("""You can load leverage ratio data by clicking on the Leverage ratio graph.
+                                       The data file should contain one record per line, each of which is a pair
+                                       of rear wheel travel and leverage ratio values separated by a comma. Lines
+                                       starting with '#' are considered a comment, and thus ignored."""),
+                                html.P("""A shock travel -> rear wheel travel function is computed from this data,
+                                       which is used to display rear wheel travel on telemetry graphs. If no leverate
+                                       ratio data is loaded, the graphs show the measured shock travel."""),
+                            ],
+                            className="tooltiptext tooltip-bottom",
+                            style={"height":"265px", "textAlign": "justify"})],
                 className="tooltipx",
                 style={'grid-row': '1', 'grid-column': '4'}),
             
