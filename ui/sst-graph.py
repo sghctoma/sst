@@ -19,11 +19,11 @@ from scipy.fft import rfft, rfftfreq
 
 TIME_STEP = 0.0002 # 5 kHz
 
-DEFAULT_FORK_ARM           = 110
-DEFAULT_FORK_MAX_DISTANCE  = 210
+DEFAULT_FORK_ARM           = 120
+DEFAULT_FORK_MAX_DISTANCE  = 218
 DEFAULT_FORK_MAX_TRAVEL    = 180
-DEFAULT_SHOCK_ARM          = 77
-DEFAULT_SHOCK_MAX_DISTANCE = 147
+DEFAULT_SHOCK_ARM          = 88
+DEFAULT_SHOCK_MAX_DISTANCE = 138
 DEFAULT_SHOCK_MAX_TRAVEL   = 65
 
 logger = logging.getLogger(__name__)
@@ -37,12 +37,8 @@ app.title = "sufni suspension telemetry"
 
 app.layout = html.Div([
     html.H3('sufni suspension telemetry', style={'font-family': 'monospace'}),
-    dcc.Upload(
-        id='upload-data',
-        children=html.Div([
-            'Drag and Drop or ',
-            html.A('Select Files'),
-        ]),
+    html.Div(
+        id='graph-container',
         style={
             'lineHeight': '60px',
             'borderWidth': '1px',
@@ -50,10 +46,7 @@ app.layout = html.Div([
             'borderRadius': '5px',
             'textAlign': 'center',
             'margin': '10px'
-        },
-        multiple=True
-    ),
-    html.Div(id='graph-container'),
+        }),
     dcc.Loading(
         id='loading-upload',
         type='default',
@@ -184,7 +177,7 @@ app.layout = html.Div([
         ],
         style={
             'display': 'grid',
-            'grid-template-columns': '200px 100px 100px 450px 450px',
+            'grid-template-columns': '200px 100px 100px 1fr 1fr',
             'grid-template-rows': '30px 30px 30px 30px 30px 30px 30px',
             'grid-gap': '5px',
             'borderWidth': '1px',
@@ -193,6 +186,22 @@ app.layout = html.Div([
             'margin': '10px',
             'padding': '5px',
         },
+    ),
+    dcc.Upload(
+        id='upload-data',
+        children=html.Div([
+            'Drag and Drop or ',
+            html.A('Select Files'),
+        ]),
+        style={
+            'lineHeight': '60px',
+            'borderWidth': '1px',
+            'borderStyle': 'dashed',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin': '10px'
+        },
+        multiple=True
     ),
 ])
 
@@ -249,8 +258,30 @@ def graph_travel(row, data, fork_max, shock_max):
     return dcc.Graph(
         id={'type': 'travel', 'index': row},
         config={'displayModeBar': False},
-        style={'width': '70%', 'height': '30vh', 'display': 'inline-block'},
+        style={'width': '100%', 'height': '30vh', 'display': 'inline-block'},
         figure=fig)
+
+def figure_histogram(telemetry_data, dataset, row, limits=None):
+    data = telemetry_data[row][dataset]
+
+    fig = go.Figure()
+    fig.update_xaxes(title_text="Travel histogram")
+    fig.update_yaxes(showticklabels=False, fixedrange=True)
+    fig.update_layout(margin=dict(l=0, r=10, t=50, b=50))
+
+    if data is None:
+        return fig
+
+    if limits:
+        data = data[max(0, limits[0]):min(limits[1],len(data))]
+
+    hist, _ = np.histogram(data, bins=50)
+
+    colorindex = row % len(CHART_COLORS) + (1 if dataset == 'shock_travel' else 0)
+    color = CHART_COLORS[colorindex]
+    fig.add_trace(go.Bar(x=np.arange(100, step=2), y=hist, marker_color=color))
+
+    return fig
 
 def figure_fft(telemetry_data, dataset, row, limits=None):
     data = telemetry_data[row][dataset]
@@ -274,11 +305,11 @@ def figure_fft(telemetry_data, dataset, row, limits=None):
     fig.add_trace(go.Scatter(x=time_f, y=do_fft(time_f, data), marker_color=color))
     return fig
 
-def graph_fft(typ, row):
+def graph_auxiliary(typ, row):
     return dcc.Graph(
         id={'type': typ, 'index': row},
         config={'displayModeBar': False},
-        style={'width': '15%', 'height': '30vh', 'display': 'inline-block'},
+        style={'width': '25%', 'height': '30vh', 'display': 'inline-block'},
         figure=go.Figure())
 
 @app.callback(
@@ -330,10 +361,12 @@ def shock_arm_changed(arm, max):
 @app.callback(
         Output({'type': 'fork-fft', 'index': MATCH}, 'figure'),
         Output({'type': 'shock-fft', 'index': MATCH}, 'figure'),
+        Output({'type': 'fork-histogram', 'index': MATCH}, 'figure'),
+        Output({'type': 'shock-histogram', 'index': MATCH}, 'figure'),
         Input({'type': 'travel', 'index': MATCH}, 'relayoutData'),
         State({'type': 'travel', 'index': MATCH}, 'id'),
         State('telemetry-data', 'data'), prevent_initial_call=True)
-def recalculate_ffts(relayoutData, id, telemetry_data):
+def recalculate_auxiliary(relayoutData, id, telemetry_data):
     if not relayoutData:
         raise PreventUpdate
 
@@ -341,13 +374,17 @@ def recalculate_ffts(relayoutData, id, telemetry_data):
     if 'autosize' in relayoutData or 'xaxis.autorange' in relayoutData:
         return [
             figure_fft(telemetry_data, 'fork_travel', row),
-            figure_fft(telemetry_data, 'shock_travel', row)]
+            figure_fft(telemetry_data, 'shock_travel', row),
+            figure_histogram(telemetry_data, 'fork_travel', row),
+            figure_histogram(telemetry_data, 'shock_travel', row)]
     else:
         start = int(relayoutData['xaxis.range[0]'] / TIME_STEP)
         stop  = int(relayoutData['xaxis.range[1]'] / TIME_STEP)
         return [
             figure_fft(telemetry_data, 'fork_travel', row, (start, stop)),
-            figure_fft(telemetry_data, 'shock_travel', row, (start, stop))]
+            figure_fft(telemetry_data, 'shock_travel', row, (start, stop)),
+            figure_histogram(telemetry_data, 'fork_travel', row, (start, stop)),
+            figure_histogram(telemetry_data, 'shock_travel', row, (start, stop))]
 
 @app.callback(
         Output('graph-container', 'children'),
@@ -375,8 +412,10 @@ def create_graphs(calibration, lr_curve, content_list, filename_list):
         for c,f in zip(content_list, filename_list):
             telemetry_data.append(parse_data(c, f, calibration, sw_f))
             travel_graphs.append(graph_travel(row, telemetry_data[row], fork_max_travel, shock_max_travel))
-            travel_graphs.append(graph_fft('fork-fft', row))
-            travel_graphs.append(graph_fft('shock-fft', row))
+            travel_graphs.append(graph_auxiliary('fork-fft', row))
+            travel_graphs.append(graph_auxiliary('shock-fft', row))
+            travel_graphs.append(graph_auxiliary('fork-histogram', row))
+            travel_graphs.append(graph_auxiliary('shock-histogram', row))
             row += 1
 
     return html.Div(travel_graphs), lr_graph, sw_graph, telemetry_data, None
