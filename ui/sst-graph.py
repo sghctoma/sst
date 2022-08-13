@@ -246,12 +246,12 @@ def graph_travel(row, data, fork_max, shock_max):
             name=f"shock-{data['name']}",
             line_color=CHART_COLORS[row%len(CHART_COLORS)+1]), secondary_y=True)
     fig.update_xaxes(title_text="Elapsed time (s)")
-    fig.update_yaxes(title_text="Fork travel (mm)", secondary_y=False,
+    fig.update_yaxes(title_text="Front travel (mm)", secondary_y=False,
             fixedrange=True, range=[fork_max, 0], tick0=fork_max, dtick=fork_max/10)
-    fig.update_yaxes(title_text="Shock travel (mm)", secondary_y=True,
+    fig.update_yaxes(title_text="Rear travel (mm)", secondary_y=True,
             fixedrange=True, range=[shock_max, 0], tick0=shock_max, dtick=shock_max/10)
     fig.update_layout(
-        title=data['name'],
+        title="Travel",
         margin=dict(l=100, r=10, t=50, b=50, autoexpand=True),
         legend=dict(yanchor='bottom', y=1.0, xanchor='right', x=1.0, orientation='h'))
 
@@ -261,25 +261,53 @@ def graph_travel(row, data, fork_max, shock_max):
         style={'width': '100%', 'height': '30vh', 'display': 'inline-block'},
         figure=fig)
 
-def figure_histogram(telemetry_data, dataset, row, limits=None):
-    data = telemetry_data[row][dataset]
+'''
+def graph_velocity(row, data):
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    if data['fork_travel'] is not None:
+        fig.add_trace(go.Scatter(x=data['time'], y=np.gradient(data['fork_travel'], TIME_STEP),
+            name=f"fork-velocity-{data['name']}",
+            line_color=CHART_COLORS[row%len(CHART_COLORS)]), secondary_y=False)
+    if data['shock_travel'] is not None:
+        fig.add_trace(go.Scatter(x=data['time'], y=np.gradient(data['shock_travel'], TIME_STEP),
+            name=f"shock-velocity-{data['name']}",
+            line_color=CHART_COLORS[row%len(CHART_COLORS)+1]), secondary_y=True)
 
+    fig.update_xaxes(title_text="Elapsed time (s)")
+    fig.update_yaxes(title_text="Front velocity (mm/s)", secondary_y=False, fixedrange=True)
+    fig.update_yaxes(title_text="Rear velocity (mm/s)", secondary_y=True, fixedrange=True)
+    fig.update_layout(
+        title="Velocity",
+        margin=dict(l=100, r=10, t=50, b=50, autoexpand=True),
+        legend=dict(yanchor='bottom', y=1.0, xanchor='right', x=1.0, orientation='h'))
+
+    return dcc.Graph(
+        id={'type': 'velocity', 'index': row},
+        config={'displayModeBar': False},
+        style={'width': '50%', 'height': '30vh', 'display': 'inline-block'},
+        figure=fig)
+'''
+
+def figure_histogram(telemetry_data, dataset, row, limits=None):
     fig = go.Figure()
     fig.update_xaxes(title_text="Travel histogram")
     fig.update_yaxes(showticklabels=False, fixedrange=True)
     fig.update_layout(margin=dict(l=0, r=10, t=50, b=50))
 
+    data = telemetry_data[row][dataset]
     if data is None:
         return fig
-
     if limits:
         data = data[max(0, limits[0]):min(limits[1],len(data))]
+    data = np.gradient(data, TIME_STEP)
+    print(data)
 
-    hist, _ = np.histogram(data, bins=50)
+    r = data.max() - data.min()
+    hist, bins = np.histogram(data, bins=math.ceil(r/20.0))
 
     colorindex = row % len(CHART_COLORS) + (1 if dataset == 'shock_travel' else 0)
     color = CHART_COLORS[colorindex]
-    fig.add_trace(go.Bar(x=np.arange(100, step=2), y=hist, marker_color=color))
+    fig.add_trace(go.Bar(x=bins, y=hist, marker_color=color))
 
     return fig
 
@@ -412,6 +440,7 @@ def create_graphs(calibration, lr_curve, content_list, filename_list):
         for c,f in zip(content_list, filename_list):
             telemetry_data.append(parse_data(c, f, calibration, sw_f))
             travel_graphs.append(graph_travel(row, telemetry_data[row], fork_max_travel, shock_max_travel))
+            #travel_graphs.append(graph_velocity(row, telemetry_data[row]))
             travel_graphs.append(graph_auxiliary('fork-fft', row))
             travel_graphs.append(graph_auxiliary('shock-fft', row))
             travel_graphs.append(graph_auxiliary('fork-histogram', row))
