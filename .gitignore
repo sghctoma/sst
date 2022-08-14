@@ -62,3 +62,9 @@ sourcematerial/
 ui/convert.py
 ui/fft5.py
 ui/fft6.py
+
+# compiled executable for gosst
+gosst/gosst
+
+# processed SST files 
+*.PSST
