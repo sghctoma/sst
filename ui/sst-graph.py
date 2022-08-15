@@ -153,7 +153,7 @@ def graph_auxiliary(typ, width, row):
 
 def figure_velocityhistogram(telemetry_data, dataset, row, limits=None):
     fig = go.Figure()
-    fig.update_xaxes(title_text="Velocity histogram", fixedrange=True)
+    fig.update_xaxes(title_text="Velocity histogram (%)", fixedrange=True)
     fig.update_yaxes(range=[-2000, 2000])
     fig.update_layout(margin=dict(l=0, r=10, t=50, b=50))
 
@@ -194,7 +194,8 @@ def figure_velocityhistogram(telemetry_data, dataset, row, limits=None):
     step = 100 # mm/s
     mn = int(((velocity.min() // step) - 1) * step)
     mx = int(((velocity.max() // step) + 1) * step)
-    hist, bins = np.histogram(velocity, bins=list(range(mn, mx, step)), density=True)
+    hist, bins = np.histogram(velocity, bins=list(range(mn, mx, step)))
+    hist = hist / len(velocity) * 100
 
     colorindex = row % len(CHART_COLORS) + (1 if dataset == 'RearTravel' else 0)
     color = CHART_COLORS[colorindex]
@@ -204,7 +205,7 @@ def figure_velocityhistogram(telemetry_data, dataset, row, limits=None):
 
 def figure_travelhistogram(telemetry_data, dataset, row, limits=None):
     fig = go.Figure()
-    fig.update_xaxes(title_text="Travel histogram", fixedrange=True)
+    fig.update_xaxes(title_text="Travel histogram (%)", fixedrange=True)
     fig.update_layout(margin=dict(l=0, r=10, t=50, b=50))
 
     data = np.array(telemetry_data[row][dataset])
@@ -219,8 +220,9 @@ def figure_travelhistogram(telemetry_data, dataset, row, limits=None):
     else:
         mx = telemetry_data[row]['ForkCalibration']['MaxTravel']
 
-    hist, bins = np.histogram(data, bins=np.arange(0, mx+mx/20, mx/20), density=True)
-    fig.update_yaxes(range=[mx+mx/20, -mx/20])
+    hist, bins = np.histogram(data, bins=np.arange(0, mx+mx/20, mx/20))
+    hist = hist / len(data) * 100
+    fig.update_yaxes(range=[mx+mx/20, -mx/20], fixedrange=True)
 
     bottomouts = np.count_nonzero(data[mx - data < 3])
     average = np.average(data)
