@@ -78,10 +78,10 @@ def hist_velocity(travel, max_travel):
         xs.append(f'x{i}')
         data_dict[f'x{i}'] = data[i]
 
-    return xs, travel_bins, ColumnDataSource(data=data_dict)
+    return xs, travel_bins, ColumnDataSource(data=data_dict), velocity
 
 def velocity_histogram_figure(travel, max_travel, title):
-    xs, tbins, source = hist_velocity(travel, max_travel)
+    xs, tbins, source, velocity = hist_velocity(travel, max_travel)
     p = figure(
         title=title,
         height=500,
@@ -104,14 +104,39 @@ def velocity_histogram_figure(travel, max_travel, title):
         ticker=FixedTicker(ticks=tbins))
     p.add_layout(color_bar, 'right')
 
-    lowspeed_box = BoxAnnotation(top=450, bottom=-450, left=0, fill_color='#FFFFFF', fill_alpha=0.1)
+    high_speed_threshold = 400
+    lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
+        left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
 
-    rebound = Label(x=70, y=70, x_units='screen', y_units='screen',
-                 text='Collected by Luke C.\n2016-04-01', text_color="lightgray", render_mode='css',
-                 border_line_color='gray', border_line_alpha=1.0,
-                 background_fill_color='black', background_fill_alpha=0.8)
-    p.add_layout(rebound)
+    count = len(velocity)
+    avgr = np.average(velocity[velocity < 0])
+    hsr = np.count_nonzero(velocity < -high_speed_threshold)
+    lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0))
+    avgc = np.average(velocity[velocity > 0])
+    lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold))
+    hsc = np.count_nonzero(velocity > high_speed_threshold)
+
+    rebound_text = (
+        f"Avg.: {avgr:8.2f} mm/s\n"
+        f"HSR: {hsr/count*100:14.2f} %\n"
+        f"LSR: {lsr/count*100:14.2f} %"
+    )
+    compression_text  = (
+        f"Avg.: {avgc:8.2f} mm/s\n"
+        f"HSC: {hsc/count*100:14.2f} %\n"
+        f"LSC: {lsc/count*100:15.2f} %"
+    )
+    annotation_rebound = Label(x=35, x_offset=-130, y=350, x_units='data', y_units='screen',
+                 text=rebound_text, text_color="lightgray", render_mode='css',
+                 border_line_color='gray', border_line_alpha=0.5,
+                 background_fill_color='black', background_fill_alpha=0.5)
+    p.add_layout(annotation_rebound)
+    annotation_compression = Label(x=35, x_offset=-130, y=10, x_units='data', y_units='screen',
+                 text=compression_text, text_color="lightgray", render_mode='css',
+                 border_line_color='gray', border_line_alpha=0.5,
+                 background_fill_color='black', background_fill_alpha=0.5)
+    p.add_layout(annotation_compression)
     return p
 
 def travel_histogram_figure(travel, max_travel, color, title):
