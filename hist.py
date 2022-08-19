@@ -1,22 +1,40 @@
 #!/usr/bin/env python
 
-from bokeh.models.annotations import BoxAnnotation, ColorBar, Label
-from bokeh.models.axes import LinearAxis
-from bokeh.models.mappers import LinearColorMapper
-from bokeh.models.ranges import Range1d
-from bokeh.models.tickers import FixedTicker
 import msgpack
-import numpy as np
 
-from scipy.signal import savgol_filter
+import numpy as np
 
 from bokeh.io import curdoc
 from bokeh.io import output_file, save
 from bokeh.layouts import column, layout
 from bokeh.models import ColumnDataSource
+from bokeh.models.annotations import BoxAnnotation, ColorBar, Label
+from bokeh.models.axes import LinearAxis
+from bokeh.models.mappers import LinearColorMapper
+from bokeh.models.ranges import Range1d
+from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Spectral9
 from bokeh.plotting import figure
 
+from scipy.fft import rfft, rfftfreq
+from scipy.signal import savgol_filter
+
+
+def do_fft(travel):
+    wf = np.kaiser(len(travel), 5)
+
+    balanced_travel = travel - np.mean(travel)
+    balanced_travel_f = rfft(balanced_travel * wf)
+    balanced_spectrum = np.abs(balanced_travel_f)
+
+    freqs= rfftfreq(len(travel), 0.0002)
+    freqs = freqs[freqs <= 10] # cut off FFT graph at 10 Hz
+
+    # TODO put a label that shows the most prominent frequencies
+    #max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
+    #print(f[max_freq_idx])
+
+    return freqs, balanced_spectrum[:len(freqs)]
 
 def group(array):
     idx_sort = np.argsort(array)
@@ -123,8 +141,17 @@ def travel_figure(telemetry, front_color, rear_color):
         y_axis_label='Travel (mm)',
         y_range=(telemetry['ForkCalibration']['MaxTravel'], 0),
         output_backend='webgl')
-    p_travel.extra_y_ranges = {'rear': Range1d(start=telemetry['MaxWheelTravel'], end=0)}
+
+    front_max = telemetry['ForkCalibration']['MaxTravel']
+    rear_max = telemetry['MaxWheelTravel']
+    p_travel.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
+    extra_y_axis = LinearAxis(y_range_name='rear')
+    extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
+    p_travel.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p_travel.add_layout(LinearAxis(y_range_name='rear'), 'right')
+    p_travel.x_range.start = 0
+    p_travel.x_range.end = telemetry['Time'][-1]
+
     p_travel.line(
         np.around(telemetry['Time'], 4)[::100],
         np.around(telemetry['FrontTravel'], 4)[::100],
@@ -139,6 +166,24 @@ def travel_figure(telemetry, front_color, rear_color):
         line_width=2,
         color=rear_color)
     return p_travel
+
+def fft_figure(travel, color, title):
+    f, s = do_fft(travel)
+    p_fft = figure(
+        title=title,
+        height=300,
+        sizing_mode='stretch_width',
+        toolbar_location='above',
+        tools='xpan,xwheel_zoom,xzoom_in,xzoom_out,reset',
+        active_drag='xpan',
+        active_scroll='xwheel_zoom',
+        x_axis_label="Fequency (Hz)",
+        output_backend='webgl')
+    p_fft.yaxis.visible = False
+    p_fft.x_range.start = -0.1
+    p_fft.x_range.end = 10.1
+    p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
+    return p_fft
 
 # ------
 
@@ -164,11 +209,14 @@ p_front_vel_hist = velocity_histogram_figure(front_travel, front_max, "Front vel
 p_rear_vel_hist = velocity_histogram_figure(rear_travel, rear_max, "Rear velocity histogram")
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Front travel histogram")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Rear travel histogram")
+p_front_fft = fft_figure(front_travel, front_color, "Frequencies in front travel")
+p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies in rear travel")
 
 l = layout(
     children=[
         [p_travel],
         [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_rear_vel_hist],
+        [p_front_fft, p_rear_fft],
     ],
     sizing_mode='stretch_width')
 save(l)
