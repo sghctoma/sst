@@ -43,6 +43,11 @@ def group(array):
     res = np.split(idx_sort, idx_start[1:])
     return res
 
+def bottomouts(travel, max_travel):
+    x = np.r_[False, (max_travel-travel<3), False]
+    bo_start = np.r_[False, ~x[:-1] & x[1:]]
+    return bo_start.nonzero()[0]
+
 def hist_velocity(travel, max_travel):
     velocity = np.gradient(travel, 0.0002)
     
@@ -126,6 +131,21 @@ def travel_histogram_figure(travel, max_travel, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=5, left=0, right=hist, color=color)
+
+    mx = np.max(travel)
+    avg = np.average(travel)
+    bo = bottomouts(travel, max_travel)
+    annotation_text = (
+        f"Max. Travel: {mx:9.2f} mm ({mx/max_travel*100:5.1f} %)\n"
+        f"Avg. Travel: {avg:11.2f} mm ({avg/max_travel*100:5.1f} %)\n"
+        f"Bottom Outs: {len(bo):34}"
+    )
+    #TODO: x placement is kind of wacky, but can't see any proper solution right now... Maybe someday.
+    annotation = Label(x=np.max(hist), x_offset=-250, y=10, x_units='data', y_units='screen',
+                 text=annotation_text, text_color="lightgray", render_mode='css',
+                 border_line_color='gray', border_line_alpha=0.5,
+                 background_fill_color='black', background_fill_alpha=0.5)
+    p.add_layout(annotation)
     return p
 
 def travel_figure(telemetry, front_color, rear_color):
@@ -165,6 +185,8 @@ def travel_figure(telemetry, front_color, rear_color):
         legend_label="Rear travel",
         line_width=2,
         color=rear_color)
+    p_travel.legend.location = 'bottom_right'
+    p_travel.legend.click_policy = 'hide'
     return p_travel
 
 def fft_figure(travel, color, title):
@@ -187,7 +209,7 @@ def fft_figure(travel, color, title):
 
 # ------
 
-telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00097.PSST', 'rb').read())
+telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00100.PSST', 'rb').read())
 rear_travel = savgol_filter(telemetry['RearTravel'], 51, 3)
 rear_travel[rear_travel<0] = 0
 front_travel = savgol_filter(telemetry['FrontTravel'], 51, 3)
