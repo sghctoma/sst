@@ -130,12 +130,12 @@ def velocity_histogram_figure(travel, max_travel, title):
     annotation_rebound = Label(x=35, x_offset=-130, y=350, x_units='data', y_units='screen',
                  text=rebound_text, text_color="lightgray", render_mode='css',
                  border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.5)
+                 background_fill_color='black', background_fill_alpha=0.3)
     p.add_layout(annotation_rebound)
     annotation_compression = Label(x=35, x_offset=-130, y=10, x_units='data', y_units='screen',
                  text=compression_text, text_color="lightgray", render_mode='css',
                  border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.5)
+                 background_fill_color='black', background_fill_alpha=0.3)
     p.add_layout(annotation_compression)
     return p
 
@@ -169,7 +169,7 @@ def travel_histogram_figure(travel, max_travel, color, title):
     annotation = Label(x=np.max(hist), x_offset=-250, y=10, x_units='data', y_units='screen',
                  text=annotation_text, text_color="lightgray", render_mode='css',
                  border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.5)
+                 background_fill_color='black', background_fill_alpha=0.3)
     p.add_layout(annotation)
     return p
 
@@ -182,8 +182,8 @@ def travel_figure(telemetry, front_color, rear_color):
         tools='xpan,xwheel_zoom,xzoom_in,xzoom_out,reset',
         active_drag='xpan',
         active_scroll='xwheel_zoom',
-        x_axis_label='Elapsed time (s)',
-        y_axis_label='Travel (mm)',
+        x_axis_label="Elapsed time (s)",
+        y_axis_label="Travel (mm)",
         y_range=(telemetry['ForkCalibration']['MaxTravel'], 0),
         output_backend='webgl')
 
@@ -214,6 +214,49 @@ def travel_figure(telemetry, front_color, rear_color):
     p_travel.legend.click_policy = 'hide'
     return p_travel
 
+def shock_wheel_figure(coeffs, max_travel, color):
+    f = np.poly1d(np.flip(coeffs))
+    p = figure(
+        title="Shock - Wheel Travel",
+        height=400,
+        width=300,
+        sizing_mode='fixed',
+        toolbar_location=None,
+        active_drag=None,
+        active_scroll=None,
+        tools='hover',
+        active_inspect='hover',
+        tooltips=[("shock travel", "$x"), ("wheel travel", "$y")],
+        x_axis_label="Shock Travel (mm)",
+        y_axis_label="Wheel Travel (mm)",
+        output_backend='webgl')
+
+    x = np.arange(0, max_travel, 1)
+    y = [f(t) for t in x]
+    p.line(x, y, line_width=2, color=color)
+    return p
+
+def leverage_ratio_figure(wtlr, color):
+    p = figure(
+        title="Leverage Ratio",
+        height=400,
+        width=300,
+        sizing_mode='fixed',
+        toolbar_location=None,
+        active_drag=None,
+        active_scroll=None,
+        tools='hover',
+        active_inspect='hover',
+        tooltips=[("wheel travel", "$x"), ("leverage ratio", "$y")],
+        x_axis_label="Rear Wheel Travel (mm)",
+        y_axis_label="Leverage Ratio",
+        output_backend='webgl')
+
+    x = wtlr[:,0]
+    y = wtlr[:,1]
+    p.line(x, y, line_width=2, color=color)
+    return p
+
 def fft_figure(travel, color, title):
     f, s = do_fft(travel)
     p_fft = figure(
@@ -234,7 +277,7 @@ def fft_figure(travel, color, title):
 
 # ------
 
-telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00100.PSST', 'rb').read())
+telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00097.PSST', 'rb').read())
 rear_travel = savgol_filter(telemetry['RearTravel'], 51, 3)
 rear_travel[rear_travel<0] = 0
 front_travel = savgol_filter(telemetry['FrontTravel'], 51, 3)
@@ -252,16 +295,20 @@ front_color = Spectral9[0]
 rear_color = Spectral9[1]
 
 p_travel = travel_figure(telemetry, front_color, rear_color)
+p_lr = leverage_ratio_figure(np.array(telemetry['WheelLeverageRatio']), Spectral9[4])
+p_sw = shock_wheel_figure(telemetry['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxTravel'], Spectral9[4])
+
 p_front_vel_hist = velocity_histogram_figure(front_travel, front_max, "Front velocity histogram")
 p_rear_vel_hist = velocity_histogram_figure(rear_travel, rear_max, "Rear velocity histogram")
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Front travel histogram")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Rear travel histogram")
+
 p_front_fft = fft_figure(front_travel, front_color, "Frequencies in front travel")
 p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies in rear travel")
 
 l = layout(
     children=[
-        [p_travel],
+        [p_travel, p_lr, p_sw],
         [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_rear_vel_hist],
         [p_front_fft, p_rear_fft],
     ],
