@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from bokeh.document.locking import without_document_lock
-from bokeh.models.widgets.markups import Div
 import msgpack
 
 import numpy as np
@@ -10,13 +8,14 @@ from bokeh.io import curdoc
 from bokeh.io import output_file, save
 from bokeh.layouts import column, layout
 from bokeh.models import ColumnDataSource
-from bokeh.models.annotations import BoxAnnotation, ColorBar, Label
+from bokeh.models.annotations import BoxAnnotation, ColorBar
 from bokeh.models.axes import LinearAxis
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Spectral9
 from bokeh.plotting import figure
+from bokeh.transform import dodge
 
 from scipy.fft import rfft, rfftfreq
 from scipy.signal import savgol_filter
@@ -108,39 +107,9 @@ def velocity_histogram_figure(velocity, travel, max_travel, title):
         ticker=FixedTicker(ticks=tbins))
     p.add_layout(color_bar, 'right')
 
-    high_speed_threshold = 400
-    lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
+    lowspeed_box = BoxAnnotation(top=400, bottom=-400,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-
-    count = len(velocity)
-    avgr = np.average(velocity[velocity < 0])
-    hsr = np.count_nonzero(velocity < -high_speed_threshold)
-    lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0))
-    avgc = np.average(velocity[velocity > 0])
-    lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold))
-    hsc = np.count_nonzero(velocity > high_speed_threshold)
-
-    rebound_text = (
-        f"Avg.: {avgr:8.2f} mm/s\n"
-        f"HSR: {hsr/count*100:14.2f} %\n"
-        f"LSR: {lsr/count*100:14.2f} %"
-    )
-    compression_text  = (
-        f"Avg.: {avgc:8.2f} mm/s\n"
-        f"HSC: {hsc/count*100:14.2f} %\n"
-        f"LSC: {lsc/count*100:15.2f} %"
-    )
-    annotation_rebound = Label(x=35, x_offset=-130, y=350, x_units='data', y_units='screen',
-                 text=rebound_text, text_color="lightgray", render_mode='css',
-                 border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.3)
-    p.add_layout(annotation_rebound)
-    annotation_compression = Label(x=35, x_offset=-130, y=10, x_units='data', y_units='screen',
-                 text=compression_text, text_color="lightgray", render_mode='css',
-                 border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.3)
-    p.add_layout(annotation_compression)
     return p
 
 def travel_histogram_figure(travel, max_travel, color, title):
@@ -160,21 +129,6 @@ def travel_histogram_figure(travel, max_travel, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=max_travel/20, left=0, right=hist, color=color, line_color='black')
-
-    mx = np.max(travel)
-    avg = np.average(travel)
-    bo = bottomouts(travel, max_travel)
-    annotation_text = (
-        f"Max. Travel: {mx:9.2f} mm ({mx/max_travel*100:5.1f} %)\n"
-        f"Avg. Travel: {avg:11.2f} mm ({avg/max_travel*100:5.1f} %)\n"
-        f"Bottom Outs: {len(bo):34}"
-    )
-    #TODO: x placement is kind of wacky, but can't see any proper solution right now... Maybe someday.
-    annotation = Label(x=np.max(hist), x_offset=-250, y=10, x_units='data', y_units='screen',
-                 text=annotation_text, text_color="lightgray", render_mode='css',
-                 border_line_color='gray', border_line_alpha=0.5,
-                 background_fill_color='black', background_fill_alpha=0.3)
-    p.add_layout(annotation)
     return p
 
 def travel_figure(telemetry, front_color, rear_color):
@@ -279,12 +233,70 @@ def fft_figure(travel, color, title):
     p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
     return p_fft
 
-def statistics_widget():
-    text = '''
-        xxx
-        '''
-    div = Div(text=text, width=400, height=300, sizing_mode='fixed')
-    return div
+def statistics_figure(f_travel, r_travel, f_max_travel, r_max_travel, f_velocity, r_velocity):
+    high_speed_threshold = 400
+
+    f_count = len(f_velocity)
+    f_avgr = np.average(f_velocity[f_velocity < 0])
+    f_maxr = np.min(f_velocity[f_velocity < 0])
+    f_hsr = np.count_nonzero(f_velocity < -high_speed_threshold) / f_count * 100
+    f_lsr = np.count_nonzero((f_velocity > -high_speed_threshold) & (f_velocity < 0)) / f_count * 100
+    f_avgc = np.average(f_velocity[f_velocity > 0])
+    f_maxc = np.max(f_velocity[f_velocity > 0])
+    f_lsc = np.count_nonzero((f_velocity > 0) & (f_velocity < high_speed_threshold)) / f_count * 100
+    f_hsc = np.count_nonzero(f_velocity > high_speed_threshold) / f_count * 100
+
+    r_count = len(r_velocity)
+    r_avgr = np.average(r_velocity[r_velocity < 0])
+    r_maxr = np.min(r_velocity[r_velocity < 0])
+    r_hsr = np.count_nonzero(r_velocity < -high_speed_threshold) / r_count * 100
+    r_lsr = np.count_nonzero((r_velocity > -high_speed_threshold) & (r_velocity < 0)) / r_count * 100
+    r_avgc = np.average(r_velocity[r_velocity > 0])
+    r_maxc = np.max(r_velocity[r_velocity > 0])
+    r_lsc = np.count_nonzero((r_velocity > 0) & (r_velocity < high_speed_threshold)) / r_count * 100
+    r_hsc = np.count_nonzero(r_velocity > high_speed_threshold) / r_count * 100
+
+    f_max = np.max(f_travel)
+    r_max = np.max(r_travel)
+    f_avg = np.average(f_travel)
+    r_avg = np.average(r_travel)
+    f_bo = bottomouts(f_travel, f_max_travel)
+    r_bo = bottomouts(r_travel, r_max_travel)
+
+    data = dict(
+        value = [
+            "Max. Travel", f"{f_max:.2f} mm ({f_max/f_max_travel*100:.1f} %)", f"{r_max:.2f} mm ({r_max/r_max_travel*100:.1f} %)",
+            "Avg. Travel", f"{f_avg:.2f} mm ({f_avg/f_max_travel*100:.1f} %)", f"{r_avg:.2f} mm ({r_avg/r_max_travel*100:.1f} %) ",
+            "Bottom Outs", f"{len(f_bo)}", f"{len(r_bo)}",
+            "Avg. Rebound Vel.", f"{f_avgr:.2f} mm/s", f"{r_avgr:.2f} mm/s",
+            "Max. Rebound Vel.", f"{f_maxr:.2f} mm/s", f"{r_maxr:.2f} mm/s",
+            "HSR (% of R time)", f"{f_hsr:.2f} %", f"{r_hsr:.2f} %",
+            "LSR (% of R time)", f"{f_lsr:.2f} %", f"{r_lsr:.2f} %",
+            "Avg. Comp. Vel.", f"{f_avgc:.2f} mm/s", f"{r_avgc:.2f} mm/s",
+            "Max. Comp. Vel.", f"{f_maxc:.2f} mm/s", f"{r_maxc:.2f} mm/s",
+            "HSC (% of C time)", f"{f_hsc:.2f} %", f"{r_hsc:.2f} %",
+            "LSC (% of C time)", f"{f_lsc:.2f} %", f"{r_lsc:.2f} %"],
+        group = ["Statistic", "Front", "Rear"] * 11,
+        statistic = [str(i//3) for i in range(33)])
+    source = ColumnDataSource(data=data)
+
+    p = figure(
+        title="Statistics",
+        width=500,
+        height=400,
+        x_range=["Statistic", "Front", "Rear"],
+        y_range=["9", "10", "6", "5", "8", "4", "7", "3", "2", "1", "0"],
+        sizing_mode='fixed',
+        toolbar_location=None)
+
+    x = dodge("group", -0.4, range=p.x_range)
+    p.text(x=x, y='statistic', text='value', source=source,
+            text_align='left', text_baseline='middle', text_color='white')
+
+    p.grid.grid_line_color = None
+    p.axis.major_label_standoff = 10
+    p.yaxis.visible = False
+    return p
 
 # ------
 
@@ -322,14 +334,13 @@ p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, 
 p_front_fft = fft_figure(front_travel, front_color, "Frequencies in front travel")
 p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies in rear travel")
 
-w_statistics = statistics_widget()
-curdoc().theme.apply_to_model(w_statistics)
+p_statistics = statistics_figure(front_travel, rear_travel, front_max, rear_max, front_velocity, rear_velocity)
 
 l = layout(
     children=[
-        [p_travel, p_lr, p_sw],
+        [p_travel, p_statistics, p_lr, p_sw],
         [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_rear_vel_hist],
-        [p_front_fft, p_rear_fft, w_statistics],
+        [p_front_fft, p_rear_fft],
     ],
     sizing_mode='stretch_width')
 save(l)
