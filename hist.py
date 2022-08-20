@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from bokeh.document.locking import without_document_lock
+from bokeh.models.widgets.markups import Div
 import msgpack
 
 import numpy as np
@@ -61,12 +63,16 @@ def hist_velocity(velocity, travel, max_travel):
         mx = max_travel
     else:
         mx = (max_travel // 10 + 1) * 10
+
+    cutoff = []
     travel_bins = np.linspace(0, mx, 10)
     for g in idx_groups:
         t = travel[g]
         th, _ = np.histogram(t, bins=travel_bins)
         th = th / len(velocity) * 100
         data.append(th)
+        if len(t)/len(travel) > 0.001:
+            cutoff.append(bins[len(data)])
 
     data = np.transpose(np.array(data))
 
@@ -76,13 +82,14 @@ def hist_velocity(velocity, travel, max_travel):
         xs.append(f'x{i}')
         data_dict[f'x{i}'] = data[i]
 
-    return xs, travel_bins, ColumnDataSource(data=data_dict)
+    return xs, travel_bins, ColumnDataSource(data=data_dict), cutoff[0], cutoff[-1]
 
 def velocity_histogram_figure(velocity, travel, max_travel, title):
-    xs, tbins, source = hist_velocity(velocity, travel, max_travel)
+    xs, tbins, source, lo, hi = hist_velocity(velocity, travel, max_travel)
     p = figure(
         title=title,
         height=500,
+        y_range=[hi, lo],
         x_axis_label="Time (%)",
         y_axis_label='Velocity (mm/s)',
         toolbar_location='above',
@@ -91,8 +98,7 @@ def velocity_histogram_figure(velocity, travel, max_travel, title):
         active_scroll='ywheel_zoom',
         output_backend='webgl')
     p.x_range.start = 0
-    p.y_range.flipped = True
-    p.hbar_stack(xs, y='y', height=80, color=Spectral9, source=source)
+    p.hbar_stack(xs, y='y', height=100, color=Spectral9, line_color='black', source=source)
 
     mapper = LinearColorMapper(palette=Spectral9[::-1], low=tbins[-1], high=0)
     color_bar = ColorBar(
@@ -153,7 +159,7 @@ def travel_histogram_figure(travel, max_travel, color, title):
         output_backend='webgl')
     p.x_range.start = 0
     p.y_range.flipped = True
-    p.hbar(y=bins[:-1], height=5, left=0, right=hist, color=color)
+    p.hbar(y=bins[:-1], height=max_travel/20, left=0, right=hist, color=color, line_color='black')
 
     mx = np.max(travel)
     avg = np.average(travel)
@@ -273,6 +279,13 @@ def fft_figure(travel, color, title):
     p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
     return p_fft
 
+def statistics_widget():
+    text = '''
+        xxx
+        '''
+    div = Div(text=text, width=400, height=300, sizing_mode='fixed')
+    return div
+
 # ------
 
 telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00097.PSST', 'rb').read())
@@ -309,11 +322,14 @@ p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, 
 p_front_fft = fft_figure(front_travel, front_color, "Frequencies in front travel")
 p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies in rear travel")
 
+w_statistics = statistics_widget()
+curdoc().theme.apply_to_model(w_statistics)
+
 l = layout(
     children=[
         [p_travel, p_lr, p_sw],
         [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_rear_vel_hist],
-        [p_front_fft, p_rear_fft],
+        [p_front_fft, p_rear_fft, w_statistics],
     ],
     sizing_mode='stretch_width')
 save(l)
