@@ -48,9 +48,7 @@ def bottomouts(travel, max_travel):
     bo_start = np.r_[False, ~x[:-1] & x[1:]]
     return bo_start.nonzero()[0]
 
-def hist_velocity(travel, max_travel):
-    velocity = np.gradient(travel, 0.0002)
-    
+def hist_velocity(velocity, travel, max_travel):
     step = 100
     mn = int(((velocity.min() // step) - 1) * step)
     mx = int(((velocity.max() // step) + 1) * step)
@@ -78,10 +76,10 @@ def hist_velocity(travel, max_travel):
         xs.append(f'x{i}')
         data_dict[f'x{i}'] = data[i]
 
-    return xs, travel_bins, ColumnDataSource(data=data_dict), velocity
+    return xs, travel_bins, ColumnDataSource(data=data_dict)
 
-def velocity_histogram_figure(travel, max_travel, title):
-    xs, tbins, source, velocity = hist_velocity(travel, max_travel)
+def velocity_histogram_figure(velocity, travel, max_travel, title):
+    xs, tbins, source = hist_velocity(velocity, travel, max_travel)
     p = figure(
         title=title,
         height=500,
@@ -278,12 +276,17 @@ def fft_figure(travel, color, title):
 # ------
 
 telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00097.PSST', 'rb').read())
-rear_travel = savgol_filter(telemetry['RearTravel'], 51, 3)
-rear_travel[rear_travel<0] = 0
-front_travel = savgol_filter(telemetry['FrontTravel'], 51, 3)
-front_travel[front_travel<0] = 0
 
+front_travel = np.array(telemetry['FrontTravel'])
+front_travel[front_travel<0] = 0
+front_travel_smooth = savgol_filter(front_travel, 51, 3)
+front_velocity = np.gradient(front_travel_smooth, 0.0002)
 front_max = telemetry['ForkCalibration']['MaxTravel']
+
+rear_travel = np.array(telemetry['RearTravel'])
+rear_travel[rear_travel<0] = 0
+rear_travel_smooth = savgol_filter(rear_travel, 51, 3)
+rear_velocity = np.gradient(rear_travel_smooth, 0.0002)
 rear_max = telemetry['MaxWheelTravel']
 
 # ------
@@ -298,8 +301,8 @@ p_travel = travel_figure(telemetry, front_color, rear_color)
 p_lr = leverage_ratio_figure(np.array(telemetry['WheelLeverageRatio']), Spectral9[4])
 p_sw = shock_wheel_figure(telemetry['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxTravel'], Spectral9[4])
 
-p_front_vel_hist = velocity_histogram_figure(front_travel, front_max, "Front velocity histogram")
-p_rear_vel_hist = velocity_histogram_figure(rear_travel, rear_max, "Rear velocity histogram")
+p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, "Front velocity histogram")
+p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, "Rear velocity histogram")
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Front travel histogram")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Rear travel histogram")
 
