@@ -8,12 +8,12 @@ from bokeh.io import curdoc
 from bokeh.io import output_file, save
 from bokeh.layouts import column, layout
 from bokeh.models import ColumnDataSource
-from bokeh.models.annotations import BoxAnnotation, ColorBar
+from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
 from bokeh.models.axes import LinearAxis
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
-from bokeh.palettes import Spectral9
+from bokeh.palettes import Spectral9, GnBu4
 from bokeh.plotting import figure
 from bokeh.transform import dodge
 
@@ -83,7 +83,7 @@ def hist_velocity(velocity, travel, max_travel):
 
     return xs, travel_bins, ColumnDataSource(data=data_dict), cutoff[0], cutoff[-1]
 
-def velocity_histogram_figure(velocity, travel, max_travel, title):
+def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold, title):
     xs, tbins, source, lo, hi = hist_velocity(velocity, travel, max_travel)
     p = figure(
         title=title,
@@ -99,17 +99,52 @@ def velocity_histogram_figure(velocity, travel, max_travel, title):
     p.x_range.start = 0
     p.hbar_stack(xs, y='y', height=100, color=Spectral9, line_color='black', source=source)
 
-    mapper = LinearColorMapper(palette=Spectral9[::-1], low=tbins[-1], high=0)
+    mapper = LinearColorMapper(palette=Spectral9, low=0, high=tbins[-1])
     color_bar = ColorBar(
         color_mapper=mapper,
-        width=8,
+        height=8,
         title="Travel (mm)",
         ticker=FixedTicker(ticks=tbins))
-    p.add_layout(color_bar, 'right')
+    p.add_layout(color_bar, 'above')
 
-    lowspeed_box = BoxAnnotation(top=400, bottom=-400,
+    lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
+
+    avgr = np.average(velocity[velocity < 0])
+    maxr = np.min(velocity[velocity < 0])
+    avgc = np.average(velocity[velocity > 0])
+    maxc = np.max(velocity[velocity > 0])
+
+    s_avgr = Span(location=avgr, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    s_maxr = Span(location=maxr, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    s_avgc = Span(location=avgc, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    s_maxc = Span(location=maxc, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    p.add_layout(s_avgr)
+    p.add_layout(s_maxr)
+    p.add_layout(s_avgc)
+    p.add_layout(s_maxc)
+
+    text_props = {
+        'x': 30,
+        'x_units': 'data',
+        'y_units': 'data',
+        'text_baseline': 'middle',
+        'text_align': 'right',
+        'text_font_size': '14px',
+        'text_color': '#fefefe'}
+    l_avgr = Label(y=avgr, text=f"avg. rebound vel.: {avgr:.1f} mm/s", y_offset=10, **text_props)
+    l_maxr = Label(y=maxr, text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
+    l_avgc = Label(y=avgc, text=f"avg. comp. vel.: {avgc:.1f} mm/s", y_offset=-10, **text_props)
+    l_maxc = Label(y=maxc, text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
+    p.add_layout(l_avgr)
+    p.add_layout(l_maxr)
+    p.add_layout(l_avgc)
+    p.add_layout(l_maxc)
     return p
 
 def travel_histogram_figure(travel, max_travel, color, title):
@@ -129,6 +164,29 @@ def travel_histogram_figure(travel, max_travel, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=max_travel/20, left=0, right=hist, color=color, line_color='black')
+
+    avg = np.average(travel)
+    mx = np.max(travel)
+    bo = bottomouts(travel, max_travel)
+    s_avg = Span(location=avg, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    s_max = Span(location=mx, dimension='width',
+            line_color='gray', line_dash='dashed', line_width=2)
+    p.add_layout(s_avg)
+    p.add_layout(s_max)
+
+    text_props = {
+        'x': np.max(hist),
+        'x_units': 'data',
+        'y_units': 'data',
+        'text_baseline': 'middle',
+        'text_align': 'right',
+        'text_font_size': '14px',
+        'text_color': '#fefefe'}
+    l_avg = Label(y=avg, text=f"avg.: {avg:.2f} mm ({avg/max_travel*100:.1f}%)", y_offset=-10, **text_props)
+    l_max = Label(y=mx, text=f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / {len(bo)} bottom outs", y_offset=10, **text_props)
+    p.add_layout(l_avg)
+    p.add_layout(l_max)
     return p
 
 def travel_figure(telemetry, front_color, rear_color):
@@ -233,69 +291,63 @@ def fft_figure(travel, color, title):
     p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
     return p_fft
 
-def statistics_figure(f_travel, r_travel, f_max_travel, r_max_travel, f_velocity, r_velocity):
-    high_speed_threshold = 400
+def velocity_stats_fugure(velocity, high_speed_threshold):
+    count = len(velocity)
+    hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
+    lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
+    zero = np.count_nonzero(velocity == 0) / count * 100
+    lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold)) / count * 100
+    hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
 
-    f_count = len(f_velocity)
-    f_avgr = np.average(f_velocity[f_velocity < 0])
-    f_maxr = np.min(f_velocity[f_velocity < 0])
-    f_hsr = np.count_nonzero(f_velocity < -high_speed_threshold) / f_count * 100
-    f_lsr = np.count_nonzero((f_velocity > -high_speed_threshold) & (f_velocity < 0)) / f_count * 100
-    f_avgc = np.average(f_velocity[f_velocity > 0])
-    f_maxc = np.max(f_velocity[f_velocity > 0])
-    f_lsc = np.count_nonzero((f_velocity > 0) & (f_velocity < high_speed_threshold)) / f_count * 100
-    f_hsc = np.count_nonzero(f_velocity > high_speed_threshold) / f_count * 100
-
-    r_count = len(r_velocity)
-    r_avgr = np.average(r_velocity[r_velocity < 0])
-    r_maxr = np.min(r_velocity[r_velocity < 0])
-    r_hsr = np.count_nonzero(r_velocity < -high_speed_threshold) / r_count * 100
-    r_lsr = np.count_nonzero((r_velocity > -high_speed_threshold) & (r_velocity < 0)) / r_count * 100
-    r_avgc = np.average(r_velocity[r_velocity > 0])
-    r_maxc = np.max(r_velocity[r_velocity > 0])
-    r_lsc = np.count_nonzero((r_velocity > 0) & (r_velocity < high_speed_threshold)) / r_count * 100
-    r_hsc = np.count_nonzero(r_velocity > high_speed_threshold) / r_count * 100
-
-    f_max = np.max(f_travel)
-    r_max = np.max(r_travel)
-    f_avg = np.average(f_travel)
-    r_avg = np.average(r_travel)
-    f_bo = bottomouts(f_travel, f_max_travel)
-    r_bo = bottomouts(r_travel, r_max_travel)
-
-    data = dict(
-        value = [
-            "Max. Travel", f"{f_max:.2f} mm ({f_max/f_max_travel*100:.1f} %)", f"{r_max:.2f} mm ({r_max/r_max_travel*100:.1f} %)",
-            "Avg. Travel", f"{f_avg:.2f} mm ({f_avg/f_max_travel*100:.1f} %)", f"{r_avg:.2f} mm ({r_avg/r_max_travel*100:.1f} %) ",
-            "Bottom Outs", f"{len(f_bo)}", f"{len(r_bo)}",
-            "Avg. Rebound Vel.", f"{f_avgr:.2f} mm/s", f"{r_avgr:.2f} mm/s",
-            "Max. Rebound Vel.", f"{f_maxr:.2f} mm/s", f"{r_maxr:.2f} mm/s",
-            "HSR (% of R time)", f"{f_hsr:.2f} %", f"{r_hsr:.2f} %",
-            "LSR (% of R time)", f"{f_lsr:.2f} %", f"{r_lsr:.2f} %",
-            "Avg. Comp. Vel.", f"{f_avgc:.2f} mm/s", f"{r_avgc:.2f} mm/s",
-            "Max. Comp. Vel.", f"{f_maxc:.2f} mm/s", f"{r_maxc:.2f} mm/s",
-            "HSC (% of C time)", f"{f_hsc:.2f} %", f"{r_hsc:.2f} %",
-            "LSC (% of C time)", f"{f_lsc:.2f} %", f"{r_lsc:.2f} %"],
-        group = ["Statistic", "Front", "Rear"] * 11,
-        statistic = [str(i//3) for i in range(33)])
-    source = ColumnDataSource(data=data)
-
+    source = ColumnDataSource(data=dict(
+        x=[0],
+        hsc=[hsc],
+        lsc=[lsc],
+        zero=[zero],
+        lsr=[lsr],
+        hsr=[hsr],
+    ))
     p = figure(
-        title="Statistics",
-        width=500,
-        height=400,
-        x_range=["Statistic", "Front", "Rear"],
-        y_range=["9", "10", "6", "5", "8", "4", "7", "3", "2", "1", "0"],
+        title="Speed zones\n\n\n\n", #XXX OK, this is fucking ugly, but setting title.standoff
+                                     #    above a certain value somehow affects neighbouring figures...
+        width=100,
+        height=500,
         sizing_mode='fixed',
+        tools='',
         toolbar_location=None)
-
-    x = dodge("group", -0.4, range=p.x_range)
-    p.text(x=x, y='statistic', text='value', source=source,
-            text_align='left', text_baseline='middle', text_color='white')
-
+    #p.title.standoff = 100
     p.grid.grid_line_color = None
-    p.axis.major_label_standoff = 10
+    p.xaxis.visible = False
     p.yaxis.visible = False
+    p.vbar_stack(['hsc', 'lsc', 'zero', 'lsr', 'hsr'], x='x',
+        width=2,
+        color=['#303030', '#282828', '#202020', '#282828', '#303030'],
+        line_color=['gray']*5,
+        source=source)
+
+    text_props = {
+        'x_units': 'data',
+        'y_units': 'data',
+        'x_offset': 5,
+        'text_baseline': 'middle',
+        'text_align': 'left',
+        'text_font_size': '14px',
+        'text_color': '#fefefe'}
+    l_hsc = Label(x=0, y=hsc/2, text=f"HSC: {hsc:.2f}%", **text_props)
+    l_lsc = Label(x=0, y=hsc+lsc/2, text=f"LSC: {lsc:.2f}%", **text_props)
+    l_zero = Label(x=0, y=hsc+lsc+zero/2, text=f"NUL: {zero:.2f}%", **text_props)
+    l_lsr = Label(x=0, y=hsc+lsc+zero+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
+    l_hsr = Label(x=0, y=hsc+lsc+zero+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
+    p.add_layout(l_hsr)
+    p.add_layout(l_lsr)
+    p.add_layout(l_zero)
+    p.add_layout(l_lsc)
+    p.add_layout(l_hsc)
+
+    p.y_range.start = 0
+    p.y_range.end = 100
+    p.x_range.start = 0
+    p.x_range.end = 1
     return p
 
 # ------
@@ -326,20 +378,21 @@ p_travel = travel_figure(telemetry, front_color, rear_color)
 p_lr = leverage_ratio_figure(np.array(telemetry['WheelLeverageRatio']), Spectral9[4])
 p_sw = shock_wheel_figure(telemetry['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxTravel'], Spectral9[4])
 
-p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, "Front velocity histogram")
-p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, "Rear velocity histogram")
+p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, 400, "Front velocity histogram")
+p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, 400, "Rear velocity histogram")
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Front travel histogram")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Rear travel histogram")
 
 p_front_fft = fft_figure(front_travel, front_color, "Frequencies in front travel")
 p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies in rear travel")
 
-p_statistics = statistics_figure(front_travel, rear_travel, front_max, rear_max, front_velocity, rear_velocity)
+p_vel_stats_front = velocity_stats_fugure(front_velocity, 400)
+p_vel_stats_rear = velocity_stats_fugure(rear_velocity, 400)
 
 l = layout(
     children=[
-        [p_travel, p_statistics, p_lr, p_sw],
-        [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_rear_vel_hist],
+        [p_travel, p_lr, p_sw],
+        [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_vel_stats_front, p_rear_vel_hist, p_vel_stats_rear],
         [p_front_fft, p_rear_fft],
     ],
     sizing_mode='stretch_width')
