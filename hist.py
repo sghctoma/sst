@@ -18,6 +18,7 @@ from bokeh.plotting import figure
 
 from scipy.fft import rfft, rfftfreq
 from scipy.signal import savgol_filter
+from scipy.stats import norm
 
 
 def do_fft(travel):
@@ -164,6 +165,7 @@ def add_velocity_stat_labels(velocity, mx, p):
 
 def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold, title):
     step = 30 # must be an even number!
+    #velocity = velocity[velocity!=0]
     xs, tbins, source, lo, hi, mx = hist_velocity(velocity, travel, max_travel, step)
     p = figure(
         title=title,
@@ -178,6 +180,12 @@ def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold
         output_backend='webgl')
     p.x_range.start = 0
     p.hbar_stack(xs, y='y', height=step, color=Spectral9, line_color='black', source=source)
+
+
+    mu, std = norm.fit(velocity)
+    ny = np.linspace(velocity.min(), velocity.max(), 1000)
+    pdf = norm.pdf(ny, mu, std) * step * 100 
+    p.line(pdf, ny, line_width=2, line_dash='dashed', color=Spectral9[-1])
 
     mapper = LinearColorMapper(palette=Spectral9, low=0, high=tbins[-1])
     color_bar = ColorBar(
