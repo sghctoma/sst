@@ -36,11 +36,27 @@ def do_fft(travel):
 
     return freqs, balanced_spectrum[:len(freqs)]
 
-def group(array):
+def group_(array):
     idx_sort = np.argsort(array)
     sorted_records_array = array[idx_sort]
     _, idx_start = np.unique(sorted_records_array, return_index=True)
     res = np.split(idx_sort, idx_start[1:])
+    return res
+
+def group(array, bins):
+    dig = np.digitize(array, bins=bins) - 1
+    idx_sort = np.argsort(dig)
+    sorted_records_array = dig[idx_sort]
+    uniq, idx_start = np.unique(sorted_records_array, return_index=True)
+    split = np.split(idx_sort, idx_start[1:])
+    res = []
+    ui = 0
+    for i in range(len(bins) - 1):
+        if i in uniq:
+            res.append(split[ui])
+            ui += 1
+        else:
+            res.append(np.array([]))
     return res
 
 def jumps(travel, max_travel):
@@ -72,39 +88,45 @@ def bottomouts(travel, max_travel):
     return bo_start.nonzero()[0]
 
 def hist_velocity(velocity, travel, max_travel, step):
-    mn = int(((velocity.min() // step) - 1) * step)
-    mx = int(((velocity.max() // step) + 1) * step)
-    bins = list(range(mn, mx, step))
-    dig = np.digitize(velocity, bins=list(range(mn, mx, step))) - 1
+    mn = (velocity.min() // step - 0.5) * step  # Subtracting half bin ensures that 0 will be at the middle of one bin
+    mx = (velocity.max() // step + 1.5) * step  # Adding 1.5 bins ensures that all values will fit in bins, and that
+                                                # the last bin fits the step boundary.
+    bins = np.linspace(mn, mx, int((mx-mn)/step)+1)
 
-    data = []
-    idx_groups = group(dig)
     if (max_travel % 10 == 0):
-        mx = max_travel
+        mxt = max_travel
     else:
-        mx = (max_travel // 10 + 1) * 10
+        mxt = (max_travel // 10 + 1) * 10
+    travel_bins = np.linspace(0, mxt, 10)
 
-    cutoff = []
-    travel_bins = np.linspace(0, mx, 10)
+    t_hists_for_v_bins = [] # this holds the travel histograms for each velocity bins
+    cutoff = []             # this holds the bins larger than 0.1% (needed for histogram range)
+    max_bin_size = 0        # this holds the size of the largest bin (needed for label placement)
+    idx_groups = group(velocity, bins)
     for g in idx_groups:
-        t = travel[g]
-        th, _ = np.histogram(t, bins=travel_bins)
-        th = th / len(velocity) * 100
-        data.append(th)
-        if len(t)/len(travel) > 0.001:
-            cutoff.append(bins[len(data)])
+        if g.size == 0:
+            t_hists_for_v_bins.append(np.array([0,0,0,0,0,0,0,0,0]))
+        else:
+            t = travel[g]
+            th, _ = np.histogram(t, bins=travel_bins)
+            th = th / len(travel) * 100
+            t_hists_for_v_bins.append(th)
+            if g.size / len(travel) > 0.001:
+                cutoff.append(bins[len(t_hists_for_v_bins)])
+            if g.size > max_bin_size:
+                max_bin_size = g.size
 
-    data = np.transpose(np.array(data))
+    t_hists_for_v_bins = np.transpose(np.array(t_hists_for_v_bins))
 
-    data_dict = dict(y = bins[1:])
+    data_dict = dict(y = bins[:-1]+step/2)
     xs = []
-    for i in range(len(data)):
+    for i in range(len(t_hists_for_v_bins)):
         xs.append(f'x{i}')
-        data_dict[f'x{i}'] = data[i]
+        data_dict[f'x{i}'] = t_hists_for_v_bins[i]
 
-    return xs, travel_bins, ColumnDataSource(data=data_dict), cutoff[0], cutoff[-1]
+    return xs, travel_bins, ColumnDataSource(data=data_dict), cutoff[0], cutoff[-1], max_bin_size/len(travel)*100
 
-def add_velocity_stat_labels(velocity, p):
+def add_velocity_stat_labels(velocity, mx, p):
     avgr = np.average(velocity[velocity < 0])
     maxr = np.min(velocity[velocity < 0])
     avgc = np.average(velocity[velocity > 0])
@@ -124,7 +146,7 @@ def add_velocity_stat_labels(velocity, p):
     p.add_layout(s_maxc)
 
     text_props = {
-        'x': 30,
+        'x': mx,
         'x_units': 'data',
         'y_units': 'data',
         'text_baseline': 'middle',
@@ -141,8 +163,8 @@ def add_velocity_stat_labels(velocity, p):
     p.add_layout(l_maxc)
 
 def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold, title):
-    step = 10
-    xs, tbins, source, lo, hi = hist_velocity(velocity, travel, max_travel, step)
+    step = 30 # must be an even number!
+    xs, tbins, source, lo, hi, mx = hist_velocity(velocity, travel, max_travel, step)
     p = figure(
         title=title,
         height=500,
@@ -168,10 +190,10 @@ def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold
     lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity, p)
+    add_velocity_stat_labels(velocity, mx, p)
     return p
 
-def add_travel_stat_labels(travel, max_travel, p):
+def add_travel_stat_labels(travel, max_travel, hist_max, p):
     avg = np.average(travel)
     mx = np.max(travel)
     bo = bottomouts(travel, max_travel)
@@ -183,7 +205,7 @@ def add_travel_stat_labels(travel, max_travel, p):
     p.add_layout(s_max)
 
     text_props = {
-        'x': np.max(hist),
+        'x': hist_max,
         'x_units': 'data',
         'y_units': 'data',
         'text_baseline': 'middle',
@@ -212,10 +234,10 @@ def travel_histogram_figure(travel, max_travel, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=max_travel/20, left=0, right=hist, color=color, line_color='black')
-    add_travel_stat_labels(travel, max_travel, p)
+    add_travel_stat_labels(travel, max_travel, np.max(hist), p)
     return p
 
-def add_jump_labels(travel, max_travel):
+def add_jump_labels(travel, max_travel, p_travel):
     #TODO: Calculate jumps from both front and rear travel.
     j_rear = jumps(travel, max_travel)
     for j in j_rear:
@@ -274,7 +296,7 @@ def travel_figure(telemetry, front_color, rear_color):
         color=rear_color)
     p_travel.legend.location = 'bottom_right'
     p_travel.legend.click_policy = 'hide'
-    add_jump_labels(telemetry['RearTravel'], telemetry['MaxWheelTravel'])
+    add_jump_labels(telemetry['RearTravel'], telemetry['MaxWheelTravel'], p_travel)
     return p_travel
 
 def shock_wheel_figure(coeffs, max_travel, color):
@@ -420,21 +442,22 @@ output_file("stacked_split.html")
 
 front_color = Spectral9[0]
 rear_color = Spectral9[1]
+high_speed_threshold = 100
 
 p_travel = travel_figure(telemetry, front_color, rear_color)
 p_lr = leverage_ratio_figure(np.array(telemetry['WheelLeverageRatio']), Spectral9[4])
 p_sw = shock_wheel_figure(telemetry['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxTravel'], Spectral9[4])
 
-p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, 400, "Speed histogram (front)")
-p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, 400, "Speed histogram (rear)")
+p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, high_speed_threshold, "Speed histogram (front)")
+p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, high_speed_threshold, "Speed histogram (rear)")
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Travel histogram (front)")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Travel histogram (rear)")
 
 p_front_fft = fft_figure(front_travel, front_color, "Frequencies (front)")
 p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies (rear)")
 
-p_vel_stats_front = velocity_stats_fugure(front_velocity, 400)
-p_vel_stats_rear = velocity_stats_fugure(rear_velocity, 400)
+p_vel_stats_front = velocity_stats_fugure(front_velocity, high_speed_threshold)
+p_vel_stats_rear = velocity_stats_fugure(rear_velocity, high_speed_threshold)
 
 l = layout(
     children=[
