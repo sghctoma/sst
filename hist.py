@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import msgpack
 
 import numpy as np
@@ -15,6 +16,8 @@ from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Spectral9
 from bokeh.plotting import figure
+
+from pathlib import Path
 
 from scipy.fft import rfft, rfftfreq
 from scipy.signal import savgol_filter
@@ -429,7 +432,19 @@ def velocity_stats_fugure(velocity, high_speed_threshold):
 
 # ------
 
-telemetry = msgpack.unpackb(open('/home/sghctoma/projects/sst/sample_data/20220724/00101.PSST', 'rb').read())
+parser = argparse.ArgumentParser(description="Turn PSST to HTML")
+parser.add_argument('input', help="PSST file path")
+parser.add_argument('output', help="HTML file path", nargs='?')
+args = parser.parse_args()
+
+psst_file = args.input
+html_file = args.output
+if not html_file:
+    html_file = Path(psst_file).with_suffix('.html')
+
+# ------
+
+telemetry = msgpack.unpackb(open(psst_file, 'rb').read())
 
 front_travel = np.array(telemetry['FrontTravel'])
 front_travel[front_travel<0] = 0
@@ -446,7 +461,7 @@ rear_max = telemetry['MaxWheelTravel']
 # ------
 
 curdoc().theme = 'dark_minimal'
-output_file("stacked_split.html")
+output_file(html_file)
 
 front_color = Spectral9[0]
 rear_color = Spectral9[1]
