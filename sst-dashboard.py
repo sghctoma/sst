@@ -279,11 +279,11 @@ def travel_figure(telemetry, front_color, rear_color):
         active_scroll='xwheel_zoom',
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
-        y_range=(telemetry['ForkCalibration']['MaxTravel'], 0),
+        y_range=(telemetry['ForkCalibration']['MaxStroke'], 0),
         output_backend='webgl')
 
-    front_max = telemetry['ForkCalibration']['MaxTravel']
-    rear_max = telemetry['MaxWheelTravel']
+    front_max = telemetry['ForkCalibration']['MaxStroke']
+    rear_max = telemetry['LeverageData']['MaxRearTravel']
     p_travel.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
     extra_y_axis = LinearAxis(y_range_name='rear')
     extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
@@ -307,7 +307,7 @@ def travel_figure(telemetry, front_color, rear_color):
         color=rear_color)
     p_travel.legend.location = 'bottom_right'
     p_travel.legend.click_policy = 'hide'
-    add_jump_labels(telemetry['RearTravel'], telemetry['MaxWheelTravel'], p_travel)
+    add_jump_labels(telemetry['RearTravel'], telemetry['LeverageData']['MaxRearTravel'], p_travel)
     return p_travel
 
 def shock_wheel_figure(coeffs, max_travel, color):
@@ -450,13 +450,13 @@ front_travel = np.array(telemetry['FrontTravel'])
 front_travel[front_travel<0] = 0
 front_travel_smooth = savgol_filter(front_travel, 51, 3)
 front_velocity = np.gradient(front_travel_smooth, 0.0002)
-front_max = telemetry['ForkCalibration']['MaxTravel']
+front_max = telemetry['ForkCalibration']['MaxStroke']
 
 rear_travel = np.array(telemetry['RearTravel'])
 rear_travel[rear_travel<0] = 0
 rear_travel_smooth = savgol_filter(rear_travel, 51, 3)
 rear_velocity = np.gradient(rear_travel_smooth, 0.0002)
-rear_max = telemetry['MaxWheelTravel']
+rear_max = telemetry['LeverageData']['MaxRearTravel']
 
 # ------
 
@@ -468,8 +468,8 @@ rear_color = Spectral9[1]
 high_speed_threshold = 100
 
 p_travel = travel_figure(telemetry, front_color, rear_color)
-p_lr = leverage_ratio_figure(np.array(telemetry['WheelLeverageRatio']), Spectral9[4])
-p_sw = shock_wheel_figure(telemetry['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxTravel'], Spectral9[4])
+p_lr = leverage_ratio_figure(np.array(telemetry['LeverageData']['WheelLeverageRatio']), Spectral9[4])
+p_sw = shock_wheel_figure(telemetry['LeverageData']['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxStroke'], Spectral9[4])
 
 p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, high_speed_threshold, "Speed histogram (front)")
 p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, high_speed_threshold, "Speed histogram (rear)")
