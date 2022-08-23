@@ -270,7 +270,7 @@ def add_jump_labels(travel, max_travel, p_travel):
 
 def travel_figure(telemetry, front_color, rear_color):
     p_travel = figure(
-        title="Suspension travel",
+        title="Wheel travel",
         height=400,
         sizing_mode="stretch_width",
         toolbar_location='above',
@@ -295,14 +295,14 @@ def travel_figure(telemetry, front_color, rear_color):
     p_travel.line(
         np.around(telemetry['Time'], 4)[::100],
         np.around(telemetry['FrontTravel'], 4)[::100],
-        legend_label="Front travel",
+        legend_label="Front",
         line_width=2,
         color=front_color)
     p_travel.line(
         np.around(telemetry['Time'], 4)[::100],
         np.around(telemetry['RearTravel'], 4)[::100],
         y_range_name='rear',
-        legend_label="Rear travel",
+        legend_label="Rear",
         line_width=2,
         color=rear_color)
     p_travel.legend.location = 'bottom_right'
@@ -313,7 +313,7 @@ def travel_figure(telemetry, front_color, rear_color):
 def shock_wheel_figure(coeffs, max_travel, color):
     f = np.poly1d(np.flip(coeffs))
     p = figure(
-        title="Shock - Wheel Travel",
+        title="Shock - Wheel displacement",
         height=400,
         width=300,
         sizing_mode='fixed',
@@ -322,8 +322,8 @@ def shock_wheel_figure(coeffs, max_travel, color):
         active_scroll=None,
         tools='hover',
         active_inspect='hover',
-        tooltips=[("shock travel", "$x"), ("wheel travel", "$y")],
-        x_axis_label="Shock Travel (mm)",
+        tooltips=[("shock stroke", "$x"), ("wheel travel", "$y")],
+        x_axis_label="Shock Stroke (mm)",
         y_axis_label="Wheel Travel (mm)",
         output_backend='webgl')
 
@@ -461,6 +461,7 @@ rear_max = telemetry['LeverageData']['MaxRearTravel']
 # ------
 
 curdoc().theme = 'dark_minimal'
+curdoc().title = "krumpli" #f"Sufni Suspention Telemetry Dashboard ({psst_file})"
 output_file(html_file)
 
 front_color = Spectral9[0]
