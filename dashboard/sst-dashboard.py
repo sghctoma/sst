@@ -461,8 +461,7 @@ rear_max = telemetry['LeverageData']['MaxRearTravel']
 # ------
 
 curdoc().theme = 'dark_minimal'
-curdoc().title = "krumpli" #f"Sufni Suspention Telemetry Dashboard ({psst_file})"
-output_file(html_file)
+output_file(html_file, title=f"Sufni Suspention Telemetry Dashboard ({Path(psst_file).name})")
 
 front_color = Spectral9[0]
 rear_color = Spectral9[1]
