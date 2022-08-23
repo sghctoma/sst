@@ -22,11 +22,16 @@ type processed struct {
     Name string
     ForkCalibration calibration
     ShockCalibration calibration
-    WheelLeverageRatio [][2]float64
-    CoeffsShockWheel []float64
     Time []float64
     FrontTravel []float64
     RearTravel []float64
+    LeverageData leverage
+}
+
+type leverage struct {
+    WheelLeverageRatio [][2]float64
+    CoeffsShockWheel []float64
+    MaxRearTravel float64
 }
 
 type record struct {
@@ -38,16 +43,16 @@ type record struct {
 type calibration struct {
     ArmLength float64
     MaxDistance float64
-    MaxTravel float64
+    MaxStroke float64
     StartAngle float64
 }
 
-func newCalibration(armLength, maxDistance, maxTravel float64) *calibration {
+func newCalibration(armLength, maxDistance, maxStroke float64) *calibration {
     a := math.Acos(maxDistance / 2.0 / armLength)
     return &calibration {
         ArmLength: armLength,
         MaxDistance: maxDistance,
-        MaxTravel: maxTravel,
+        MaxStroke: maxStroke,
         StartAngle: a,
     }
 }
@@ -77,7 +82,7 @@ func parseLeverageData(data io.Reader) ([][2]float64, []float64) {
     return wtlr, coeffsShockWheel
 }
 
-func angleToTravel(angle uint16, calibration calibration) float64 {
+func angleToStroke(angle uint16, calibration calibration) float64 {
     a := math.Pi / 4096.0 * float64(angle)
     d := 2.0 * calibration.ArmLength * math.Cos(a + calibration.StartAngle)
     return calibration.MaxDistance - d
@@ -98,13 +103,13 @@ func main() {
     var processedData processed
     processedData.Name = opts.TelemetryFile
 
-    var farm, fmaxdist, fmaxtravel, sarm, smaxdist, smaxtravel float64
-    _, err = fmt.Sscanf(opts.CalibrationData, "%f,%f,%f,%f,%f,%f", &farm, &fmaxdist, &fmaxtravel, &sarm, &smaxdist, &smaxtravel)
+    var farm, fmaxdist, fmaxstroke, sarm, smaxdist, smaxstroke float64
+    _, err = fmt.Sscanf(opts.CalibrationData, "%f,%f,%f,%f,%f,%f", &farm, &fmaxdist, &fmaxstroke, &sarm, &smaxdist, &smaxstroke)
     if err != nil {
         log.Fatalln(err)
     }
-    processedData.ForkCalibration = *newCalibration(farm, fmaxdist, fmaxtravel)
-    processedData.ShockCalibration = *newCalibration(sarm, smaxdist, smaxtravel)
+    processedData.ForkCalibration = *newCalibration(farm, fmaxdist, fmaxstroke)
+    processedData.ShockCalibration = *newCalibration(sarm, smaxdist, smaxstroke)
 
     lrf, err := os.Open(opts.LeverageRatioFile)
     if err != nil {
@@ -128,16 +133,19 @@ func main() {
         log.Fatalln(err)
     }
 
-    processedData.WheelLeverageRatio, processedData.CoeffsShockWheel = parseLeverageData(lrf)
-    p, _ := polygo.NewRealPolynomial(processedData.CoeffsShockWheel)
+    var leverageData leverage
+    leverageData.WheelLeverageRatio, leverageData.CoeffsShockWheel = parseLeverageData(lrf)
+    p, _ := polygo.NewRealPolynomial(leverageData.CoeffsShockWheel)
     processedData.Time = make([]float64, len(records))
     processedData.FrontTravel = make([]float64, len(records))
     processedData.RearTravel = make([]float64, len(records))
     for index, value := range records {
         processedData.Time[index] = float64(index) * 0.0002
-        processedData.FrontTravel[index] = angleToTravel(value.ForkAngle, processedData.ForkCalibration)
-        processedData.RearTravel[index] = p.At(angleToTravel(value.ShockAngle, processedData.ShockCalibration))
+        processedData.FrontTravel[index] = angleToStroke(value.ForkAngle, processedData.ForkCalibration)
+        processedData.RearTravel[index] = p.At(angleToStroke(value.ShockAngle, processedData.ShockCalibration))
     }
+    leverageData.MaxRearTravel = p.At(processedData.ShockCalibration.MaxStroke)
+    processedData.LeverageData = leverageData
 
     var output = opts.OutputFile
     if output == "" {
