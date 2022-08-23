@@ -68,3 +68,6 @@ gosst/gosst
 
 # processed SST files 
 *.PSST
+
+# generated dashboards
+*.html
