@@ -54,17 +54,14 @@ dkms.conf
 # build directories
 pico/sufni-suspension-telemetry/build/
 
-# datasheets & external documentations
-datasheets/
+# external documentations
 sourcematerial/
 
-# scratch codes that are useful to me, but unlikely to be useful to others...
-ui/convert.py
-ui/fft5.py
-ui/fft6.py
-
 # compiled executable for gosst
-gosst/gosst
+dashboard/gosst/gosst
+
+# test utilities
+dashboard/gosst-convert/
 
 # processed SST files 
 *.PSST
