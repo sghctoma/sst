@@ -16,11 +16,18 @@
 // ----------------------------------------------------------------------------
 // Data acquisition
 
+static const uint16_t SAMPLE_RATE = 5000;
+
 static bool have_fork;
 static bool have_shock;
 
+struct header {
+    char magic[3];
+    uint8_t version;
+    uint16_t sample_rate;
+};
+
 struct record {
-    uint32_t micros;
     uint16_t fork_angle;
     uint16_t shock_angle;
 };
@@ -53,7 +60,6 @@ bool data_acquisition_cb(repeating_timer_t *rt) {
         active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
     }
 
-    active_buffer[count].micros = time_us_32();
     if (have_fork) {
         active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
     } else {
@@ -112,6 +118,9 @@ int open_datafile(FIL *file) {
     if (fr != FR_OK) {
         return fr;
     }
+
+    struct header h = {"SST", 2, SAMPLE_RATE};
+    f_write(file, &h, sizeof(struct header), NULL);
 
     return index;
 }
@@ -274,7 +283,7 @@ int main() {
 
         // Start collection timer
         repeating_timer_t data_acquisition_timer;
-        if (!add_repeating_timer_us(-200, data_acquisition_cb, NULL, &data_acquisition_timer)) {
+        if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
             display_message(&disp, "TIMER ERR");
             while(true) { tight_loop_contents(); }
         }

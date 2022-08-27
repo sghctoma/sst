@@ -24,14 +24,14 @@ from scipy.signal import savgol_filter
 from scipy.stats import norm
 
 
-def do_fft(travel):
+def do_fft(travel, tick):
     wf = np.kaiser(len(travel), 5)
 
     balanced_travel = travel - np.mean(travel)
     balanced_travel_f = rfft(balanced_travel * wf)
     balanced_spectrum = np.abs(balanced_travel_f)
 
-    freqs= rfftfreq(len(travel), 0.0002)
+    freqs= rfftfreq(len(travel), tick)
     freqs = freqs[freqs <= 10] # cut off FFT graph at 10 Hz
 
     # TODO put a label that shows the most prominent frequencies
@@ -63,7 +63,7 @@ def group(array, bins):
             res.append(np.array([]))
     return res
 
-def jumps(travel, max_travel):
+def jumps(travel, tick, max_travel):
     threshold = max_travel * 0.04
     x = np.r_[False, (np.array(travel)<threshold), False]
     start = np.r_[False, ~x[:-1] & x[1:]]
@@ -76,13 +76,15 @@ def jumps(travel, max_travel):
         jumps = jumps[1:]
 
     filtered_jumps = []
+    v_time_gap = 0.02 # from how many seconds before/after a supposed jump we calculate suspension velocity
+    v_time_gap_ticks = int(v_time_gap/tick)
     for j in jumps:
         if j[1] + 500 > len(travel): # skip if we are at the end
             continue
         if j[1] - j[0] > 1500: # if jump if longer than 0.3 seconds
-            vbefore = (travel[j[0]] - travel[j[0]-200]) / 0.02
-            vafter = (travel[j[1]+200] - travel[j[1]]) / 0.02
-            if vbefore < -1000 and vafter > 1000: # if suspension speed is sufficiently large
+            vbefore = (travel[j[0]] - travel[j[0]-v_time_gap_ticks]) / v_time_gap
+            vafter = (travel[j[1]+v_time_gap_ticks] - travel[j[1]]) / v_time_gap
+            if vbefore < -800 and vafter > 1000: # if suspension speed is sufficiently large
                 filtered_jumps.append((j[0], j[1]))
     return filtered_jumps
 
@@ -248,12 +250,12 @@ def travel_histogram_figure(travel, max_travel, color, title):
     add_travel_stat_labels(travel, max_travel, np.max(hist), p)
     return p
 
-def add_jump_labels(travel, max_travel, p_travel):
+def add_jump_labels(travel, tick, max_travel, p_travel):
     #TODO: Calculate jumps from both front and rear travel.
-    j_rear = jumps(travel, max_travel)
+    j_rear = jumps(travel, tick, max_travel)
     for j in j_rear:
-        t1 = j[0] * 0.0002
-        t2 = j[1] * 0.0002
+        t1 = j[0] * tick
+        t2 = j[1] * tick
         b = BoxAnnotation(left=t1, right=t2, fill_color=Spectral9[-1], fill_alpha=0.2)
         p_travel.add_layout(b)
         l = Label(
@@ -289,17 +291,19 @@ def travel_figure(telemetry, front_color, rear_color):
     extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
     p_travel.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p_travel.add_layout(LinearAxis(y_range_name='rear'), 'right')
+
+    time = np.around(np.arange(0, len(telemetry['FrontTravel'])) / telemetry['SampleRate'], 4) 
     p_travel.x_range.start = 0
-    p_travel.x_range.end = telemetry['Time'][-1]
+    p_travel.x_range.end = time[-1]
 
     p_travel.line(
-        np.around(telemetry['Time'], 4)[::100],
+        time[::100],
         np.around(telemetry['FrontTravel'], 4)[::100],
         legend_label="Front",
         line_width=2,
         color=front_color)
     p_travel.line(
-        np.around(telemetry['Time'], 4)[::100],
+        time[::100],
         np.around(telemetry['RearTravel'], 4)[::100],
         y_range_name='rear',
         legend_label="Rear",
@@ -307,7 +311,7 @@ def travel_figure(telemetry, front_color, rear_color):
         color=rear_color)
     p_travel.legend.location = 'bottom_right'
     p_travel.legend.click_policy = 'hide'
-    add_jump_labels(telemetry['RearTravel'], telemetry['LeverageData']['MaxRearTravel'], p_travel)
+    add_jump_labels(telemetry['RearTravel'], 1.0/telemetry['SampleRate'], telemetry['LeverageData']['MaxRearTravel'], p_travel)
     return p_travel
 
 def shock_wheel_figure(coeffs, max_travel, color):
@@ -353,8 +357,8 @@ def leverage_ratio_figure(wtlr, color):
     p.line(x, y, line_width=2, color=color)
     return p
 
-def fft_figure(travel, color, title):
-    f, s = do_fft(travel)
+def fft_figure(travel, tick, color, title):
+    f, s = do_fft(travel, tick)
     p_fft = figure(
         title=title,
         height=300,
@@ -445,17 +449,18 @@ if not html_file:
 # ------
 
 telemetry = msgpack.unpackb(open(psst_file, 'rb').read())
+tick = 1.0 / telemetry['SampleRate'] # time step length in seconds
 
 front_travel = np.array(telemetry['FrontTravel'])
 front_travel[front_travel<0] = 0
 front_travel_smooth = savgol_filter(front_travel, 51, 3)
-front_velocity = np.gradient(front_travel_smooth, 0.0002)
+front_velocity = np.gradient(front_travel_smooth, tick)
 front_max = telemetry['ForkCalibration']['MaxStroke']
 
 rear_travel = np.array(telemetry['RearTravel'])
 rear_travel[rear_travel<0] = 0
 rear_travel_smooth = savgol_filter(rear_travel, 51, 3)
-rear_velocity = np.gradient(rear_travel_smooth, 0.0002)
+rear_velocity = np.gradient(rear_travel_smooth, tick)
 rear_max = telemetry['LeverageData']['MaxRearTravel']
 
 # ------
@@ -476,8 +481,8 @@ p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max
 p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Travel histogram (front)")
 p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Travel histogram (rear)")
 
-p_front_fft = fft_figure(front_travel, front_color, "Frequencies (front)")
-p_rear_fft = fft_figure(rear_travel, rear_color, "Frequencies (rear)")
+p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
+p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
 
 p_vel_stats_front = velocity_stats_fugure(front_velocity, high_speed_threshold)
 p_vel_stats_rear = velocity_stats_fugure(rear_velocity, high_speed_threshold)

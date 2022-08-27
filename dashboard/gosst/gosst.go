@@ -20,9 +20,10 @@ import (
 
 type processed struct {
     Name string
+    Version uint8
+    SampleRate uint16
     ForkCalibration calibration
     ShockCalibration calibration
-    Time []float64
     FrontTravel []float64
     RearTravel []float64
     LeverageData leverage
@@ -34,8 +35,13 @@ type leverage struct {
     MaxRearTravel float64
 }
 
+type header struct {
+    Magic [3]byte
+    Version uint8
+    SampleRate uint16
+}
+
 type record struct {
-    Micros uint32
     ForkAngle uint16
     ShockAngle uint16
 }
@@ -92,7 +98,7 @@ func main() {
     var opts struct {
         TelemetryFile string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
         LeverageRatioFile string `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
-        CalibrationData string `short:"c" long:"calibration" description:"Calibration data" default:"120,218,180,88,138,65"`
+        CalibrationData string `short:"c" long:"calibration" description:"Calibration data (arm, max. distance, max stroke for front and rear)" default:"120,218,180,88,138,65"`
         OutputFile string `short:"o" long:"output" description:"Output file"`
     }
     _, err := flags.Parse(&opts)
@@ -123,11 +129,24 @@ func main() {
     }
     defer f.Close()
 
+    headers := make([]header, 1)
+    err = binary.Read(f, binary.LittleEndian, &headers)
+    if err != nil {
+        log.Fatalln(err)
+    }
+    fileHeader := headers[0]
+    if string(fileHeader.Magic[:]) == "SST" {
+        processedData.Version = fileHeader.Version
+        processedData.SampleRate = fileHeader.SampleRate
+    } else {
+        log.Fatalln("Input file is old (versionless), please use gosst-old!")
+    }
+
     fi, err := f.Stat()
     if err != nil {
         log.Fatalln(err)
     }
-    records := make([]record, fi.Size() / 8)
+    records := make([]record, (fi.Size() - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
     err = binary.Read(f, binary.LittleEndian, &records)
     if err != nil {
         log.Fatalln(err)
@@ -136,11 +155,9 @@ func main() {
     var leverageData leverage
     leverageData.WheelLeverageRatio, leverageData.CoeffsShockWheel = parseLeverageData(lrf)
     p, _ := polygo.NewRealPolynomial(leverageData.CoeffsShockWheel)
-    processedData.Time = make([]float64, len(records))
     processedData.FrontTravel = make([]float64, len(records))
     processedData.RearTravel = make([]float64, len(records))
     for index, value := range records {
-        processedData.Time[index] = float64(index) * 0.0002
         processedData.FrontTravel[index] = angleToStroke(value.ForkAngle, processedData.ForkCalibration)
         processedData.RearTravel[index] = p.At(angleToStroke(value.ShockAngle, processedData.ShockCalibration))
     }
