@@ -1,8 +1,51 @@
 # SST - DIY mountain bike suspension telemetry
 
-Sufni Suspension Telemetry aims to be a cheap MTB fork and shock telemetry solution - mainly to satisfy my curiosity, but maybe somebody else will also find it interesting, or even useful. I started thinking about this when I was looking for a frame to replace my 2014 Giant Trance, and took a deep dive into frame kinematics and suspension in general. The final push was when I stumbled upon Dougal's [1 Page Suspension Setup Guide](http://www.shockcraft.co.nz/media/wysiwyg/shockcraft_1_page_suspension_setup_guide_v0.pdf) on a [Mara Pro forum](https://www.mtbr.com/threads/manitou-mara-pro.1126919), and the frequency-based suspension setup described in the guide got my attention. I thought it would be cool to graph fork and shock movement in the frequency domain to supplement the guide. My Clash arrived in April, and that's when I started working on this project.
+Sufni Suspension Telemetry aims to be a cheap MTB fork and shock telemetry solution - mainly to satisfy my curiosity, but maybe somebody else will also find it interesting, or even useful.
 
-The first version used a [Sharp GP2Y0A41SK0F](https://www.pololu.com/product/2464) IR distance sensor hooked to a Raspberry Pi Zero. This seemed to work OK-ish inside, when I was just pushing down on the handlebar, so replaced the Pi Zero with a [Teensy 3.2](https://www.pjrc.com/store/teensy32.html) microcontroller, and went to the local trails.
+## The current state 
+
+As of 2022.08.27., the project uses
+
+ - magnetic rotary encoders (AS5600) to measure distance, that connect to the head unit via phone cables / RJ11 connectors,
+ - a Raspberry Pi Pico as "brain", neatly packed into a box with the battery and a not-yet-too-useful display.
+ - mechanical parts made of LEGO instead of random quadcopter parts to increase reproducability,
+ - a dashboard built with [Bokeh](http://bokeh.org/) to help analyse the data. There's also a utility called `gosst` (written in Go) that performs parts of analysis that were awefully slow with Python.
+
+The dashboard is perhaps the biggest change from previous versions. It contains a number of graphs that should be useful based on my current knowledge of suspension theory. This knowledge mainly comes from sources that deal with automotive of motorcycle suspension - not much concrete information regarding MTBs are out there. I have listed these source at the end of this section.
+
+|[![The new dashboard](pics/kiserdo.png)](pics/kiserdo.png)|
+|:--:|
+|The new dashboard|
+
+The plots from top to bottom, left to righ:
+
+ - Wheel travel (Front and rear together). Also marks jumps, and displays air time, although this feature is stil rudimentary.
+ - Rear wheel travel - Leverage ratio graph (This is input data, not something measured by this project).
+ - Shock stroke - rear wheel travel graph.
+ - Front and rear travel histogram that also shows averages and maximums (including number of bottom-outs).
+ - Front and rear velocity histograms. This also shows the travel distribution for each velocity bin via bar colors. Low-speed zone is marked, and there's a dashed line that show normal distribution. Supposedly, a setup that follows normal distribution more closely should be closer to ideal.
+ - Front and rear velocity distribution that displays the time percentage spent in HSR, LSR, zero velocity, LSC and HSC.
+ - Front and rear frequencies (FFT of travel)
+
+Finally, some picture of the hardware parts:
+
+|[![Front mech](pics/lego_front.jpg)](pics/lego_front.jpg)|[![Front mech closeup](pics/lego_front_closeup.jpg)](pics/lego_front_closeup.jpg)|[![Rear mech](pics/lego_rear.jpg)](pics/lego_rear.jpg)|
+|:--:|:--:|:--:|
+|Front mech|Front mech closeup|Rear mech|
+
+### Sources
+
+ - [Histograms and Suspension Velocity Analysis](https://www.datamc.org/data-acquisition/suspension-data-analysis/histograms-and-suspension-velocity-analysis/)
+ - [How to Set Up a Suspension (Time) Histogram v2](https://pdfcoffee.com/how-to-set-up-a-suspension-time-histogram-v2-pdf-free.html)
+ - [Shock Tuning User Guide](https://s100.iracing.com/wp-content/uploads/2021/08/Shock-Tuning-User-Guide.pdf)
+ - [Tuning shock absorbers using the shock speed histogram](http://fsae.scripts.mit.edu/motorhead/images/4/4d/Shockspeedarticle.doc)
+ - [Histogram Summary Excel sheet](https://www.datamc.org/wp-content/uploads/2019/01/suspension_histograms_v1.0.xlsx)
+
+## History
+
+ I started thinking about this when I was looking for a frame to replace my 2014 Giant Trance, and took a deep dive into frame kinematics and suspension in general. The final push was when I stumbled upon Dougal's [1 Page Suspension Setup Guide](http://www.shockcraft.co.nz/media/wysiwyg/shockcraft_1_page_suspension_setup_guide_v0.pdf) on a [Mara Pro forum](https://www.mtbr.com/threads/manitou-mara-pro.1126919), and the frequency-based suspension setup described in the guide got my attention. I thought it would be cool to graph fork and shock movement in the frequency domain to supplement the guide.
+
+My Clash arrived in April, and that's when I started working on this project. The first version used a [Sharp GP2Y0A41SK0F](https://www.pololu.com/product/2464) IR distance sensor hooked to a Raspberry Pi Zero. This seemed to work OK-ish inside, when I was just pushing down on the handlebar, so replaced the Pi Zero with a [Teensy 3.2](https://www.pjrc.com/store/teensy32.html) microcontroller, and went to the local trails.
 
 |![First version with IR distance sensor](pics/ir.jpg)|
 |:--:|
@@ -66,15 +109,3 @@ I ported my code from the Teensy with two important changes:
 
  - This version presents itself as a mass storage device instead of MTP.
  - The Pico has two cores, so one of them collects data, and the other dumps it on the card.
-
-Somewhere along the lines I managed to kill one of the AS5600 boards, so this version was not tested outside yet. Of course it works with only one sensor, but I would like the first real test to be a dual-sensor setup. Soon :)
-
-My current TODO list in more-or-less order of importance:
-
- - Fix and test the Pico version.
- - Create a UI for calibration.
- - Add the ability to specify a leverage ratio curve, and apply it to the shock graph, so that it shows the travel of the rear wheel. Since the Clash has a single-pivot linkage, I'm also thinking about putting the sensor on the main pivot, so that I can directly measure wheel travel. And if I'm interested in the travel of the shock, I can always apply the inverse of the leverage ratio curve.
- - Normalize the fork and shock values to be comparable (i.e. if both of them are on N% of their travel at some point in time, their graph should be at the same value).
- - Design somewhat more decent and universal mechanic parts. The bamboo chopstick axle and the Velcro joints definitely have to go, but the quadcopter motors as sensor axles are something I would like to replace too.
-
-As a long term goal, it would be nice to implement some automatic analysis on the data, but I have to learn a bit more about suspension theory for that. Also, I don't really have the experience to tell apart a good enough and a really good suspension tune, so testing would be somewhat difficult :) 
