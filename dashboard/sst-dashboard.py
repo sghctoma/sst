@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 import argparse
-from bokeh.models.tools import BoxSelectTool
+from bokeh.models.layouts import Box
+from bokeh.models.tools import BoxSelectTool, WheelZoomTool
 import msgpack
 
 import numpy as np
@@ -187,7 +188,6 @@ def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold
     p.x_range.start = 0
     p.hbar_stack(xs, y='y', height=step, color=Spectral9, line_color='black', source=source)
 
-
     mu, std = norm.fit(velocity)
     ny = np.linspace(velocity.min(), velocity.max(), 1000)
     pdf = norm.pdf(ny, mu, std) * step * 100 
@@ -283,9 +283,8 @@ def travel_figure(telemetry, front_color, rear_color):
         height=400,
         sizing_mode="stretch_width",
         toolbar_location='above',
-        tools='xpan,xwheel_zoom,reset,hover',
+        tools='xpan,reset,hover',
         active_drag='xpan',
-        active_scroll='xwheel_zoom',
         tooltips=[("elapsed time", "@t s"), ("front wheel", "@f mm"), ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
@@ -300,8 +299,7 @@ def travel_figure(telemetry, front_color, rear_color):
     p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p.add_layout(LinearAxis(y_range_name='rear'), 'right')
 
-    p.x_range.start = 0
-    p.x_range.end = time[-1]
+    p.x_range = Range1d(0, time[-1], bounds='auto')
 
     l = p.line(
         't', 'f',
@@ -317,6 +315,9 @@ def travel_figure(telemetry, front_color, rear_color):
         color=rear_color,
         source=source)
     p.add_tools(BoxSelectTool(dimensions="width"))
+    wz = WheelZoomTool(maintain_focus=False, dimensions='width')
+    p.add_tools(wz)
+    p.toolbar.active_scroll = wz
     p.hover.mode = 'vline'
     p.hover.renderers = [l]
     p.legend.location = 'bottom_right'
@@ -371,7 +372,7 @@ def leverage_ratio_figure(wtlr, color):
 
 def fft_figure(travel, tick, color, title):
     f, s = do_fft(travel, tick)
-    p_fft = figure(
+    p = figure(
         title=title,
         height=300,
         sizing_mode='stretch_width',
@@ -382,12 +383,14 @@ def fft_figure(travel, tick, color, title):
         active_scroll='xwheel_zoom',
         x_axis_label="Fequency (Hz)",
         output_backend='webgl')
+    wz = WheelZoomTool(maintain_focus=False, dimensions='width')
+    p.add_tools(wz)
+    p.toolbar.active_scroll = wz
     p_travel.hover.mode = 'vline'
-    p_fft.yaxis.visible = False
-    p_fft.x_range.start = -0.05
-    p_fft.x_range.end = 5.05
-    p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
-    return p_fft
+    p.yaxis.visible = False
+    p.x_range = Range1d(0.05, 5.05, bounds=(0.05, 10.05))
+    p.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
+    return p
 
 def velocity_stats_fugure(velocity, high_speed_threshold):
     count = len(velocity)
