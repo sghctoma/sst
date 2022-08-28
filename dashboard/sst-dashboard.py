@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import argparse
+from bokeh.events import DoubleTap, SelectionGeometry
+from bokeh.models.callbacks import CustomJS
 from bokeh.models.layouts import Box
 from bokeh.models.tools import BoxSelectTool, WheelZoomTool
 import msgpack
@@ -314,14 +316,40 @@ def travel_figure(telemetry, front_color, rear_color):
         line_width=2,
         color=rear_color,
         source=source)
-    p.add_tools(BoxSelectTool(dimensions="width"))
+
+    left_unselected = BoxAnnotation(left=p.x_range.start, right=p.x_range.start, fill_alpha=0.8, fill_color='#000000')
+    right_unselected = BoxAnnotation(left=p.x_range.end, right=p.x_range.end, fill_alpha=0.8, fill_color='#000000')
+    p.add_layout(left_unselected)
+    p.add_layout(right_unselected)
+
+    bs = BoxSelectTool(dimensions="width")
+    p.add_tools(bs)
+    p.js_on_event(DoubleTap, CustomJS(args=dict(lu=left_unselected, ru=right_unselected, end=p.x_range.end), code='''
+        lu.right = 0;
+        ru.left = end;
+        lu.change.emit();
+        ru.change.emit();
+        '''))
+    p.js_on_event(SelectionGeometry, CustomJS(args=dict(lu=left_unselected, ru=right_unselected), code='''
+        const geometry = cb_obj['geometry'];
+        console.log(geometry);
+        lu.right = geometry['x0'];
+        ru.left = geometry['x1'];
+        lu.change.emit();
+        ru.change.emit();
+
+        //TODO: redraw FFTs and histograms
+        '''))
+
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
+   
     p.hover.mode = 'vline'
     p.hover.renderers = [l]
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
+    
     add_jump_labels(telemetry['RearTravel'], 1.0/telemetry['SampleRate'], telemetry['LeverageData']['MaxRearTravel'], p)
     return p
 
@@ -377,10 +405,9 @@ def fft_figure(travel, tick, color, title):
         height=300,
         sizing_mode='stretch_width',
         toolbar_location='above',
-        tools='xpan,xwheel_zoom,reset,hover',
+        tools='xpan,reset,hover',
         tooltips="$x Hz",
         active_drag='xpan',
-        active_scroll='xwheel_zoom',
         x_axis_label="Fequency (Hz)",
         output_backend='webgl')
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
@@ -445,10 +472,8 @@ def velocity_stats_fugure(velocity, high_speed_threshold):
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
-    p.y_range.start = 0
-    p.y_range.end = 100
-    p.x_range.start = 0
-    p.x_range.end = 1
+    p.y_range = Range1d(0, 100)
+    p.x_range = Range1d(0, 1)
     return p
 
 # ------
