@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+from bokeh.models.tools import BoxSelectTool
 import msgpack
 
 import numpy as np
@@ -271,14 +272,21 @@ def add_jump_labels(travel, tick, max_travel, p_travel):
         p_travel.add_layout(l)
 
 def travel_figure(telemetry, front_color, rear_color):
-    p_travel = figure(
+    time = np.around(np.arange(0, len(telemetry['FrontTravel'])) / telemetry['SampleRate'], 4) 
+    source = ColumnDataSource(data=dict(
+        t=time[::100],
+        f=np.around(telemetry['FrontTravel'], 4)[::100],
+        r=np.around(telemetry['RearTravel'], 4)[::100],
+    ))
+    p = figure(
         title="Wheel travel",
         height=400,
         sizing_mode="stretch_width",
         toolbar_location='above',
-        tools='xpan,xwheel_zoom,xzoom_in,xzoom_out,reset',
+        tools='xpan,xwheel_zoom,reset,hover',
         active_drag='xpan',
         active_scroll='xwheel_zoom',
+        tooltips=[("elapsed time", "@t s"), ("front wheel", "@f mm"), ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
         y_range=(telemetry['ForkCalibration']['MaxStroke'], 0),
@@ -286,33 +294,35 @@ def travel_figure(telemetry, front_color, rear_color):
 
     front_max = telemetry['ForkCalibration']['MaxStroke']
     rear_max = telemetry['LeverageData']['MaxRearTravel']
-    p_travel.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
+    p.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
     extra_y_axis = LinearAxis(y_range_name='rear')
     extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
-    p_travel.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
-    p_travel.add_layout(LinearAxis(y_range_name='rear'), 'right')
+    p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
+    p.add_layout(LinearAxis(y_range_name='rear'), 'right')
 
-    time = np.around(np.arange(0, len(telemetry['FrontTravel'])) / telemetry['SampleRate'], 4) 
-    p_travel.x_range.start = 0
-    p_travel.x_range.end = time[-1]
+    p.x_range.start = 0
+    p.x_range.end = time[-1]
 
-    p_travel.line(
-        time[::100],
-        np.around(telemetry['FrontTravel'], 4)[::100],
+    l = p.line(
+        't', 'f',
         legend_label="Front",
         line_width=2,
-        color=front_color)
-    p_travel.line(
-        time[::100],
-        np.around(telemetry['RearTravel'], 4)[::100],
+        color=front_color,
+        source=source)
+    p.line(
+        't', 'r',
         y_range_name='rear',
         legend_label="Rear",
         line_width=2,
-        color=rear_color)
-    p_travel.legend.location = 'bottom_right'
-    p_travel.legend.click_policy = 'hide'
-    add_jump_labels(telemetry['RearTravel'], 1.0/telemetry['SampleRate'], telemetry['LeverageData']['MaxRearTravel'], p_travel)
-    return p_travel
+        color=rear_color,
+        source=source)
+    p.add_tools(BoxSelectTool(dimensions="width"))
+    p.hover.mode = 'vline'
+    p.hover.renderers = [l]
+    p.legend.location = 'bottom_right'
+    p.legend.click_policy = 'hide'
+    add_jump_labels(telemetry['RearTravel'], 1.0/telemetry['SampleRate'], telemetry['LeverageData']['MaxRearTravel'], p)
+    return p
 
 def shock_wheel_figure(coeffs, max_travel, color):
     f = np.poly1d(np.flip(coeffs))
@@ -330,6 +340,7 @@ def shock_wheel_figure(coeffs, max_travel, color):
         x_axis_label="Shock Stroke (mm)",
         y_axis_label="Wheel Travel (mm)",
         output_backend='webgl')
+    p.hover.mode = 'vline'
 
     x = np.arange(0, max_travel, 1)
     y = [f(t) for t in x]
@@ -351,6 +362,7 @@ def leverage_ratio_figure(wtlr, color):
         x_axis_label="Rear Wheel Travel (mm)",
         y_axis_label="Leverage Ratio",
         output_backend='webgl')
+    p.hover.mode = 'vline'
 
     x = wtlr[:,0]
     y = wtlr[:,1]
@@ -364,14 +376,16 @@ def fft_figure(travel, tick, color, title):
         height=300,
         sizing_mode='stretch_width',
         toolbar_location='above',
-        tools='xpan,xwheel_zoom,xzoom_in,xzoom_out,reset',
+        tools='xpan,xwheel_zoom,reset,hover',
+        tooltips="$x Hz",
         active_drag='xpan',
         active_scroll='xwheel_zoom',
         x_axis_label="Fequency (Hz)",
         output_backend='webgl')
+    p_travel.hover.mode = 'vline'
     p_fft.yaxis.visible = False
-    p_fft.x_range.start = -0.1
-    p_fft.x_range.end = 10.1
+    p_fft.x_range.start = -0.05
+    p_fft.x_range.end = 5.05
     p_fft.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
     return p_fft
 
