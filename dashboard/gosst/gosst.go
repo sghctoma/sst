@@ -53,7 +53,12 @@ type calibration struct {
     StartAngle float64
 }
 
-func newCalibration(armLength, maxDistance, maxStroke float64) *calibration {
+func newCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *calibration {
+    if useLegoModule {
+        // 1M = 5/16 inch = 7.9375 mm
+        armLength = armLength * 7.9375
+        maxDistance = maxDistance * 7.9375
+    }
     a := math.Acos(maxDistance / 2.0 / armLength)
     return &calibration {
         ArmLength: armLength,
@@ -99,6 +104,7 @@ func main() {
         TelemetryFile string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
         LeverageRatioFile string `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
         CalibrationData string `short:"c" long:"calibration" description:"Calibration data (arm, max. distance, max stroke for front and rear)" default:"120,218,180,88,138,65"`
+        CalibrationInModule bool `short:"m" long:"lego" description:"If present, arm and max. distance are considered to be in LEGO Module"`
         OutputFile string `short:"o" long:"output" description:"Output file"`
     }
     _, err := flags.Parse(&opts)
@@ -114,8 +120,8 @@ func main() {
     if err != nil {
         log.Fatalln(err)
     }
-    processedData.ForkCalibration = *newCalibration(farm, fmaxdist, fmaxstroke)
-    processedData.ShockCalibration = *newCalibration(sarm, smaxdist, smaxstroke)
+    processedData.ForkCalibration = *newCalibration(farm, fmaxdist, fmaxstroke, opts.CalibrationInModule)
+    processedData.ShockCalibration = *newCalibration(sarm, smaxdist, smaxstroke, opts.CalibrationInModule)
 
     lrf, err := os.Open(opts.LeverageRatioFile)
     if err != nil {
