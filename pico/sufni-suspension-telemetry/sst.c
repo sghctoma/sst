@@ -16,7 +16,7 @@
 // ----------------------------------------------------------------------------
 // Data acquisition
 
-static const uint16_t SAMPLE_RATE = 5000;
+static const uint16_t SAMPLE_RATE = 1000;
 
 static bool have_fork;
 static bool have_shock;
@@ -172,7 +172,15 @@ bool setup_baseline(i2c_inst_t *i2c) {
         }
         baseline /= 10;
         as5600_set_start_position(i2c, baseline);
-        as5600_set_max_angle(i2c, 2048);
+
+        // Power down tha DAC, we don't need it.
+        as5600_conf_set_output(i2c, OUTPUT_PWM);
+        // Helps with those 1-quanta-high rapid spikes.
+        as5600_conf_set_hysteresis(i2c, HYSTERESIS_2_LSB);
+        // 0.55 ms step response delay, 0.03 RMS output noise.
+        as5600_conf_set_slow_filter(i2c, SLOW_FILTER_4x);
+        // TODO: experiment with fast filter.
+        as5600_conf_set_fast_filter_threshold(i2c, FAST_FILTER_THRESHOLD_6_LSB);
         return true;
     } else {
         return false;

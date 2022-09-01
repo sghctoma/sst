@@ -3,7 +3,6 @@
 import argparse
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.models.callbacks import CustomJS
-from bokeh.models.layouts import Box
 from bokeh.models.tools import BoxSelectTool, WheelZoomTool
 import msgpack
 
@@ -68,6 +67,9 @@ def group(array, bins):
     return res
 
 def jumps(travel, tick, max_travel):
+    #XXX rewrite: Find intervals where both travel and speed are close to 0, and 
+    #     - airtime if average speed before/after for a small amount of time exceeds a threshold,
+    #     - idling otherwise.
     threshold = max_travel * 0.04
     x = np.r_[False, (np.array(travel)<threshold), False]
     start = np.r_[False, ~x[:-1] & x[1:]]
@@ -85,10 +87,10 @@ def jumps(travel, tick, max_travel):
     for j in jumps:
         if j[1] + 500 > len(travel): # skip if we are at the end
             continue
-        if j[1] - j[0] > 1500: # if jump if longer than 0.3 seconds
+        if j[1] - j[0] > 1000: # if jump if longer than 0.2 seconds
             vbefore = (travel[j[0]] - travel[j[0]-v_time_gap_ticks]) / v_time_gap
             vafter = (travel[j[1]+v_time_gap_ticks] - travel[j[1]]) / v_time_gap
-            if vbefore < -800 and vafter > 1000: # if suspension speed is sufficiently large
+            if vbefore < -200 and vafter > 1000: # if suspension speed is sufficiently large
                 filtered_jumps.append((j[0], j[1]))
     return filtered_jumps
 
@@ -270,15 +272,15 @@ def add_jump_labels(travel, tick, max_travel, p_travel):
             text_color='#fefefe',
             text_align='center',
             text_baseline='middle',
-            text=f"{t2-t1:.2f}s jump")
+            text=f"{t2-t1:.2f}s air")
         p_travel.add_layout(l)
 
 def travel_figure(telemetry, front_color, rear_color):
     time = np.around(np.arange(0, len(telemetry['FrontTravel'])) / telemetry['SampleRate'], 4) 
     source = ColumnDataSource(data=dict(
-        t=time[::100],
-        f=np.around(telemetry['FrontTravel'], 4)[::100],
-        r=np.around(telemetry['RearTravel'], 4)[::100],
+        t=time,#[::100],
+        f=np.around(telemetry['FrontTravel'], 4),#[::100],
+        r=np.around(telemetry['RearTravel'], 4,)#[::100],
     ))
     p = figure(
         title="Wheel travel",

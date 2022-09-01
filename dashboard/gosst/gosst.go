@@ -94,7 +94,10 @@ func parseLeverageData(data io.Reader) ([][2]float64, []float64) {
 }
 
 func angleToStroke(angle uint16, calibration calibration) float64 {
-    a := math.Pi / 4096.0 * float64(angle)
+    if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
+        angle = 0
+    }
+    a := 2.0 * math.Pi / 4096.0 * float64(angle)
     d := 2.0 * calibration.ArmLength * math.Cos(a + calibration.StartAngle)
     return calibration.MaxDistance - d
 }
