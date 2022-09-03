@@ -1,29 +1,29 @@
 #!/usr/bin/env python
 
 import argparse
-from bokeh.events import DoubleTap, SelectionGeometry
-from bokeh.models.callbacks import CustomJS
-from bokeh.models.tools import BoxSelectTool, WheelZoomTool
 import msgpack
 
 import numpy as np
 
+from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
 from bokeh.io import output_file, save
 from bokeh.layouts import column, layout
 from bokeh.models import ColumnDataSource
 from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
 from bokeh.models.axes import LinearAxis
+from bokeh.models.callbacks import CustomJS
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
+from bokeh.models.tools import BoxSelectTool, WheelZoomTool
 from bokeh.palettes import Spectral9
 from bokeh.plotting import figure
 
+from dataclasses import dataclass, fields as datafields
 from pathlib import Path
 
 from scipy.fft import rfft, rfftfreq
-from scipy.signal import savgol_filter
 from scipy.stats import norm
 
 
@@ -276,11 +276,14 @@ def add_jump_labels(travel, tick, max_travel, p_travel):
         p_travel.add_layout(l)
 
 def travel_figure(telemetry, front_color, rear_color):
-    time = np.around(np.arange(0, len(telemetry['FrontTravel'])) / telemetry['SampleRate'], 4) 
+    time = np.around(np.arange(0, len(telemetry.Front.Travel)) / telemetry.SampleRate, 4) 
+    front_max = telemetry.Front.Calibration.MaxStroke
+    rear_max = telemetry.Frame.MaxRearTravel
+
     source = ColumnDataSource(data=dict(
-        t=time,#[::100],
-        f=np.around(telemetry['FrontTravel'], 4),#[::100],
-        r=np.around(telemetry['RearTravel'], 4,)#[::100],
+        t=time[::100],
+        f=np.around(telemetry.Front.Travel, 4)[::100],
+        r=np.around(telemetry.Rear.Travel, 4,)[::100],
     ))
     p = figure(
         title="Wheel travel",
@@ -292,11 +295,9 @@ def travel_figure(telemetry, front_color, rear_color):
         tooltips=[("elapsed time", "@t s"), ("front wheel", "@f mm"), ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
-        y_range=(telemetry['ForkCalibration']['MaxStroke'], 0),
+        y_range=(front_max, 0),
         output_backend='webgl')
 
-    front_max = telemetry['ForkCalibration']['MaxStroke']
-    rear_max = telemetry['LeverageData']['MaxRearTravel']
     p.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
     extra_y_axis = LinearAxis(y_range_name='rear')
     extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
@@ -352,7 +353,7 @@ def travel_figure(telemetry, front_color, rear_color):
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
     
-    add_jump_labels(telemetry['RearTravel'], 1.0/telemetry['SampleRate'], telemetry['LeverageData']['MaxRearTravel'], p)
+    add_jump_labels(telemetry.Rear.Travel, 1.0/telemetry.SampleRate, telemetry.Frame.MaxRearTravel, p)
     return p
 
 def shock_wheel_figure(coeffs, max_travel, color):
@@ -415,7 +416,7 @@ def fft_figure(travel, tick, color, title):
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
-    p_travel.hover.mode = 'vline'
+    p.hover.mode = 'vline'
     p.yaxis.visible = False
     p.x_range = Range1d(0.05, 5.05, bounds=(0.05, 10.05))
     p.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
@@ -478,64 +479,104 @@ def velocity_stats_fugure(velocity, high_speed_threshold):
     p.x_range = Range1d(0, 1)
     return p
 
-# ------
+@dataclass
+class Digitized:
+    Data: list
+    Bins: list
 
-parser = argparse.ArgumentParser(description="Turn PSST to HTML")
-parser.add_argument('input', help="PSST file path")
-parser.add_argument('output', help="HTML file path", nargs='?')
-args = parser.parse_args()
+@dataclass
+class Frame:
+    WheelLeverageRatio: list
+    CoeffsShockWheel: list
+    MaxRearTravel: float
 
-psst_file = args.input
-html_file = args.output
-if not html_file:
-    html_file = Path(psst_file).with_suffix('.html')
+@dataclass
+class Calibration:
+    ArmLength: float
+    MaxDistance: float
+    MaxStroke: float
+    StartAngle: float
 
-# ------
+@dataclass
+class Suspension:
+    Calibration: Calibration
+    Travel: list
+    Velocity: list
+    DigitizedTravel: Digitized
+    DigitizedVelocity: Digitized
 
-telemetry = msgpack.unpackb(open(psst_file, 'rb').read())
-tick = 1.0 / telemetry['SampleRate'] # time step length in seconds
+@dataclass
+class Telemetry:
+    Name: str
+    Version: int
+    SampleRate: int
+    Front: Suspension
+    Rear: Suspension
+    Frame: Frame
 
-front_travel = np.array(telemetry['FrontTravel'])
-front_travel[front_travel<0] = 0
-front_travel_smooth = savgol_filter(front_travel, 51, 3)
-front_velocity = np.gradient(front_travel_smooth, tick)
-front_max = telemetry['ForkCalibration']['MaxStroke']
+# source: https://stackoverflow.com/a/54769644
+def dataclass_from_dict(klass, d):
+    try:
+        fieldtypes = {f.name:f.type for f in datafields(klass)}
+        return klass(**{f:dataclass_from_dict(fieldtypes[f],d[f]) for f in d})
+    except Exception as ex:
+        return d # Not a dataclass field
 
-rear_travel = np.array(telemetry['RearTravel'])
-rear_travel[rear_travel<0] = 0
-rear_travel_smooth = savgol_filter(rear_travel, 51, 3)
-rear_velocity = np.gradient(rear_travel_smooth, tick)
-rear_max = telemetry['LeverageData']['MaxRearTravel']
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Turn PSST to HTML")
+    parser.add_argument('input', help="PSST file path")
+    parser.add_argument('output', help="HTML file path", nargs='?')
+    args = parser.parse_args()
 
-# ------
+    psst_file = args.input
+    html_file = args.output
+    if not html_file:
+        html_file = Path(psst_file).with_suffix('.html')
+    return psst_file, html_file
 
-curdoc().theme = 'dark_minimal'
-output_file(html_file, title=f"Sufni Suspention Telemetry Dashboard ({Path(psst_file).name})")
+def main():
+    psst_file, html_file = parse_arguments()
+    telemetry = dataclass_from_dict(Telemetry, msgpack.unpackb(open(psst_file, 'rb').read()))
 
-front_color = Spectral9[0]
-rear_color = Spectral9[1]
-high_speed_threshold = 100
+    high_speed_threshold = 100
+    tick = 1.0 / telemetry.SampleRate # time step length in seconds
 
-p_travel = travel_figure(telemetry, front_color, rear_color)
-p_lr = leverage_ratio_figure(np.array(telemetry['LeverageData']['WheelLeverageRatio']), Spectral9[4])
-p_sw = shock_wheel_figure(telemetry['LeverageData']['CoeffsShockWheel'], telemetry['ShockCalibration']['MaxStroke'], Spectral9[4])
+    front_travel = np.array(telemetry.Front.Travel)
+    front_velocity = np.array(telemetry.Front.Velocity)
+    front_max = telemetry.Front.Calibration.MaxStroke
 
-p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, high_speed_threshold, "Speed histogram (front)")
-p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, high_speed_threshold, "Speed histogram (rear)")
-p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Travel histogram (front)")
-p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Travel histogram (rear)")
+    rear_travel = np.array(telemetry.Rear.Travel)
+    rear_velocity = np.array(telemetry.Rear.Velocity)
+    rear_max = telemetry.Frame.MaxRearTravel
 
-p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
-p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
+    curdoc().theme = 'dark_minimal'
+    output_file(html_file, title=f"Sufni Suspention Telemetry Dashboard ({Path(psst_file).name})")
+    front_color = Spectral9[0]
+    rear_color = Spectral9[1]
 
-p_vel_stats_front = velocity_stats_fugure(front_velocity, high_speed_threshold)
-p_vel_stats_rear = velocity_stats_fugure(rear_velocity, high_speed_threshold)
+    p_travel = travel_figure(telemetry, front_color, rear_color)
+    p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral9[4])
+    p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral9[4])
 
-l = layout(
-    children=[
-        [p_travel, p_lr, p_sw],
-        [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_vel_stats_front, p_rear_vel_hist, p_vel_stats_rear],
-        [p_front_fft, p_rear_fft],
-    ],
-    sizing_mode='stretch_width')
-save(l)
+    p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, high_speed_threshold, "Speed histogram (front)")
+    p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, high_speed_threshold, "Speed histogram (rear)")
+    p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Travel histogram (front)")
+    p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Travel histogram (rear)")
+
+    p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
+    p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
+
+    p_vel_stats_front = velocity_stats_fugure(front_velocity, high_speed_threshold)
+    p_vel_stats_rear = velocity_stats_fugure(rear_velocity, high_speed_threshold)
+
+    l = layout(
+        children=[
+            [p_travel, p_lr, p_sw],
+            [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_vel_stats_front, p_rear_vel_hist, p_vel_stats_rear],
+            [p_front_fft, p_rear_fft],
+        ],
+        sizing_mode='stretch_width')
+    save(l)
+
+if __name__ == "__main__":
+    main()
