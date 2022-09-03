@@ -1,38 +1,58 @@
 package main
 
 import (
-    "bufio"
-    "encoding/binary"
-    "fmt"
-    "io"
-    "log"
-    "math"
-    "os"
-    "path"
-    "strings"
+	"bufio"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"log"
+	"math"
+	"os"
+	"path"
+	"sort"
+	"strings"
 
-    "github.com/jessevdk/go-flags"
-    "github.com/openacid/slimarray/polyfit"
-    "github.com/SeanJxie/polygo"
-    "github.com/ugorji/go/codec"
-    "gonum.org/v1/gonum/floats"
+	"github.com/SeanJxie/polygo"
+	"github.com/jessevdk/go-flags"
+	"github.com/openacid/slimarray/polyfit"
+	"github.com/pconstantinou/savitzkygolay"
+	"github.com/ugorji/go/codec"
+	"gonum.org/v1/gonum/floats"
 )
+
+type digitized struct {
+    Data []int
+    Bins []float64
+}
+
+type frame struct {
+    WheelLeverageRatio [][2]float64
+    CoeffsShockWheel []float64
+    MaxRearTravel float64
+}
+
+type calibration struct {
+    ArmLength float64
+    MaxDistance float64
+    MaxStroke float64
+    StartAngle float64
+}
+
+type suspension struct {
+    Calibration calibration
+    Travel []float64
+    Velocity []float64
+    DigitizedTravel digitized
+    DigitizedVelocity digitized
+}
 
 type processed struct {
     Name string
     Version uint8
     SampleRate uint16
-    ForkCalibration calibration
-    ShockCalibration calibration
-    FrontTravel []float64
-    RearTravel []float64
-    LeverageData leverage
-}
-
-type leverage struct {
-    WheelLeverageRatio [][2]float64
-    CoeffsShockWheel []float64
-    MaxRearTravel float64
+    Front suspension
+    Rear suspension
+    Frame frame
 }
 
 type header struct {
@@ -44,13 +64,6 @@ type header struct {
 type record struct {
     ForkAngle uint16
     ShockAngle uint16
-}
-
-type calibration struct {
-    ArmLength float64
-    MaxDistance float64
-    MaxStroke float64
-    StartAngle float64
 }
 
 func newCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *calibration {
@@ -102,6 +115,38 @@ func angleToStroke(angle uint16, calibration calibration) float64 {
     return calibration.MaxDistance - d
 }
 
+func linspace(min, max float64, num int) []float64 {
+    step := (max - min) / float64(num - 1)
+    bins := make([]float64, num)
+    for i := range bins {bins[i] = min + step * float64(i)}
+    return bins
+}
+
+func digitize(data, bins []float64) []int {
+    inds := make([]int, len(data))
+    for k, v := range data {
+        i := sort.SearchFloat64s(bins, v)
+        // If current value is not exactly a bin boundary, we subtract 1 to make
+        // the digitized slice indexed from 0 instead of 1. We do the same if a
+        // value would exceed existing bins.
+        if v >= bins[len(bins) - 1] || v != bins[i] {
+            i -= 1
+        }
+        inds[k] = i
+    }
+    return inds
+}
+
+func digitizeVelocity(v []float64, d *digitized) {
+    step := 30.0
+    mn := (math.Floor(floats.Min(v) / step) - 0.5) * step  // Subtracting half bin ensures that 0 will be at the middle of one bin
+    mx := (math.Floor(floats.Max(v) / step) + 1.5) * step  // Adding 1.5 bins ensures that all values will fit in bins, and that
+                                                           // the last bin fits the step boundary.
+    bins := linspace(mn, mx, int((mx - mn) / step) + 1)
+    d.Bins = bins
+    d.Data = digitize(v, bins)
+}
+
 func main() {
     var opts struct {
         TelemetryFile string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
@@ -115,16 +160,16 @@ func main() {
         return
     }
 
-    var processedData processed
-    processedData.Name = opts.TelemetryFile
+    var pd processed
+    pd.Name = opts.TelemetryFile
 
     var farm, fmaxdist, fmaxstroke, sarm, smaxdist, smaxstroke float64
     _, err = fmt.Sscanf(opts.CalibrationData, "%f,%f,%f,%f,%f,%f", &farm, &fmaxdist, &fmaxstroke, &sarm, &smaxdist, &smaxstroke)
     if err != nil {
         log.Fatalln(err)
     }
-    processedData.ForkCalibration = *newCalibration(farm, fmaxdist, fmaxstroke, opts.CalibrationInModule)
-    processedData.ShockCalibration = *newCalibration(sarm, smaxdist, smaxstroke, opts.CalibrationInModule)
+    pd.Front.Calibration = *newCalibration(farm, fmaxdist, fmaxstroke, opts.CalibrationInModule)
+    pd.Rear.Calibration = *newCalibration(sarm, smaxdist, smaxstroke, opts.CalibrationInModule)
 
     lrf, err := os.Open(opts.LeverageRatioFile)
     if err != nil {
@@ -145,8 +190,8 @@ func main() {
     }
     fileHeader := headers[0]
     if string(fileHeader.Magic[:]) == "SST" {
-        processedData.Version = fileHeader.Version
-        processedData.SampleRate = fileHeader.SampleRate
+        pd.Version = fileHeader.Version
+        pd.SampleRate = fileHeader.SampleRate
     } else {
         log.Fatalln("Input file is old (versionless), please use gosst-old!")
     }
@@ -161,17 +206,34 @@ func main() {
         log.Fatalln(err)
     }
 
-    var leverageData leverage
-    leverageData.WheelLeverageRatio, leverageData.CoeffsShockWheel = parseLeverageData(lrf)
-    p, _ := polygo.NewRealPolynomial(leverageData.CoeffsShockWheel)
-    processedData.FrontTravel = make([]float64, len(records))
-    processedData.RearTravel = make([]float64, len(records))
+    var frame frame
+    frame.WheelLeverageRatio, frame.CoeffsShockWheel = parseLeverageData(lrf)
+    p, _ := polygo.NewRealPolynomial(frame.CoeffsShockWheel)
+    pd.Front.Travel = make([]float64, len(records))
+    pd.Rear.Travel = make([]float64, len(records))
     for index, value := range records {
-        processedData.FrontTravel[index] = angleToStroke(value.ForkAngle, processedData.ForkCalibration)
-        processedData.RearTravel[index] = p.At(angleToStroke(value.ShockAngle, processedData.ShockCalibration))
+        pd.Front.Travel[index] = angleToStroke(value.ForkAngle, pd.Front.Calibration)
+        pd.Rear.Travel[index] = p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
     }
-    leverageData.MaxRearTravel = p.At(processedData.ShockCalibration.MaxStroke)
-    processedData.LeverageData = leverageData
+    frame.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
+    pd.Frame = frame
+
+    tb := linspace(0, pd.Front.Calibration.MaxStroke, 21)
+    pd.Front.DigitizedTravel.Bins = tb
+    pd.Front.DigitizedTravel.Data = digitize(pd.Front.Travel, tb)
+    tb = linspace(0, pd.Frame.MaxRearTravel, 21)
+    pd.Rear.DigitizedTravel.Bins = tb
+    pd.Rear.DigitizedTravel.Data = digitize(pd.Rear.Travel, tb)
+
+    time := make([]float64, len(pd.Front.Travel))
+    for i := range time {time[i] = 1.0 / float64(pd.SampleRate) * float64(i)}
+    filter, _ := savitzkygolay.NewFilter(51, 1, 3)
+    vf, _ := filter.Process(pd.Front.Travel, time)
+    pd.Front.Velocity = vf
+    digitizeVelocity(vf, &pd.Front.DigitizedVelocity)
+    vr, _ := filter.Process(pd.Rear.Travel, time)
+    pd.Rear.Velocity =vr
+    digitizeVelocity(vr, &pd.Rear.DigitizedVelocity)
 
     var output = opts.OutputFile
     if output == "" {
@@ -191,5 +253,5 @@ func main() {
 
     var h codec.MsgpackHandle
     enc := codec.NewEncoder(fo, &h)
-    enc.Encode(processedData)
+    enc.Encode(pd)
 }
