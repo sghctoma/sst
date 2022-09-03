@@ -17,7 +17,7 @@ from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.models.tools import BoxSelectTool, WheelZoomTool
-from bokeh.palettes import Spectral9
+from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
 from dataclasses import dataclass, fields as datafields
@@ -99,45 +99,6 @@ def bottomouts(travel, max_travel):
     bo_start = np.r_[False, ~x[:-1] & x[1:]]
     return bo_start.nonzero()[0]
 
-def hist_velocity(velocity, travel, max_travel, step):
-    mn = (velocity.min() // step - 0.5) * step  # Subtracting half bin ensures that 0 will be at the middle of one bin
-    mx = (velocity.max() // step + 1.5) * step  # Adding 1.5 bins ensures that all values will fit in bins, and that
-                                                # the last bin fits the step boundary.
-    bins = np.linspace(mn, mx, int((mx-mn)/step)+1)
-
-    if (max_travel % 10 == 0):
-        mxt = max_travel
-    else:
-        mxt = (max_travel // 10 + 1) * 10
-    travel_bins = np.linspace(0, mxt, 10)
-
-    t_hists_for_v_bins = [] # this holds the travel histograms for each velocity bins
-    cutoff = []             # this holds the bins larger than 0.1% (needed for histogram range)
-    max_bin_size = 0        # this holds the size of the largest bin (needed for label placement)
-    idx_groups = group(velocity, bins)
-    for g in idx_groups:
-        if g.size == 0:
-            t_hists_for_v_bins.append(np.array([0,0,0,0,0,0,0,0,0]))
-        else:
-            t = travel[g]
-            th, _ = np.histogram(t, bins=travel_bins)
-            th = th / len(travel) * 100
-            t_hists_for_v_bins.append(th)
-            if g.size / len(travel) > 0.001:
-                cutoff.append(bins[len(t_hists_for_v_bins)])
-            if g.size > max_bin_size:
-                max_bin_size = g.size
-
-    t_hists_for_v_bins = np.transpose(np.array(t_hists_for_v_bins))
-
-    data_dict = dict(y = bins[:-1]+step/2)
-    xs = []
-    for i in range(len(t_hists_for_v_bins)):
-        xs.append(f'x{i}')
-        data_dict[f'x{i}'] = t_hists_for_v_bins[i]
-
-    return xs, travel_bins, ColumnDataSource(data=data_dict), cutoff[0], cutoff[-1], max_bin_size/len(travel)*100
-
 def add_velocity_stat_labels(velocity, mx, p):
     avgr = np.average(velocity[velocity < 0])
     maxr = np.min(velocity[velocity < 0])
@@ -174,10 +135,30 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
 
-def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold, title):
-    step = 30 # must be an even number!
-    #velocity = velocity[velocity!=0]
-    xs, tbins, source, lo, hi, mx = hist_velocity(velocity, travel, max_travel, step)
+def velocity_histogram_figure(dt, dv, velocity, high_speed_threshold, title):
+    step = dv.Bins[1] - dv.Bins[0]
+    hist = np.zeros(((len(dt.Bins)-1)//2, len(dv.Bins)-1))
+    for i in range(len(dv.Data)):
+        vbin = dv.Data[i]
+        tbin = dt.Data[i] // 2
+        hist[tbin][vbin] += 1
+    hist = hist / len(dt.Data) * 100
+
+    thist = np.transpose(hist)
+    largest_bin = 0
+    cutoff = []
+    for i in range(len(thist)):
+        sm = np.sum(thist[i])
+        if sm > largest_bin:
+            largest_bin = sm
+        if sm > 0.1:
+            cutoff.append(i)
+
+    sd = {str(k): v for k,v in enumerate(hist)}
+    sd['y'] = np.array(dv.Bins[:-1])+step/2
+    source = ColumnDataSource(data=sd)
+    hi, lo = dv.Bins[cutoff[-1]], dv.Bins[cutoff[0]]
+
     p = figure(
         title=title,
         height=500,
@@ -190,25 +171,26 @@ def velocity_histogram_figure(velocity, travel, max_travel, high_speed_threshold
         active_scroll='ywheel_zoom',
         output_backend='webgl')
     p.x_range.start = 0
-    p.hbar_stack(xs, y='y', height=step, color=Spectral9, line_color='black', source=source)
+    palette = Spectral11[1:]
+    p.hbar_stack([str(i) for i in range(len(hist))], y='y', height=step, color=palette, line_color='black', source=source)
 
     mu, std = norm.fit(velocity)
     ny = np.linspace(velocity.min(), velocity.max(), 1000)
     pdf = norm.pdf(ny, mu, std) * step * 100 
-    p.line(pdf, ny, line_width=2, line_dash='dashed', color=Spectral9[-1])
+    p.line(pdf, ny, line_width=2, line_dash='dashed', color=Spectral11[-2])
 
-    mapper = LinearColorMapper(palette=Spectral9, low=0, high=tbins[-1])
+    mapper = LinearColorMapper(palette=palette, low=0, high=100)
     color_bar = ColorBar(
         color_mapper=mapper,
         height=8,
-        title="Travel (mm)",
-        ticker=FixedTicker(ticks=tbins))
+        title="Travel (%)",
+        ticker=FixedTicker(ticks=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]))
     p.add_layout(color_bar, 'above')
 
     lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity, mx, p)
+    add_velocity_stat_labels(velocity, largest_bin, p)
     return p
 
 def add_travel_stat_labels(travel, max_travel, hist_max, p):
@@ -235,9 +217,14 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
     p.add_layout(l_avg)
     p.add_layout(l_max)
 
-def travel_histogram_figure(travel, max_travel, color, title):
-    hist, bins = np.histogram(travel, bins=np.arange(0, max_travel+max_travel/20, max_travel/20))
-    hist = hist / len(travel) * 100
+def travel_histogram_figure(digitized, travel, color, title):
+    bins = digitized.Bins
+    max_travel = bins[-1]
+    hist = np.zeros(len(bins)-1)
+    for i in digitized.Data:
+        hist[i] += 1
+
+    hist = hist / len(digitized.Data) * 100
     p = figure(
         title=title,
         height=250,
@@ -251,7 +238,7 @@ def travel_histogram_figure(travel, max_travel, color, title):
         output_backend='webgl')
     p.x_range.start = 0
     p.y_range.flipped = True
-    p.hbar(y=bins[:-1], height=max_travel/20, left=0, right=hist, color=color, line_color='black')
+    p.hbar(y=bins[:-1], height=max_travel/(len(bins)-1), left=0, right=hist, color=color, line_color='black')
     add_travel_stat_labels(travel, max_travel, np.max(hist), p)
     return p
 
@@ -261,7 +248,7 @@ def add_jump_labels(travel, tick, max_travel, p_travel):
     for j in j_rear:
         t1 = j[0] * tick
         t2 = j[1] * tick
-        b = BoxAnnotation(left=t1, right=t2, fill_color=Spectral9[-1], fill_alpha=0.2)
+        b = BoxAnnotation(left=t1, right=t2, fill_color=Spectral11[-2], fill_alpha=0.2)
         p_travel.add_layout(b)
         l = Label(
             x=t1+(t2-t1)/2,
@@ -519,7 +506,7 @@ def dataclass_from_dict(klass, d):
     try:
         fieldtypes = {f.name:f.type for f in datafields(klass)}
         return klass(**{f:dataclass_from_dict(fieldtypes[f],d[f]) for f in d})
-    except Exception as ex:
+    except:
         return d # Not a dataclass field
 
 def parse_arguments():
@@ -543,25 +530,25 @@ def main():
 
     front_travel = np.array(telemetry.Front.Travel)
     front_velocity = np.array(telemetry.Front.Velocity)
-    front_max = telemetry.Front.Calibration.MaxStroke
 
     rear_travel = np.array(telemetry.Rear.Travel)
     rear_velocity = np.array(telemetry.Rear.Velocity)
-    rear_max = telemetry.Frame.MaxRearTravel
 
     curdoc().theme = 'dark_minimal'
     output_file(html_file, title=f"Sufni Suspention Telemetry Dashboard ({Path(psst_file).name})")
-    front_color = Spectral9[0]
-    rear_color = Spectral9[1]
+    front_color = Spectral11[1]
+    rear_color = Spectral11[2]
 
     p_travel = travel_figure(telemetry, front_color, rear_color)
-    p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral9[4])
-    p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral9[4])
+    p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
+    p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
-    p_front_vel_hist = velocity_histogram_figure(front_velocity, front_travel, front_max, high_speed_threshold, "Speed histogram (front)")
-    p_rear_vel_hist = velocity_histogram_figure(rear_velocity, rear_travel, rear_max, high_speed_threshold, "Speed histogram (rear)")
-    p_front_travel_hist = travel_histogram_figure(front_travel, front_max, front_color, "Travel histogram (front)")
-    p_rear_travel_hist = travel_histogram_figure(rear_travel, rear_max, rear_color, "Travel histogram (rear)")
+    p_front_vel_hist = velocity_histogram_figure(telemetry.Front.DigitizedTravel, telemetry.Front.DigitizedVelocity,
+        front_velocity, high_speed_threshold, "Speed histogram (front)")
+    p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
+        rear_velocity, high_speed_threshold, "Speed histogram (rear)")
+    p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, front_travel, front_color, "Travel histogram (front)")
+    p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_color, "Travel histogram (rear)")
 
     p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
     p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
