@@ -138,7 +138,7 @@ func digitize(data, bins []float64) []int {
 }
 
 func digitizeVelocity(v []float64, d *digitized) {
-    step := 30.0
+    step := 50.0
     mn := (math.Floor(floats.Min(v) / step) - 0.5) * step  // Subtracting half bin ensures that 0 will be at the middle of one bin
     mx := (math.Floor(floats.Max(v) / step) + 1.5) * step  // Adding 1.5 bins ensures that all values will fit in bins, and that
                                                            // the last bin fits the step boundary.

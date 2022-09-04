@@ -430,7 +430,6 @@ def velocity_stats_figure(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
     lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
-    zero = np.count_nonzero(velocity == 0) / count * 100
     lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold)) / count * 100
     hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
 
@@ -438,7 +437,6 @@ def velocity_stats_figure(velocity, high_speed_threshold):
         x=[0],
         hsc=[hsc],
         lsc=[lsc],
-        zero=[zero],
         lsr=[lsr],
         hsr=[hsr],
     ))
@@ -454,10 +452,10 @@ def velocity_stats_figure(velocity, high_speed_threshold):
     p.grid.grid_line_color = None
     p.xaxis.visible = False
     p.yaxis.visible = False
-    p.vbar_stack(['hsc', 'lsc', 'zero', 'lsr', 'hsr'], x='x',
+    p.vbar_stack(['hsc', 'lsc', 'lsr', 'hsr'], x='x',
         width=2,
-        color=['#303030', '#282828', '#202020', '#282828', '#303030'],
-        line_color=['gray']*5,
+        color=['#303030', '#282828', '#282828', '#303030'],
+        line_color=['gray']*4,
         source=source)
 
     text_props = {
@@ -470,12 +468,10 @@ def velocity_stats_figure(velocity, high_speed_threshold):
         'text_color': '#fefefe'}
     l_hsc = Label(x=0, y=hsc/2, text=f"HSC: {hsc:.2f}%", **text_props)
     l_lsc = Label(x=0, y=hsc+lsc/2, text=f"LSC: {lsc:.2f}%", **text_props)
-    l_zero = Label(x=0, y=hsc+lsc+zero/2, text=f"NUL: {zero:.2f}%", **text_props)
-    l_lsr = Label(x=0, y=hsc+lsc+zero+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
-    l_hsr = Label(x=0, y=hsc+lsc+zero+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
+    l_lsr = Label(x=0, y=hsc+lsc+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
+    l_hsr = Label(x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
     p.add_layout(l_hsr)
     p.add_layout(l_lsr)
-    p.add_layout(l_zero)
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
