@@ -79,15 +79,19 @@ def max_extension_intervals(travel, max_travel, sample_rate):
     diff = me[:,-1] - me[:,0]
     return me[diff>0.2*sample_rate] # return max extension intervals that are longer than 0.2s
 
-def filter_jumps(max_extensions, velocity, sample_rate):
-    jumps = []
+def max_extensions_mask(max_extensions, length):
+    l0 = max_extensions[:,[0]] <= np.arange(length)
+    l1 = max_extensions[:,[1]] >= np.arange(length)
+    return np.logical_not(np.any(l0&l1, axis=0))
 
+def filter_jumps(max_extensions, velocity, sample_rate):
     v_check_interval = int(0.02 * sample_rate)
     if max_extensions[0][0] < v_check_interval: # beginning is not a jump
         max_extensions = max_extensions[1:]
     if max_extensions[-1][1] > len(velocity) - v_check_interval: # end is not a jumps
         max_extensions = max_extensions[:-1]
 
+    jumps = []
     for me in max_extensions:
         v_before = np.mean(velocity[me[0]-v_check_interval:me[0]])
         v_after = np.mean(velocity[me[1]:me[1]+v_check_interval])
@@ -136,14 +140,15 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
 
-def velocity_histogram_figure(dt, dv, velocity, high_speed_threshold, title):
+def velocity_histogram_figure(dt, dv, velocity, mem, high_speed_threshold, title):
     step = dv.Bins[1] - dv.Bins[0]
     hist = np.zeros(((len(dt.Bins)-1)//2, len(dv.Bins)-1))
     for i in range(len(dv.Data)):
-        vbin = dv.Data[i]
-        tbin = dt.Data[i] // 2
-        hist[tbin][vbin] += 1
-    hist = hist / len(dt.Data) * 100
+        if mem[i]:
+            vbin = dv.Data[i]
+            tbin = dt.Data[i] // 2
+            hist[tbin][vbin] += 1
+    hist = hist / np.count_nonzero(mem) * 100
 
     thist = np.transpose(hist)
     largest_bin = 0
@@ -191,7 +196,7 @@ def velocity_histogram_figure(dt, dv, velocity, high_speed_threshold, title):
     lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity, largest_bin, p)
+    add_velocity_stat_labels(velocity[mem], largest_bin, p)
     return p
 
 def add_travel_stat_labels(travel, max_travel, hist_max, p):
@@ -218,12 +223,13 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
     p.add_layout(l_avg)
     p.add_layout(l_max)
 
-def travel_histogram_figure(digitized, travel, color, title):
+def travel_histogram_figure(digitized, travel, mem, color, title):
     bins = digitized.Bins
     max_travel = bins[-1]
     hist = np.zeros(len(bins)-1)
-    for i in digitized.Data:
-        hist[i] += 1
+    for i in range(len(digitized.Data)):
+        if mem[i]:
+            hist[digitized.Data[i]] += 1
 
     hist = hist / len(digitized.Data) * 100
     p = figure(
@@ -240,7 +246,7 @@ def travel_histogram_figure(digitized, travel, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=max_travel/(len(bins)-1), left=0, right=hist, color=color, line_color='black')
-    add_travel_stat_labels(travel, max_travel, np.max(hist), p)
+    add_travel_stat_labels(travel[mem], max_travel, np.max(hist), p)
     return p
 
 def add_jump_labels(jumps, tick, p_travel):
@@ -536,25 +542,27 @@ def main():
     rear_color = Spectral11[2]
 
     p_travel = travel_figure(telemetry, front_color, rear_color)
-    max_extensions = max_extension_intervals(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
-    jumps = filter_jumps(max_extensions, rear_velocity, telemetry.SampleRate)
+    me = max_extension_intervals(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    front_mem = max_extensions_mask(me, len(front_travel))
+    rear_mem = max_extensions_mask(me, len(rear_travel))
+    jumps = filter_jumps(me, rear_velocity, telemetry.SampleRate)
     add_jump_labels(jumps, tick, p_travel)
 
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
+    p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, front_travel, front_mem, front_color, "Travel histogram (front)")
+    p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_mem, rear_color, "Travel histogram (rear)")
     p_front_vel_hist = velocity_histogram_figure(telemetry.Front.DigitizedTravel, telemetry.Front.DigitizedVelocity,
-        front_velocity, high_speed_threshold, "Speed histogram (front)")
+        front_velocity, front_mem, high_speed_threshold, "Speed histogram (front)")
     p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
-        rear_velocity, high_speed_threshold, "Speed histogram (rear)")
-    p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, front_travel, front_color, "Travel histogram (front)")
-    p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_color, "Travel histogram (rear)")
+        rear_velocity, rear_mem, high_speed_threshold, "Speed histogram (rear)")
 
-    p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
-    p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
+    p_front_fft = fft_figure(front_travel[front_mem], tick, front_color, "Frequencies (front)")
+    p_rear_fft = fft_figure(rear_travel[rear_mem], tick, rear_color, "Frequencies (rear)")
 
-    p_vel_stats_front = velocity_stats_figure(front_velocity, high_speed_threshold)
-    p_vel_stats_rear = velocity_stats_figure(rear_velocity, high_speed_threshold)
+    p_vel_stats_front = velocity_stats_figure(front_velocity[front_mem], high_speed_threshold)
+    p_vel_stats_rear = velocity_stats_figure(rear_velocity[rear_mem], high_speed_threshold)
 
     l = layout(
         children=[
