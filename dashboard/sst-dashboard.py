@@ -66,33 +66,34 @@ def group(array, bins):
             res.append(np.array([]))
     return res
 
-def jumps(travel, tick, max_travel):
-    #XXX rewrite: Find intervals where both travel and speed are close to 0, and 
-    #     - airtime if average speed before/after for a small amount of time exceeds a threshold,
-    #     - idling otherwise.
-    threshold = max_travel * 0.04
-    x = np.r_[False, (np.array(travel)<threshold), False]
+def max_extension_intervals(travel, max_travel, sample_rate):
+    travel_nz = travel < max_travel * 0.04
+    # XXX: Maybe we should add a velocity threshold too.
+    #velocity_nz = np.abs(velocity) < 200
+    x = np.r_[False, (travel_nz), False]
     start = np.r_[False, ~x[:-1] & x[1:]]
     end = np.r_[x[:-1] & ~x[1:], False]
     # creating start-end pairs while filtering out single <threshold values
-    jumps = np.where(start^end)[0] - 1
-    jumps.shape = (-1, 2)
+    me = np.where(start^end)[0] - 1
+    me.shape = (-1, 2)
+    diff = me[:,-1] - me[:,0]
+    return me[diff>0.2*sample_rate] # return max extension intervals that are longer than 0.2s
 
-    if jumps[0][0] == 0: # beginning is not a jump
-        jumps = jumps[1:]
+def filter_jumps(max_extensions, velocity, sample_rate):
+    jumps = []
 
-    filtered_jumps = []
-    v_time_gap = 0.02 # from how many seconds before/after a supposed jump we calculate suspension velocity
-    v_time_gap_ticks = int(v_time_gap/tick)
-    for j in jumps:
-        if j[1] + 500 > len(travel): # skip if we are at the end
-            continue
-        if j[1] - j[0] > 1000: # if jump if longer than 0.2 seconds
-            vbefore = (travel[j[0]] - travel[j[0]-v_time_gap_ticks]) / v_time_gap
-            vafter = (travel[j[1]+v_time_gap_ticks] - travel[j[1]]) / v_time_gap
-            if vbefore < -200 and vafter > 1000: # if suspension speed is sufficiently large
-                filtered_jumps.append((j[0], j[1]))
-    return filtered_jumps
+    v_check_interval = int(0.02 * sample_rate)
+    if max_extensions[0][0] < v_check_interval: # beginning is not a jump
+        max_extensions = max_extensions[1:]
+    if max_extensions[-1][1] > len(velocity) - v_check_interval: # end is not a jumps
+        max_extensions = max_extensions[:-1]
+
+    for me in max_extensions:
+        v_before = np.mean(velocity[me[0]-v_check_interval:me[0]])
+        v_after = np.mean(velocity[me[1]:me[1]+v_check_interval])
+        if v_before < -200 and v_after > 1000: # if suspension speed is sufficiently large
+            jumps.append(me)
+    return jumps
 
 def bottomouts(travel, max_travel):
     x = np.r_[False, (max_travel-travel<3), False]
@@ -242,10 +243,8 @@ def travel_histogram_figure(digitized, travel, color, title):
     add_travel_stat_labels(travel, max_travel, np.max(hist), p)
     return p
 
-def add_jump_labels(travel, tick, max_travel, p_travel):
-    #TODO: Calculate jumps from both front and rear travel.
-    j_rear = jumps(travel, tick, max_travel)
-    for j in j_rear:
+def add_jump_labels(jumps, tick, p_travel):
+    for j in jumps:
         t1 = j[0] * tick
         t2 = j[1] * tick
         b = BoxAnnotation(left=t1, right=t2, fill_color=Spectral11[-2], fill_alpha=0.2)
@@ -322,7 +321,6 @@ def travel_figure(telemetry, front_color, rear_color):
         '''))
     p.js_on_event(SelectionGeometry, CustomJS(args=dict(lu=left_unselected, ru=right_unselected), code='''
         const geometry = cb_obj['geometry'];
-        console.log(geometry);
         lu.right = geometry['x0'];
         ru.left = geometry['x1'];
         lu.change.emit();
@@ -339,8 +337,6 @@ def travel_figure(telemetry, front_color, rear_color):
     p.hover.renderers = [l]
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
-    
-    add_jump_labels(telemetry.Rear.Travel, 1.0/telemetry.SampleRate, telemetry.Frame.MaxRearTravel, p)
     return p
 
 def shock_wheel_figure(coeffs, max_travel, color):
@@ -409,7 +405,7 @@ def fft_figure(travel, tick, color, title):
     p.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
     return p
 
-def velocity_stats_fugure(velocity, high_speed_threshold):
+def velocity_stats_figure(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
     lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
@@ -540,6 +536,10 @@ def main():
     rear_color = Spectral11[2]
 
     p_travel = travel_figure(telemetry, front_color, rear_color)
+    max_extensions = max_extension_intervals(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    jumps = filter_jumps(max_extensions, rear_velocity, telemetry.SampleRate)
+    add_jump_labels(jumps, tick, p_travel)
+
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
@@ -553,8 +553,8 @@ def main():
     p_front_fft = fft_figure(front_travel, tick, front_color, "Frequencies (front)")
     p_rear_fft = fft_figure(rear_travel, tick, rear_color, "Frequencies (rear)")
 
-    p_vel_stats_front = velocity_stats_fugure(front_velocity, high_speed_threshold)
-    p_vel_stats_rear = velocity_stats_fugure(rear_velocity, high_speed_threshold)
+    p_vel_stats_front = velocity_stats_figure(front_velocity, high_speed_threshold)
+    p_vel_stats_rear = velocity_stats_figure(rear_velocity, high_speed_threshold)
 
     l = layout(
         children=[
