@@ -84,20 +84,26 @@ def max_extensions_mask(max_extensions, length):
     l1 = max_extensions[:,[1]] >= np.arange(length)
     return np.logical_not(np.any(l0&l1, axis=0))
 
-def filter_jumps(max_extensions, velocity, sample_rate):
+def filter_airtime(max_extensions, velocity, sample_rate):
+    airtimes = []
+    idlings = []
+
     v_check_interval = int(0.02 * sample_rate)
     if max_extensions[0][0] < v_check_interval: # beginning is not a jump
+        idlings.append(max_extensions[0])
         max_extensions = max_extensions[1:]
     if max_extensions[-1][1] > len(velocity) - v_check_interval: # end is not a jumps
+        idlings.append(max_extensions[-1])
         max_extensions = max_extensions[:-1]
 
-    jumps = []
     for me in max_extensions:
         v_before = np.mean(velocity[me[0]-v_check_interval:me[0]])
         v_after = np.mean(velocity[me[1]:me[1]+v_check_interval])
         if v_before < -200 and v_after > 1000: # if suspension speed is sufficiently large
-            jumps.append(me)
-    return jumps
+            airtimes.append(me)
+        else:
+            idlings.append(me)
+    return airtimes, idlings
 
 def bottomouts(travel, max_travel):
     x = np.r_[False, (max_travel-travel<3), False]
@@ -249,8 +255,8 @@ def travel_histogram_figure(digitized, travel, mem, color, title):
     add_travel_stat_labels(travel[mem], max_travel, np.max(hist), p)
     return p
 
-def add_jump_labels(jumps, tick, p_travel):
-    for j in jumps:
+def add_airtime_labels(airtime, tick, p_travel):
+    for j in airtime:
         t1 = j[0] * tick
         t2 = j[1] * tick
         b = BoxAnnotation(left=t1, right=t2, fill_color=Spectral11[-2], fill_alpha=0.2)
@@ -266,6 +272,14 @@ def add_jump_labels(jumps, tick, p_travel):
             text_baseline='middle',
             text=f"{t2-t1:.2f}s air")
         p_travel.add_layout(l)
+
+def add_idling_marks(idlings, tick, p_travel):
+    for i in idlings:
+        t1 = i[0] * tick
+        t2 = i[1] * tick
+        b = BoxAnnotation(left=t1, right=t2, fill_color='black', fill_alpha=0.4,
+            hatch_pattern='/', hatch_color='#333333', hatch_alpha=0.4, hatch_weight=5, hatch_scale=25)
+        p_travel.add_layout(b)
 
 def travel_figure(telemetry, front_color, rear_color):
     time = np.around(np.arange(0, len(telemetry.Front.Travel)) / telemetry.SampleRate, 4) 
@@ -311,6 +325,7 @@ def travel_figure(telemetry, front_color, rear_color):
         line_width=2,
         color=rear_color,
         source=source)
+    p.legend.level = 'overlay'
 
     left_unselected = BoxAnnotation(left=p.x_range.start, right=p.x_range.start, fill_alpha=0.8, fill_color='#000000')
     right_unselected = BoxAnnotation(left=p.x_range.end, right=p.x_range.end, fill_alpha=0.8, fill_color='#000000')
@@ -542,11 +557,13 @@ def main():
     rear_color = Spectral11[2]
 
     p_travel = travel_figure(telemetry, front_color, rear_color)
+    #TODO: calculate max extensions for both suspension
     me = max_extension_intervals(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
     front_mem = max_extensions_mask(me, len(front_travel))
     rear_mem = max_extensions_mask(me, len(rear_travel))
-    jumps = filter_jumps(me, rear_velocity, telemetry.SampleRate)
-    add_jump_labels(jumps, tick, p_travel)
+    airtimes, idlings = filter_airtime(me, rear_velocity, telemetry.SampleRate)
+    add_airtime_labels(airtimes, tick, p_travel)
+    add_idling_marks(idlings, tick, p_travel)
 
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
