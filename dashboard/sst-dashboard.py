@@ -283,6 +283,7 @@ def travel_figure(telemetry, front_color, rear_color):
         sizing_mode="stretch_width",
         toolbar_location='above',
         tools='xpan,reset,hover',
+        active_inspect=None,
         active_drag='xpan',
         tooltips=[("elapsed time", "@t s"), ("front wheel", "@f mm"), ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
@@ -346,7 +347,7 @@ def travel_figure(telemetry, front_color, rear_color):
     p.legend.click_policy = 'hide'
     return p
 
-def shock_wheel_figure(coeffs, max_travel, color):
+def shock_wheel_figure(coeffs, max_stroke, color):
     f = np.poly1d(np.flip(coeffs))
     p = figure(
         title="Shock - Wheel displacement",
@@ -358,13 +359,13 @@ def shock_wheel_figure(coeffs, max_travel, color):
         active_scroll=None,
         tools='hover',
         active_inspect='hover',
-        tooltips=[("shock stroke", "$x"), ("wheel travel", "$y")],
+        tooltips=[("shock stroke", "@x"), ("wheel travel", "@y")],
         x_axis_label="Shock Stroke (mm)",
         y_axis_label="Wheel Travel (mm)",
         output_backend='webgl')
     p.hover.mode = 'vline'
 
-    x = np.arange(0, max_travel, 1)
+    x = np.arange(0, max_stroke, 1)
     y = [f(t) for t in x]
     p.line(x, y, line_width=2, color=color)
     return p
@@ -380,7 +381,7 @@ def leverage_ratio_figure(wtlr, color):
         active_scroll=None,
         tools='hover',
         active_inspect='hover',
-        tooltips=[("wheel travel", "$x"), ("leverage ratio", "$y")],
+        tooltips=[("wheel travel", "@x"), ("leverage ratio", "@y")],
         x_axis_label="Rear Wheel Travel (mm)",
         y_axis_label="Leverage Ratio",
         output_backend='webgl')
@@ -399,7 +400,7 @@ def fft_figure(travel, tick, color, title):
         sizing_mode='stretch_width',
         toolbar_location='above',
         tools='xpan,reset,hover',
-        tooltips="$x Hz",
+        tooltips="@x Hz",
         active_drag='xpan',
         x_axis_label="Fequency (Hz)",
         output_backend='webgl')
