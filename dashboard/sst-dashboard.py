@@ -223,7 +223,7 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
         if mask[i]:
             hist[digitized.Data[i]] += 1
 
-    hist = hist / len(digitized.Data) * 100
+    hist = hist / np.count_nonzero(mask) * 100
     p = figure(
         title=title,
         height=250,
@@ -563,7 +563,7 @@ def main():
         rear_velocity, rear_topouts_mask, high_speed_threshold, "Speed histogram (rear)")
 
     p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
-    p_rear_fft = fft_figure(rear_travel[front_topouts_mask], tick, rear_color, "Frequencies (rear)")
+    p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequencies (rear)")
 
     p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], high_speed_threshold)
     p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], high_speed_threshold)
