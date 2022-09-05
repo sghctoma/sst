@@ -209,13 +209,18 @@ func main() {
     var frame frame
     frame.WheelLeverageRatio, frame.CoeffsShockWheel = parseLeverageData(lrf)
     p, _ := polygo.NewRealPolynomial(frame.CoeffsShockWheel)
+    frame.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
     pd.Front.Travel = make([]float64, len(records))
     pd.Rear.Travel = make([]float64, len(records))
     for index, value := range records {
         pd.Front.Travel[index] = angleToStroke(value.ForkAngle, pd.Front.Calibration)
-        pd.Rear.Travel[index] = p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
+        x := p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
+        // Rear travel might overshoot the max because of
+        //  a) inaccurately measured leverage ratio
+        //  b) inaccuracies introduced by polynomial fitting
+        // So we just cap it at calculated maximum.
+        pd.Rear.Travel[index] = math.Min(x, frame.MaxRearTravel)
     }
-    frame.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
     pd.Frame = frame
 
     tb := linspace(0, pd.Front.Calibration.MaxStroke, 21)
