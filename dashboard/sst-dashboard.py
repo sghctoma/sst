@@ -43,66 +43,52 @@ def do_fft(travel, tick):
 
     return freqs, balanced_spectrum[:len(freqs)]
 
-def group_(array):
-    idx_sort = np.argsort(array)
-    sorted_records_array = array[idx_sort]
-    _, idx_start = np.unique(sorted_records_array, return_index=True)
-    res = np.split(idx_sort, idx_start[1:])
-    return res
-
-def group(array, bins):
-    dig = np.digitize(array, bins=bins) - 1
-    idx_sort = np.argsort(dig)
-    sorted_records_array = dig[idx_sort]
-    uniq, idx_start = np.unique(sorted_records_array, return_index=True)
-    split = np.split(idx_sort, idx_start[1:])
-    res = []
-    ui = 0
-    for i in range(len(bins) - 1):
-        if i in uniq:
-            res.append(split[ui])
-            ui += 1
-        else:
-            res.append(np.array([]))
-    return res
-
-def max_extension_intervals(travel, max_travel, sample_rate):
-    travel_nz = travel < max_travel * 0.04
-    # XXX: Maybe we should add a velocity threshold too.
-    #velocity_nz = np.abs(velocity) < 200
-    x = np.r_[False, (travel_nz), False]
+def _get_intervals(data, threshold):
+    x = np.r_[False, (data), False]
     start = np.r_[False, ~x[:-1] & x[1:]]
     end = np.r_[x[:-1] & ~x[1:], False]
     # creating start-end pairs while filtering out single <threshold values
-    me = np.where(start^end)[0] - 1
-    me.shape = (-1, 2)
-    diff = me[:,-1] - me[:,0]
-    return me[diff>0.2*sample_rate] # return max extension intervals that are longer than 0.2s
+    intervals = np.where(start^end)[0] - 1
+    intervals.shape = (-1, 2)
+    diff = intervals[:,-1] - intervals[:,0]
+    return intervals[diff>threshold] # return intervals longer than threshold
 
-def max_extensions_mask(max_extensions, length):
-    l0 = max_extensions[:,[0]] <= np.arange(length)
-    l1 = max_extensions[:,[1]] >= np.arange(length)
+def topouts(travel, max_travel, sample_rate):
+    # XXX: Maybe we should add a velocity threshold too.
+    travel_nz = travel < max_travel * 0.04
+    return _get_intervals(travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
+
+def combined_topouts(front_travel, front_max, rear_travel, rear_max, sample_rate):
+    # XXX: Maybe we should add a velocity threshold too.
+    f_travel_nz = front_travel < front_max * 0.04
+    r_travel_nz = rear_travel < rear_max * 0.04
+    return _get_intervals(f_travel_nz&r_travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
+
+def intervals_mask(intervals, length):
+    l0 = intervals[:,[0]] <= np.arange(length)
+    l1 = intervals[:,[1]] >= np.arange(length)
     return np.logical_not(np.any(l0&l1, axis=0))
 
-def filter_airtime(max_extensions, velocity, sample_rate):
+def categorize_topouts(topouts, front_velocity, rear_velocity, sample_rate):
     airtimes = []
     idlings = []
 
     v_check_interval = int(0.02 * sample_rate)
-    if max_extensions[0][0] < v_check_interval: # beginning is not a jump
-        idlings.append(max_extensions[0])
-        max_extensions = max_extensions[1:]
-    if max_extensions[-1][1] > len(velocity) - v_check_interval: # end is not a jumps
-        idlings.append(max_extensions[-1])
-        max_extensions = max_extensions[:-1]
+    if topouts[0][0] < v_check_interval: # beginning is not airtime
+        idlings.append(topouts[0])
+        topouts = topouts[1:]
+    if topouts[-1][1] > len(front_velocity) - v_check_interval: # end is not airtime
+        idlings.append(topouts[-1])
+        topouts = topouts[:-1]
 
-    for me in max_extensions:
-        v_before = np.mean(velocity[me[0]-v_check_interval:me[0]])
-        v_after = np.mean(velocity[me[1]:me[1]+v_check_interval])
-        if v_before < -200 and v_after > 1000: # if suspension speed is sufficiently large
-            airtimes.append(me)
+    for to in topouts:
+        v_front_after = np.mean(front_velocity[to[1]:to[1]+v_check_interval])
+        v_rear_after = np.mean(rear_velocity[to[1]:to[1]+v_check_interval])
+        # if suspension speed on landing is sufficiently large
+        if v_front_after > 500 or v_rear_after > 500:
+            airtimes.append(to)
         else:
-            idlings.append(me)
+            idlings.append(to)
     return airtimes, idlings
 
 def bottomouts(travel, max_travel):
@@ -146,15 +132,15 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
 
-def velocity_histogram_figure(dt, dv, velocity, mem, high_speed_threshold, title):
+def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, title):
     step = dv.Bins[1] - dv.Bins[0]
     hist = np.zeros(((len(dt.Bins)-1)//2, len(dv.Bins)-1))
     for i in range(len(dv.Data)):
-        if mem[i]:
+        if mask[i]:
             vbin = dv.Data[i]
             tbin = dt.Data[i] // 2
             hist[tbin][vbin] += 1
-    hist = hist / np.count_nonzero(mem) * 100
+    hist = hist / np.count_nonzero(mask) * 100
 
     thist = np.transpose(hist)
     largest_bin = 0
@@ -202,7 +188,7 @@ def velocity_histogram_figure(dt, dv, velocity, mem, high_speed_threshold, title
     lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity[mem], largest_bin, p)
+    add_velocity_stat_labels(velocity[mask], largest_bin, p)
     return p
 
 def add_travel_stat_labels(travel, max_travel, hist_max, p):
@@ -229,12 +215,12 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
     p.add_layout(l_avg)
     p.add_layout(l_max)
 
-def travel_histogram_figure(digitized, travel, mem, color, title):
+def travel_histogram_figure(digitized, travel, mask, color, title):
     bins = digitized.Bins
     max_travel = bins[-1]
     hist = np.zeros(len(bins)-1)
     for i in range(len(digitized.Data)):
-        if mem[i]:
+        if mask[i]:
             hist[digitized.Data[i]] += 1
 
     hist = hist / len(digitized.Data) * 100
@@ -252,7 +238,7 @@ def travel_histogram_figure(digitized, travel, mem, color, title):
     p.x_range.start = 0
     p.y_range.flipped = True
     p.hbar(y=bins[:-1], height=max_travel/(len(bins)-1), left=0, right=hist, color=color, line_color='black')
-    add_travel_stat_labels(travel[mem], max_travel, np.max(hist), p)
+    add_travel_stat_labels(travel[mask], max_travel, np.max(hist), p)
     return p
 
 def add_airtime_labels(airtime, tick, p_travel):
@@ -553,29 +539,33 @@ def main():
     rear_color = Spectral11[2]
 
     p_travel = travel_figure(telemetry, front_color, rear_color)
-    #TODO: calculate max extensions for both suspension
-    me = max_extension_intervals(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
-    front_mem = max_extensions_mask(me, len(front_travel))
-    rear_mem = max_extensions_mask(me, len(rear_travel))
-    airtimes, idlings = filter_airtime(me, rear_velocity, telemetry.SampleRate)
+    front_topouts = topouts(front_travel, telemetry.Front.Calibration.MaxStroke, telemetry.SampleRate)
+    rear_topouts = topouts(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    front_topouts_mask = intervals_mask(front_topouts, len(front_travel))
+    rear_topouts_mask = intervals_mask(rear_topouts, len(rear_travel))
+    comb_topouts = combined_topouts(front_travel, telemetry.Front.Calibration.MaxStroke,
+        rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    airtimes, idlings = categorize_topouts(comb_topouts, front_velocity, rear_velocity, telemetry.SampleRate)
     add_airtime_labels(airtimes, tick, p_travel)
     add_idling_marks(idlings, tick, p_travel)
 
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
-    p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, front_travel, front_mem, front_color, "Travel histogram (front)")
-    p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_mem, rear_color, "Travel histogram (rear)")
+    p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, front_travel, front_topouts_mask,
+        front_color, "Travel histogram (front)")
+    p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_topouts_mask,
+        rear_color, "Travel histogram (rear)")
     p_front_vel_hist = velocity_histogram_figure(telemetry.Front.DigitizedTravel, telemetry.Front.DigitizedVelocity,
-        front_velocity, front_mem, high_speed_threshold, "Speed histogram (front)")
+        front_velocity, front_topouts_mask, high_speed_threshold, "Speed histogram (front)")
     p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
-        rear_velocity, rear_mem, high_speed_threshold, "Speed histogram (rear)")
+        rear_velocity, rear_topouts_mask, high_speed_threshold, "Speed histogram (rear)")
 
-    p_front_fft = fft_figure(front_travel[front_mem], tick, front_color, "Frequencies (front)")
-    p_rear_fft = fft_figure(rear_travel[rear_mem], tick, rear_color, "Frequencies (rear)")
+    p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
+    p_rear_fft = fft_figure(rear_travel[front_topouts_mask], tick, rear_color, "Frequencies (rear)")
 
-    p_vel_stats_front = velocity_stats_figure(front_velocity[front_mem], high_speed_threshold)
-    p_vel_stats_rear = velocity_stats_figure(rear_velocity[rear_mem], high_speed_threshold)
+    p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], high_speed_threshold)
+    p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], high_speed_threshold)
 
     l = layout(
         children=[
