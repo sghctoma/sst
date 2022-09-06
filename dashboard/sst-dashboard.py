@@ -64,21 +64,17 @@ def combined_topouts(front_travel, front_max, rear_travel, rear_max, sample_rate
     r_travel_nz = rear_travel < rear_max * 0.04
     return _get_intervals(f_travel_nz&r_travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
 
-def intervals_mask(intervals, length):
+def intervals_mask(intervals, length, negate=True):
     l0 = intervals[:,[0]] <= np.arange(length)
     l1 = intervals[:,[1]] >= np.arange(length)
-    return np.logical_not(np.any(l0&l1, axis=0))
+    return np.logical_not(np.any(l0&l1, axis=0)) if negate else np.any(l0&l1, axis=0)
 
-def categorize_topouts(topouts, front_velocity, rear_velocity, sample_rate):
+def filter_airtimes(topouts, front_velocity, rear_velocity, sample_rate):
     airtimes = []
-    idlings = []
-
     v_check_interval = int(0.02 * sample_rate)
     if topouts[0][0] < v_check_interval: # beginning is not airtime
-        idlings.append(topouts[0])
         topouts = topouts[1:]
     if topouts[-1][1] > len(front_velocity) - v_check_interval: # end is not airtime
-        idlings.append(topouts[-1])
         topouts = topouts[:-1]
 
     for to in topouts:
@@ -87,9 +83,14 @@ def categorize_topouts(topouts, front_velocity, rear_velocity, sample_rate):
         # if suspension speed on landing is sufficiently large
         if v_front_after > 500 or v_rear_after > 500:
             airtimes.append(to)
-        else:
+    return airtimes
+
+def filter_idlings(topouts, mask):
+    idlings = []
+    for to in topouts:
+        if not np.any(mask[to[0]:to[1]]):
             idlings.append(to)
-    return airtimes, idlings
+    return idlings
 
 def bottomouts(travel, max_travel):
     x = np.r_[False, (max_travel-travel<3), False]
@@ -259,13 +260,12 @@ def add_airtime_labels(airtime, tick, p_travel):
             text=f"{t2-t1:.2f}s air")
         p_travel.add_layout(l)
 
-def add_idling_marks(idlings, tick, p_travel):
+def add_idling_marks(idlings, tick, pattern, p_travel):
     for i in idlings:
         t1 = i[0] * tick
         t2 = i[1] * tick
-        b = BoxAnnotation(left=t1, right=t2, fill_color='black', fill_alpha=0.4,
-            hatch_pattern='/', hatch_color='#333333', hatch_alpha=0.4, hatch_weight=5, hatch_scale=25)
-        p_travel.add_layout(b)
+        p_travel.add_layout(BoxAnnotation(left=t1, right=t2, fill_color='#222222', fill_alpha=0.2,
+            hatch_pattern=pattern, hatch_color='black', hatch_alpha=0.2, hatch_weight=5, hatch_scale=25))
 
 def travel_figure(telemetry, front_color, rear_color):
     time = np.around(np.arange(0, len(telemetry.Front.Travel)) / telemetry.SampleRate, 4) 
@@ -546,9 +546,13 @@ def main():
     rear_topouts_mask = intervals_mask(rear_topouts, len(rear_travel))
     comb_topouts = combined_topouts(front_travel, telemetry.Front.Calibration.MaxStroke,
         rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
-    airtimes, idlings = categorize_topouts(comb_topouts, front_velocity, rear_velocity, telemetry.SampleRate)
+    airtimes = filter_airtimes(comb_topouts, front_velocity, rear_velocity, telemetry.SampleRate)
     add_airtime_labels(airtimes, tick, p_travel)
-    add_idling_marks(idlings, tick, p_travel)
+    airtimes_mask = intervals_mask(np.array(airtimes), len(front_travel), False)
+    front_idlings = filter_idlings(front_topouts, airtimes_mask)
+    rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
+    add_idling_marks(front_idlings, tick, '/', p_travel)
+    add_idling_marks(rear_idlings, tick, '\\', p_travel)
 
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
