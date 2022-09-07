@@ -54,17 +54,18 @@ def _get_intervals(data, threshold):
     return intervals[diff>threshold] # return intervals longer than threshold
 
 def topouts(travel, max_travel, sample_rate):
-    # XXX: Maybe we should add a velocity threshold too.
     travel_nz = travel < max_travel * 0.04
-    return _get_intervals(travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
+    return _get_intervals(travel_nz, 0.5*sample_rate) # return topout intervals longer than 0.5s
 
 def combined_topouts(front_travel, front_max, rear_travel, rear_max, sample_rate):
-    # XXX: Maybe we should add a velocity threshold too.
-    f_travel_nz = front_travel < front_max * 0.04
-    r_travel_nz = rear_travel < rear_max * 0.04
-    return _get_intervals(f_travel_nz&r_travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
+    combined_mean = np.mean([front_travel, rear_travel], axis=0)
+    combined_max_mean = (front_max + rear_max) / 2.0
+    travel_nz = combined_mean < combined_max_mean * 0.04
+    return _get_intervals(travel_nz, 0.2*sample_rate) # return topout intervals longer than 0.2s
 
 def intervals_mask(intervals, length, negate=True):
+    if intervals.size == 0:
+        return np.full(length, negate)
     l0 = intervals[:,[0]] <= np.arange(length)
     l1 = intervals[:,[1]] >= np.arange(length)
     return np.logical_not(np.any(l0&l1, axis=0)) if negate else np.any(l0&l1, axis=0)
@@ -223,8 +224,8 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     for i in range(len(digitized.Data)):
         if mask[i]:
             hist[digitized.Data[i]] += 1
-
     hist = hist / np.count_nonzero(mask) * 100
+
     p = figure(
         title=title,
         height=250,
@@ -260,22 +261,21 @@ def add_airtime_labels(airtime, tick, p_travel):
             text=f"{t2-t1:.2f}s air")
         p_travel.add_layout(l)
 
-def add_idling_marks(idlings, tick, pattern, p_travel):
+def add_idling_marks(idlings, tick, p_travel):
     for i in idlings:
         t1 = i[0] * tick
         t2 = i[1] * tick
-        p_travel.add_layout(BoxAnnotation(left=t1, right=t2, fill_color='#222222', fill_alpha=0.2,
-            hatch_pattern=pattern, hatch_color='black', hatch_alpha=0.2, hatch_weight=5, hatch_scale=25))
+        p_travel.add_layout(BoxAnnotation(left=t1, right=t2, fill_color='black', fill_alpha=0.4))
 
-def travel_figure(telemetry, front_color, rear_color):
+def travel_figure(telemetry, lod, front_color, rear_color):
     time = np.around(np.arange(0, len(telemetry.Front.Travel)) / telemetry.SampleRate, 4) 
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Frame.MaxRearTravel
 
     source = ColumnDataSource(data=dict(
-        t=time[::100],
-        f=np.around(telemetry.Front.Travel, 4)[::100],
-        r=np.around(telemetry.Rear.Travel, 4,)[::100],
+        t=time[::lod],
+        f=np.around(telemetry.Front.Travel[::lod], 4),
+        r=np.around(telemetry.Rear.Travel[::lod], 4,),
     ))
     p = figure(
         title="Wheel travel",
@@ -528,31 +528,50 @@ def main():
     high_speed_threshold = 100
     tick = 1.0 / telemetry.SampleRate # time step length in seconds
 
+    # collect information for graphs
     front_travel = np.array(telemetry.Front.Travel)
     front_velocity = np.array(telemetry.Front.Velocity)
-
     rear_travel = np.array(telemetry.Rear.Travel)
     rear_velocity = np.array(telemetry.Rear.Velocity)
 
+    '''
+    Topouts are intervals where suspension is at zero extension for an extended period of time. It allows us to filter
+    out e.g. the beginning and the end of the ride, where the bike is at rest, or intervals where we stop mid-ride.
+    Filtering these out is important, because they can skew travel and velocity statistics. They are handled
+    individually for front and rear suspension.
+    '''
+    front_topouts = topouts(front_travel, telemetry.Front.Calibration.MaxStroke, telemetry.SampleRate)
+    rear_topouts = topouts(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    front_topouts_mask = intervals_mask(front_topouts, len(front_travel))
+    rear_topouts_mask = intervals_mask(rear_topouts, len(rear_travel))
+
+    '''
+    We use both suspensions to find airtimes. Basically, everything is considered airtime if both suspensions are close
+    to zero travel, and suspension velocity at the end of the interval reaches a threshold. A few remarks:
+     - Originally, I used a velocity threshold at the beginning too of a candidate interval, but there were a lot of
+       false negatives usually with drops.
+     - We use the mean of front and rear travel to determine closeness to zero. This is based on the empirical
+       observation that sometimes one of the suspensions (usually my fork) oscillates outside the set threshold during
+       airtime (usually during drops). I expect this to become a problem if anybody else starts using this program, but
+       could not come up with better heuristics so far.
+    '''
+    comb_topouts = combined_topouts(front_travel, telemetry.Front.Calibration.MaxStroke,
+        rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    airtimes = filter_airtimes(comb_topouts, front_velocity, rear_velocity, telemetry.SampleRate)
+    airtimes_mask = intervals_mask(np.array(airtimes), len(front_travel), False)
+    front_idlings = filter_idlings(front_topouts, airtimes_mask)
+    rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
+
+    # create graphs
     curdoc().theme = 'dark_minimal'
     output_file(html_file, title=f"Sufni Suspention Telemetry Dashboard ({Path(psst_file).name})")
     front_color = Spectral11[1]
     rear_color = Spectral11[2]
 
-    p_travel = travel_figure(telemetry, front_color, rear_color)
-    front_topouts = topouts(front_travel, telemetry.Front.Calibration.MaxStroke, telemetry.SampleRate)
-    rear_topouts = topouts(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
-    front_topouts_mask = intervals_mask(front_topouts, len(front_travel))
-    rear_topouts_mask = intervals_mask(rear_topouts, len(rear_travel))
-    comb_topouts = combined_topouts(front_travel, telemetry.Front.Calibration.MaxStroke,
-        rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
-    airtimes = filter_airtimes(comb_topouts, front_velocity, rear_velocity, telemetry.SampleRate)
+    p_travel = travel_figure(telemetry, 100, front_color, rear_color)
     add_airtime_labels(airtimes, tick, p_travel)
-    airtimes_mask = intervals_mask(np.array(airtimes), len(front_travel), False)
-    front_idlings = filter_idlings(front_topouts, airtimes_mask)
-    rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
-    add_idling_marks(front_idlings, tick, '/', p_travel)
-    add_idling_marks(rear_idlings, tick, '\\', p_travel)
+    add_idling_marks(front_idlings, tick, p_travel)
+    add_idling_marks(rear_idlings, tick, p_travel)
 
     p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
@@ -566,12 +585,13 @@ def main():
     p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
         rear_velocity, rear_topouts_mask, high_speed_threshold, "Speed histogram (rear)")
 
-    p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
-    p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequencies (rear)")
-
     p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], high_speed_threshold)
     p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], high_speed_threshold)
 
+    p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
+    p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequencies (rear)")
+
+    # add graphs to layout
     l = layout(
         children=[
             [p_travel, p_lr, p_sw],
