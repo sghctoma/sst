@@ -23,7 +23,18 @@ p = Path(args.get('psst')[0].decode('utf-8')).name
 psst_file = Path('data').joinpath(p)
 telemetry = dataclass_from_dict(Telemetry, msgpack.unpackb(open(psst_file, 'rb').read()))
 
-high_speed_threshold = 100
+# lod - Level of Detail for travel graph (downsample ratio)
+try:
+    lod = int(args.get('lod')[0])
+except:
+    lod = 100
+
+# hst - High Speed Threshold for velocity graphs/statistics in mm/s
+try:
+    hst = int(args.get('hst')[0])
+except:
+    hst = 100
+
 tick = 1.0 / telemetry.SampleRate # time step length in seconds
 
 # collect information for graphs
@@ -64,7 +75,7 @@ rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
 front_color = Spectral11[1]
 rear_color = Spectral11[2]
 
-p_travel = travel_figure(telemetry, 100, front_color, rear_color)
+p_travel = travel_figure(telemetry, lod, front_color, rear_color)
 add_airtime_labels(airtimes, tick, p_travel)
 add_idling_marks(front_idlings, tick, p_travel)
 add_idling_marks(rear_idlings, tick, p_travel)
@@ -77,12 +88,12 @@ p_front_travel_hist = travel_histogram_figure(telemetry.Front.DigitizedTravel, f
 p_rear_travel_hist = travel_histogram_figure(telemetry.Rear.DigitizedTravel, rear_travel, rear_topouts_mask,
     rear_color, "Travel histogram (rear)")
 p_front_vel_hist = velocity_histogram_figure(telemetry.Front.DigitizedTravel, telemetry.Front.DigitizedVelocity,
-    front_velocity, front_topouts_mask, high_speed_threshold, "Speed histogram (front)")
+    front_velocity, front_topouts_mask, hst, "Speed histogram (front)")
 p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
-    rear_velocity, rear_topouts_mask, high_speed_threshold, "Speed histogram (rear)")
+    rear_velocity, rear_topouts_mask, hst, "Speed histogram (rear)")
 
-p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], high_speed_threshold)
-p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], high_speed_threshold)
+p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], hst)
+p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], hst)
 
 p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
 p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequencies (rear)")
