@@ -3,6 +3,7 @@
 import msgpack
 import numpy as np
 
+from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
 from bokeh.layouts import column, layout
 from bokeh.palettes import Spectral11
@@ -14,7 +15,7 @@ from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure
 from leverage import shock_wheel_figure, leverage_ratio_figure
 from psst import Telemetry, dataclass_from_dict
-from travel import travel_figure, travel_histogram_figure
+from travel import travel_figure, travel_histogram_figure, update_travel_histogram
 from velocity import velocity_histogram_figure, velocity_stats_figure
 
 
@@ -72,10 +73,26 @@ front_idlings = filter_idlings(front_topouts, airtimes_mask)
 rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
 
 # create graphs
+def on_selectiongeometry(event):
+    start = int(event.geometry['x0'] * telemetry.SampleRate)
+    end = int(event.geometry['x1'] * telemetry.SampleRate)
+    mask = np.full(len(telemetry.Front.Travel), True)
+    mask[:start] = False
+    mask[end:] = False
+    update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask&mask)
+    update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask&mask)
+
+def on_doubletap():
+    update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask)
+    update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask)
+
 front_color = Spectral11[1]
 rear_color = Spectral11[2]
-
+    
 p_travel = travel_figure(telemetry, lod, front_color, rear_color)
+p_travel.on_event(SelectionGeometry, on_selectiongeometry)
+p_travel.on_event(DoubleTap, on_doubletap)
+
 add_airtime_labels(airtimes, tick, p_travel)
 add_idling_marks(front_idlings, tick, p_travel)
 add_idling_marks(rear_idlings, tick, p_travel)

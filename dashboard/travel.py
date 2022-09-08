@@ -91,15 +91,19 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     p.legend.click_policy = 'hide'
     return p
 
-def travel_histogram_figure(digitized, travel, mask, color, title):
-    bins = digitized.Bins
-    max_travel = bins[-1]
-    hist = np.zeros(len(bins)-1)
+def travel_histogram_data(digitized, mask):
+    hist = np.zeros(len(digitized.Bins)-1)
     for i in range(len(digitized.Data)):
         if mask[i]:
             hist[digitized.Data[i]] += 1
     hist = hist / np.count_nonzero(mask) * 100
+    return dict(y=digitized.Bins[:-1], right=hist)
 
+def travel_histogram_figure(digitized, travel, mask, color, title):
+    bins = digitized.Bins
+    max_travel = bins[-1]
+    data = travel_histogram_data(digitized, mask)
+    source = ColumnDataSource(name='ds_hist', data=data)
     p = figure(
         title=title,
         height=250,
@@ -113,17 +117,23 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
         output_backend='webgl')
     p.x_range.start = 0
     p.y_range.flipped = True
-    p.hbar(y=bins[:-1], height=max_travel/(len(bins)-1), left=0, right=hist, color=color, line_color='black')
-    add_travel_stat_labels(travel[mask], max_travel, np.max(hist), p)
+    p.hbar(y='y', height=max_travel/(len(bins)-1), left=0, right='right', source=source, color=color, line_color='black')
+    add_travel_stat_labels(travel[mask], max_travel, np.max(data['right']), p)
     return p
 
-def add_travel_stat_labels(travel, max_travel, hist_max, p):
+def travel_stats(travel, max_travel):
     avg = np.average(travel)
     mx = np.max(travel)
     bo = bottomouts(travel, max_travel)
-    s_avg = Span(location=avg, dimension='width',
+    avg_text = f"avg.: {avg:.2f} mm ({avg/max_travel*100:.1f}%)"
+    mx_text = f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / {len(bo)} bottom outs"
+    return avg, mx, avg_text, mx_text
+
+def add_travel_stat_labels(travel, max_travel, hist_max, p):
+    avg, mx, avg_text, mx_text = travel_stats(travel, max_travel)
+    s_avg = Span(name='s_avg', location=avg, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
-    s_max = Span(location=mx, dimension='width',
+    s_max = Span(name='s_max', location=mx, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
     p.add_layout(s_avg)
     p.add_layout(s_max)
@@ -136,7 +146,26 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
         'text_align': 'right',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_avg = Label(y=avg, text=f"avg.: {avg:.2f} mm ({avg/max_travel*100:.1f}%)", y_offset=-10, **text_props)
-    l_max = Label(y=mx, text=f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / {len(bo)} bottom outs", y_offset=10, **text_props)
+    l_avg = Label(name='l_avg', y=avg, text=avg_text, y_offset=-10, **text_props)
+    l_max = Label(name='l_max', y=mx, text=mx_text, y_offset=10, **text_props)
     p.add_layout(l_avg)
     p.add_layout(l_max)
+
+def update_travel_histogram(p, travel, digitized, mask):
+    ds = p.select_one('ds_hist')
+    ds.data = travel_histogram_data(digitized, mask)
+
+    avg, mx, avg_text, mx_text = travel_stats(travel[mask], ds.data['y'][-1])
+    l_avg = p.select_one('l_avg')
+    l_avg.text = avg_text
+    l_avg.x = np.max(ds.data['right'])
+    l_avg.y = avg
+    l_max = p.select_one('l_max')
+    l_max.text = mx_text
+    l_max.x = np.max(ds.data['right'])
+    l_max.y = mx
+    s_avg = p.select_one('s_avg')
+    s_avg.location = avg
+    s_max = p.select_one('s_max')
+    s_max.location = mx
+
