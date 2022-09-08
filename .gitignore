@@ -68,3 +68,8 @@ gosst-convert/
 
 # generated dashboards
 *.html
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
