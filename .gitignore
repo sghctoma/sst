@@ -58,10 +58,10 @@ pico/sufni-suspension-telemetry/build/
 sourcematerial/
 
 # compiled executable for gosst
-dashboard/gosst/gosst
+gosst/gosst
 
 # test utilities
-dashboard/gosst-convert/
+gosst-convert/
 
 # processed SST files 
 *.PSST
