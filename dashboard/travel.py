@@ -79,8 +79,6 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         ru.left = geometry['x1'];
         lu.change.emit();
         ru.change.emit();
-
-        //TODO: redraw FFTs and histograms
         '''))
 
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
