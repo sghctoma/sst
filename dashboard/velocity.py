@@ -9,8 +9,14 @@ from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
 
-def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, title):
-    step = dv.Bins[1] - dv.Bins[0]
+
+def normal_distribution_data(velocity, step):
+    mu, std = norm.fit(velocity)
+    ny = np.linspace(velocity.min(), velocity.max(), 1000)
+    pdf = norm.pdf(ny, mu, std) * step * 100 
+    return dict(pdf=pdf, ny=ny)
+
+def velocity_histogram_data(dt, dv, mask, step):
     hist = np.zeros(((len(dt.Bins)-1)//2, len(dv.Bins)-1))
     for i in range(len(dv.Data)):
         if mask[i]:
@@ -31,8 +37,25 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
 
     sd = {str(k): v for k,v in enumerate(hist)}
     sd['y'] = np.array(dv.Bins[:-1])+step/2
-    source = ColumnDataSource(data=sd)
     hi, lo = dv.Bins[cutoff[-1]], dv.Bins[cutoff[0]]
+    return sd, hi, lo, largest_bin
+
+def update_velocity_histogram(p, dt, dv, velocity, mask):
+    ds = p.select_one('ds_hist')
+    step = dv.Bins[1] - dv.Bins[0]
+    sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
+    ds.data=sd
+    p.y_range = Range1d(hi, lo)
+
+    ds_normal = p.select_one('ds_normal')
+    ds_normal.data = normal_distribution_data(velocity, step)
+
+    update_velocity_stats(p, velocity, mx)
+
+def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, title):
+    step = dv.Bins[1] - dv.Bins[0]
+    sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
+    source = ColumnDataSource(name='ds_hist', data=sd)
 
     p = figure(
         title=title,
@@ -47,12 +70,12 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
         output_backend='webgl')
     p.x_range.start = 0
     palette = Spectral11[1:]
-    p.hbar_stack([str(i) for i in range(len(hist))], y='y', height=step, color=palette, line_color='black', source=source)
+    k = list(sd.keys())
+    k.remove('y')
+    p.hbar_stack(stackers=k, name='hb', y='y', height=step, color=palette, line_color='black', source=source)
 
-    mu, std = norm.fit(velocity)
-    ny = np.linspace(velocity.min(), velocity.max(), 1000)
-    pdf = norm.pdf(ny, mu, std) * step * 100 
-    p.line(pdf, ny, line_width=2, line_dash='dashed', color=Spectral11[-2])
+    source_normal = ColumnDataSource(name='ds_normal', data=normal_distribution_data(velocity, step))
+    p.line(x='pdf', y='ny', line_width=2, source=source_normal, line_dash='dashed', color=Spectral11[-2])
 
     mapper = LinearColorMapper(palette=palette, low=0, high=100)
     color_bar = ColorBar(
@@ -65,22 +88,19 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
     lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity[mask], largest_bin, p)
+    add_velocity_stat_labels(velocity[mask], mx, p)
     return p
 
 def add_velocity_stat_labels(velocity, mx, p):
-    avgr = np.average(velocity[velocity < 0])
-    maxr = np.min(velocity[velocity < 0])
-    avgc = np.average(velocity[velocity > 0])
-    maxc = np.max(velocity[velocity > 0])
+    avgr, maxr, avgc, maxc = velocity_stats(velocity)
 
-    s_avgr = Span(location=avgr, dimension='width',
+    s_avgr = Span(name='s_avgr', location=avgr, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
-    s_maxr = Span(location=maxr, dimension='width',
+    s_maxr = Span(name='s_maxr', location=maxr, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
-    s_avgc = Span(location=avgc, dimension='width',
+    s_avgc = Span(name='s_avgc', location=avgc, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
-    s_maxc = Span(location=maxc, dimension='width',
+    s_maxc = Span(name='s_maxc', location=maxc, dimension='width',
             line_color='gray', line_dash='dashed', line_width=2)
     p.add_layout(s_avgr)
     p.add_layout(s_maxr)
@@ -95,16 +115,48 @@ def add_velocity_stat_labels(velocity, mx, p):
         'text_align': 'right',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_avgr = Label(y=avgr, text=f"avg. rebound vel.: {avgr:.1f} mm/s", y_offset=10, **text_props)
-    l_maxr = Label(y=maxr, text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
-    l_avgc = Label(y=avgc, text=f"avg. comp. vel.: {avgc:.1f} mm/s", y_offset=-10, **text_props)
-    l_maxc = Label(y=maxc, text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
+    l_avgr = Label(name='l_avgr', y=avgr, text=f"avg. rebound vel.: {avgr:.1f} mm/s", y_offset=10, **text_props)
+    l_maxr = Label(name='l_maxr', y=maxr, text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
+    l_avgc = Label(name='l_avgc', y=avgc, text=f"avg. comp. vel.: {avgc:.1f} mm/s", y_offset=-10, **text_props)
+    l_maxc = Label(name='l_maxc', y=maxc, text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
     p.add_layout(l_avgr)
     p.add_layout(l_maxr)
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
 
-def velocity_stats(velocity, high_speed_threshold):
+def velocity_stats(velocity):
+    avgr = np.average(velocity[velocity < 0])
+    maxr = np.min(velocity[velocity < 0])
+    avgc = np.average(velocity[velocity > 0])
+    maxc = np.max(velocity[velocity > 0])
+    return avgr, maxr, avgc, maxc
+
+def update_velocity_stats(p, velocity, mx):
+    avgr, maxr, avgc, maxc = velocity_stats(velocity)
+
+    p.select_one('s_avgr').location = avgr
+    p.select_one('s_avgc').location = avgc
+    p.select_one('s_maxr').location = maxr
+    p.select_one('s_maxc').location = maxc
+    
+    l_avgr = p.select_one('l_avgr')
+    l_avgr.x = mx
+    l_avgr.y = avgr
+    l_avgr.text = f"avg. rebound vel.: {avgr:.1f} mm/s"
+    l_maxr = p.select_one('l_maxr')
+    l_maxr.x = mx
+    l_maxr.y = maxr
+    l_maxr.text = f"max. rebound vel.: {maxr:.1f} mm/s"
+    l_avgc = p.select_one('l_avgc')
+    l_avgc.x = mx
+    l_avgc.y = avgc
+    l_avgc.text = f"avg. comp. vel.: {avgc:.1f} mm/s"
+    l_maxc = p.select_one('l_maxc')
+    l_maxc.x = mx
+    l_maxc.y = maxc
+    l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
+    
+def velocity_band_stats(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
     lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
@@ -112,8 +164,8 @@ def velocity_stats(velocity, high_speed_threshold):
     hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
     return hsr, lsr, lsc, hsc
 
-def velocity_stats_figure(velocity, high_speed_threshold):
-    hsr, lsr, lsc, hsc = velocity_stats(velocity, high_speed_threshold)
+def velocity_band_stats_figure(velocity, high_speed_threshold):
+    hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
     source = ColumnDataSource(name='ds_stats', data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
         title="Speed zones\n\n\n\n", #XXX OK, this is fucking ugly, but setting title.standoff
@@ -150,13 +202,13 @@ def velocity_stats_figure(velocity, high_speed_threshold):
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
-    p.y_range = Range1d(0, 100)
+    p.y_range = Range1d(0, hsr+lsr+lsc+hsc)
     p.x_range = Range1d(0, 1)
     return p
 
-def update_velocity_stats(p, velocity, high_speed_threshold):
+def update_velocity_band_stats(p, velocity, high_speed_threshold):
     ds = p.select_one('ds_stats')
-    hsr, lsr, lsc, hsc = velocity_stats(velocity, high_speed_threshold)
+    hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
     ds.data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
     
     l_hsr = p.select_one('l_hsr')
@@ -171,3 +223,5 @@ def update_velocity_stats(p, velocity, high_speed_threshold):
     l_hsc = p.select_one('l_hsc')
     l_hsc.text = f"HSC: {hsc:.2f}%"
     l_hsc.y = hsc / 2
+    
+    p.y_range = Range1d(0, hsr+lsr+lsc+hsc)
