@@ -1,12 +1,13 @@
 import numpy as np
 
 from bokeh.models.ranges import Range1d
-from bokeh.models.tools import WheelZoomTool
+from bokeh.models.sources import ColumnDataSource
+from bokeh.models.tools import HoverTool, WheelZoomTool
 from bokeh.plotting import figure
 from scipy.fft import rfft, rfftfreq
 
 
-def do_fft(travel, tick):
+def fft_data(travel, tick):
     wf = np.kaiser(len(travel), 5)
 
     balanced_travel = travel - np.mean(travel)
@@ -20,26 +21,31 @@ def do_fft(travel, tick):
     #max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
     #print(f[max_freq_idx])
 
-    return freqs, balanced_spectrum[:len(freqs)]
+    return dict(freqs=freqs, spectrum=balanced_spectrum[:len(freqs)])
 
 def fft_figure(travel, tick, color, title):
-    f, s = do_fft(travel, tick)
+    source = ColumnDataSource(name='ds_fft', data=fft_data(travel, tick))
     p = figure(
         title=title,
         height=300,
         sizing_mode='stretch_width',
         toolbar_location='above',
-        tools='xpan,reset,hover',
-        tooltips="@x Hz",
+        tools='xpan,reset',
         active_drag='xpan',
         x_axis_label="Fequency (Hz)",
         output_backend='webgl')
-    wz = WheelZoomTool(maintain_focus=False, dimensions='width')
-    p.add_tools(wz)
-    p.toolbar.active_scroll = wz
-    p.hover.mode = 'vline'
+    wzt = WheelZoomTool(maintain_focus=False, dimensions='width')
+    p.add_tools(wzt)
+    p.toolbar.active_scroll = wzt
+    ht = HoverTool(name='ht', tooltips="@freqs Hz", mode='vline', attachment='above')
+    p.add_tools(ht)
     p.yaxis.visible = False
     p.x_range = Range1d(0.05, 5.05, bounds=(0.05, 10.05))
-    p.vbar(x=f, bottom=0, top=s, width=0.005, color=color)
+    p.vbar(name='b_fft', x='freqs', bottom=0, top='spectrum', source=source, width=4.9/len(source.data['freqs']), color=color)
     return p
 
+def update_fft(p, travel, tick):
+    ds = p.select_one('ds_fft')
+    ds.data = fft_data(travel, tick)
+    b = p.select_one('b_fft')
+    b.glyph.width = 4.9 / len(ds.data['freqs'])

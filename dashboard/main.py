@@ -12,7 +12,7 @@ from pathlib import Path
 from extremes import topouts, combined_topouts
 from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
-from fft import fft_figure
+from fft import fft_figure, update_fft
 from leverage import shock_wheel_figure, leverage_ratio_figure
 from psst import Telemetry, dataclass_from_dict
 from travel import travel_figure, travel_histogram_figure, update_travel_histogram
@@ -79,12 +79,17 @@ def on_selectiongeometry(event):
     mask = np.full(len(telemetry.Front.Travel), True)
     mask[:start] = False
     mask[end:] = False
+
     update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask&mask)
     update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask&mask)
+    update_fft(p_front_fft, front_travel[front_topouts_mask&mask], tick)
+    update_fft(p_rear_fft, rear_travel[rear_topouts_mask&mask], tick)
 
 def on_doubletap():
     update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask)
     update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask)
+    update_fft(p_front_fft, front_travel[front_topouts_mask], tick)
+    update_fft(p_rear_fft, rear_travel[rear_topouts_mask], tick)
 
 front_color = Spectral11[1]
 rear_color = Spectral11[2]
