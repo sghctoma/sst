@@ -16,7 +16,7 @@ from fft import fft_figure, update_fft
 from leverage import shock_wheel_figure, leverage_ratio_figure
 from psst import Telemetry, dataclass_from_dict
 from travel import travel_figure, travel_histogram_figure, update_travel_histogram
-from velocity import velocity_histogram_figure, velocity_stats_figure
+from velocity import update_velocity_stats, velocity_histogram_figure, velocity_stats_figure
 
 
 args = curdoc().session_context.request.arguments
@@ -84,12 +84,16 @@ def on_selectiongeometry(event):
     update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask&mask)
     update_fft(p_front_fft, front_travel[front_topouts_mask&mask], tick)
     update_fft(p_rear_fft, rear_travel[rear_topouts_mask&mask], tick)
+    update_velocity_stats(p_front_vel_stats, front_velocity[front_topouts_mask&mask], hst)
+    update_velocity_stats(p_rear_vel_stats, rear_velocity[rear_topouts_mask&mask], hst)
 
 def on_doubletap():
     update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask)
     update_travel_histogram(p_rear_travel_hist, rear_travel, telemetry.Rear.DigitizedTravel, rear_topouts_mask)
     update_fft(p_front_fft, front_travel[front_topouts_mask], tick)
     update_fft(p_rear_fft, rear_travel[rear_topouts_mask], tick)
+    update_velocity_stats(p_front_vel_stats, front_velocity[front_topouts_mask], hst)
+    update_velocity_stats(p_rear_vel_stats, rear_velocity[rear_topouts_mask], hst)
 
 front_color = Spectral11[1]
 rear_color = Spectral11[2]
@@ -114,8 +118,8 @@ p_front_vel_hist = velocity_histogram_figure(telemetry.Front.DigitizedTravel, te
 p_rear_vel_hist = velocity_histogram_figure(telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
     rear_velocity, rear_topouts_mask, hst, "Speed histogram (rear)")
 
-p_vel_stats_front = velocity_stats_figure(front_velocity[front_topouts_mask], hst)
-p_vel_stats_rear = velocity_stats_figure(rear_velocity[front_topouts_mask], hst)
+p_front_vel_stats = velocity_stats_figure(front_velocity[front_topouts_mask], hst)
+p_rear_vel_stats = velocity_stats_figure(rear_velocity[front_topouts_mask], hst)
 
 p_front_fft = fft_figure(front_travel[front_topouts_mask], tick, front_color, "Frequencies (front)")
 p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequencies (rear)")
@@ -124,7 +128,7 @@ p_rear_fft = fft_figure(rear_travel[rear_topouts_mask], tick, rear_color, "Frequ
 l = layout(
     children=[
         [p_travel, p_lr, p_sw],
-        [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_vel_stats_front, p_rear_vel_hist, p_vel_stats_rear],
+        [column(p_front_travel_hist, p_rear_travel_hist), p_front_vel_hist, p_front_vel_stats, p_rear_vel_hist, p_rear_vel_stats],
         [p_front_fft, p_rear_fft],
     ],
     sizing_mode='stretch_width')

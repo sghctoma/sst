@@ -104,20 +104,17 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
 
-def velocity_stats_figure(velocity, high_speed_threshold):
+def velocity_stats(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
     lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
     lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold)) / count * 100
     hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
+    return hsr, lsr, lsc, hsc
 
-    source = ColumnDataSource(data=dict(
-        x=[0],
-        hsc=[hsc],
-        lsc=[lsc],
-        lsr=[lsr],
-        hsr=[hsr],
-    ))
+def velocity_stats_figure(velocity, high_speed_threshold):
+    hsr, lsr, lsc, hsc = velocity_stats(velocity, high_speed_threshold)
+    source = ColumnDataSource(name='ds_stats', data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
         title="Speed zones\n\n\n\n", #XXX OK, this is fucking ugly, but setting title.standoff
                                      #    above a certain value somehow affects neighbouring figures...
@@ -144,10 +141,10 @@ def velocity_stats_figure(velocity, high_speed_threshold):
         'text_align': 'left',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_hsc = Label(x=0, y=hsc/2, text=f"HSC: {hsc:.2f}%", **text_props)
-    l_lsc = Label(x=0, y=hsc+lsc/2, text=f"LSC: {lsc:.2f}%", **text_props)
-    l_lsr = Label(x=0, y=hsc+lsc+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
-    l_hsr = Label(x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
+    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
+    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
+    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f"LSC: {lsc:.2f}%", **text_props)
+    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f"HSC: {hsc:.2f}%", **text_props)
     p.add_layout(l_hsr)
     p.add_layout(l_lsr)
     p.add_layout(l_lsc)
@@ -157,3 +154,20 @@ def velocity_stats_figure(velocity, high_speed_threshold):
     p.x_range = Range1d(0, 1)
     return p
 
+def update_velocity_stats(p, velocity, high_speed_threshold):
+    ds = p.select_one('ds_stats')
+    hsr, lsr, lsc, hsc = velocity_stats(velocity, high_speed_threshold)
+    ds.data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
+    
+    l_hsr = p.select_one('l_hsr')
+    l_hsr.text = f"HSR: {hsr:.2f}%"
+    l_hsr.y = hsc + lsc + lsr + hsr / 2
+    l_lsr = p.select_one('l_lsr')
+    l_lsr.text = f"LSR: {lsr:.2f}%"
+    l_lsr.y = hsc + lsc + lsr / 2
+    l_lsc = p.select_one('l_lsc')
+    l_lsc.text = f"LSC: {lsc:.2f}%"
+    l_lsc.y = hsc + lsc / 2
+    l_hsc = p.select_one('l_hsc')
+    l_hsc.text = f"HSC: {hsc:.2f}%"
+    l_hsc.y = hsc / 2
