@@ -48,7 +48,7 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
     p.y_range = Range1d(hi, lo)
 
     ds_normal = p.select_one('ds_normal')
-    ds_normal.data = normal_distribution_data(velocity, step)
+    ds_normal.data = normal_distribution_data(velocity[mask], step)
 
     update_velocity_stats(p, velocity, mx)
 
@@ -74,7 +74,7 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
     k.remove('y')
     p.hbar_stack(stackers=k, name='hb', y='y', height=step, color=palette, line_color='black', source=source)
 
-    source_normal = ColumnDataSource(name='ds_normal', data=normal_distribution_data(velocity, step))
+    source_normal = ColumnDataSource(name='ds_normal', data=normal_distribution_data(velocity[mask], step))
     p.line(x='pdf', y='ny', line_width=2, source=source_normal, line_dash='dashed', color=Spectral11[-2])
 
     mapper = LinearColorMapper(palette=palette, low=0, high=100)
