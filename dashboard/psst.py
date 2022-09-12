@@ -21,6 +21,7 @@ class Calibration:
 
 @dataclass
 class Suspension:
+    Present: bool
     Calibration: Calibration
     Travel: list
     Velocity: list

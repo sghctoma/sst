@@ -94,14 +94,10 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
 def add_velocity_stat_labels(velocity, mx, p):
     avgr, maxr, avgc, maxc = velocity_stats(velocity)
 
-    s_avgr = Span(name='s_avgr', location=avgr, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
-    s_maxr = Span(name='s_maxr', location=maxr, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
-    s_avgc = Span(name='s_avgc', location=avgc, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
-    s_maxc = Span(name='s_maxc', location=maxc, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
+    s_avgr = Span(name='s_avgr', location=avgr, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
+    s_maxr = Span(name='s_maxr', location=maxr, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
+    s_avgc = Span(name='s_avgc', location=avgc, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
+    s_maxc = Span(name='s_maxc', location=maxc, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
     p.add_layout(s_avgr)
     p.add_layout(s_maxr)
     p.add_layout(s_avgc)

@@ -14,14 +14,15 @@ from extremes import bottomouts
 
 
 def travel_figure(telemetry, lod, front_color, rear_color):
-    time = np.around(np.arange(0, len(telemetry.Front.Travel)) / telemetry.SampleRate, 4) 
+    l = len(telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
+    time = np.around(np.arange(0, l)/telemetry.SampleRate, 4) 
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Frame.MaxRearTravel
 
     source = ColumnDataSource(data=dict(
         t=time[::lod],
-        f=np.around(telemetry.Front.Travel[::lod], 4),
-        r=np.around(telemetry.Rear.Travel[::lod], 4,),
+        f=np.around(telemetry.Front.Travel[::lod], 4) if telemetry.Front.Present else np.full(l, 0)[::lod],
+        r=np.around(telemetry.Rear.Travel[::lod], 4,) if telemetry.Rear.Present else np.full(l, 0)[::lod],
     ))
     p = figure(
         title="Wheel travel",
