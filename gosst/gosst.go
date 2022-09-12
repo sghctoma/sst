@@ -39,6 +39,7 @@ type calibration struct {
 }
 
 type suspension struct {
+    Present bool
     Calibration calibration
     Travel []float64
     Velocity []float64
@@ -59,6 +60,7 @@ type header struct {
     Magic [3]byte
     Version uint8
     SampleRate uint16
+    Dummy uint32 // XXX temporary fix for struct padding error in firmware
 }
 
 type record struct {
@@ -200,45 +202,76 @@ func main() {
     if err != nil {
         log.Fatalln(err)
     }
-    records := make([]record, (fi.Size() - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
+    records := make([]record, (fi.Size() - 10 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
     err = binary.Read(f, binary.LittleEndian, &records)
     if err != nil {
         log.Fatalln(err)
     }
+    var hasFront = records[0].ForkAngle != 0xffff
+    pd.Front.Present = hasFront
+    var hasRear = records[0].ShockAngle != 0xffff
+    pd.Rear.Present = hasRear
 
     var frame frame
     frame.WheelLeverageRatio, frame.CoeffsShockWheel = parseLeverageData(lrf)
     p, _ := polygo.NewRealPolynomial(frame.CoeffsShockWheel)
     frame.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
-    pd.Front.Travel = make([]float64, len(records))
-    pd.Rear.Travel = make([]float64, len(records))
+
+    if hasFront {
+        pd.Front.Travel = make([]float64, len(records))
+    }
+    if hasRear {
+        pd.Rear.Travel = make([]float64, len(records))
+    }
     for index, value := range records {
-        pd.Front.Travel[index] = angleToStroke(value.ForkAngle, pd.Front.Calibration)
-        x := p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
-        // Rear travel might overshoot the max because of
-        //  a) inaccurately measured leverage ratio
-        //  b) inaccuracies introduced by polynomial fitting
-        // So we just cap it at calculated maximum.
-        pd.Rear.Travel[index] = math.Min(x, frame.MaxRearTravel)
+        if hasFront {
+            // Front travel might under/overshoot because of erronous data
+            // acqusition. Errors might occur mid-ride (e.g. broken electrical
+            // connection due to vibration), so we don't error out, just cap
+            // travel. Errors like these will be obvious on the graphs, and
+            // the affected regions can be filtered by hand.
+            x := angleToStroke(value.ForkAngle, pd.Front.Calibration)
+            x = math.Max(0, x)
+            x = math.Min(x, pd.Front.Calibration.MaxStroke)
+            pd.Front.Travel[index] = x
+        }
+        if hasRear {
+            // Rear travel might also overshoot the max because of
+            //  a) inaccurately measured leverage ratio
+            //  b) inaccuracies introduced by polynomial fitting
+            // So we just cap it at calculated maximum.
+            x := p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
+            x = math.Max(0, x)
+            x = math.Min(x, frame.MaxRearTravel)
+            pd.Rear.Travel[index] = x
+        }
     }
     pd.Frame = frame
 
-    tb := linspace(0, pd.Front.Calibration.MaxStroke, 21)
-    pd.Front.DigitizedTravel.Bins = tb
-    pd.Front.DigitizedTravel.Data = digitize(pd.Front.Travel, tb)
-    tb = linspace(0, pd.Frame.MaxRearTravel, 21)
-    pd.Rear.DigitizedTravel.Bins = tb
-    pd.Rear.DigitizedTravel.Data = digitize(pd.Rear.Travel, tb)
+    if hasFront {
+        tb := linspace(0, pd.Front.Calibration.MaxStroke, 21)
+        pd.Front.DigitizedTravel.Bins = tb
+        pd.Front.DigitizedTravel.Data = digitize(pd.Front.Travel, tb)
+    }
+    if hasRear {
+        tb := linspace(0, pd.Frame.MaxRearTravel, 21)
+        pd.Rear.DigitizedTravel.Bins = tb
+        pd.Rear.DigitizedTravel.Data = digitize(pd.Rear.Travel, tb)
+    }
 
-    time := make([]float64, len(pd.Front.Travel))
+    time := make([]float64, len(records))
     for i := range time {time[i] = 1.0 / float64(pd.SampleRate) * float64(i)}
     filter, _ := savitzkygolay.NewFilter(51, 1, 3)
-    vf, _ := filter.Process(pd.Front.Travel, time)
-    pd.Front.Velocity = vf
-    digitizeVelocity(vf, &pd.Front.DigitizedVelocity)
-    vr, _ := filter.Process(pd.Rear.Travel, time)
-    pd.Rear.Velocity =vr
-    digitizeVelocity(vr, &pd.Rear.DigitizedVelocity)
+    if hasFront {
+        vf, _ := filter.Process(pd.Front.Travel, time)
+        pd.Front.Velocity = vf
+        digitizeVelocity(vf, &pd.Front.DigitizedVelocity)
+    }
+    if hasRear {
+        vr, _ := filter.Process(pd.Rear.Travel, time)
+        pd.Rear.Velocity = vr
+        digitizeVelocity(vr, &pd.Rear.DigitizedVelocity)
+    }
 
     var output = opts.OutputFile
     if output == "" {
