@@ -60,7 +60,6 @@ type header struct {
     Magic [3]byte
     Version uint8
     SampleRate uint16
-    Dummy uint32 // XXX temporary fix for struct padding error in firmware
 }
 
 type record struct {
@@ -202,14 +201,17 @@ func main() {
     if err != nil {
         log.Fatalln(err)
     }
-    records := make([]record, (fi.Size() - 10 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
+    records := make([]record, (fi.Size() - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
     err = binary.Read(f, binary.LittleEndian, &records)
     if err != nil {
         log.Fatalln(err)
     }
-    var hasFront = records[0].ForkAngle != 0xffff
+    // TODO: Using index 1 here to be compatible with SST files generated with
+    // an earlier firmware version that contained an off-by-one error. This
+    // should no cause any trouble, but should eventually set back to 0.
+    var hasFront = records[1].ForkAngle != 0xffff
     pd.Front.Present = hasFront
-    var hasRear = records[0].ShockAngle != 0xffff
+    var hasRear = records[1].ShockAngle != 0xffff
     pd.Rear.Present = hasRear
 
     var frame frame
