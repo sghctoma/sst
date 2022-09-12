@@ -29,10 +29,6 @@ if not psst_file.exists():
     raise Exception("No such file")
 d = msgpack.unpackb(open(psst_file, 'rb').read())
 
-# XXX for compatibility with older PSST files...
-if 'Present' not in d['Front'].keys():
-    d['Front']['Present'] = True
-    d['Rear']['Present'] = True
 telemetry = dataclass_from_dict(Telemetry, d)
 
 # lod - Level of Detail for travel graph (downsample ratio)
