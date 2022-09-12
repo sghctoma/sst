@@ -54,7 +54,7 @@ struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
 bool data_acquisition_cb(repeating_timer_t *rt) {
-    if (++count == BUFFER_SIZE) {
+    if (count == BUFFER_SIZE) {
         count = 0;
         multicore_fifo_push_blocking((uintptr_t)active_buffer);
         active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
@@ -71,6 +71,8 @@ bool data_acquisition_cb(repeating_timer_t *rt) {
     } else {
         active_buffer[count].shock_angle = 0xffff;
     }
+
+    count += 1;
 
     return true; // keep repeating
 }
