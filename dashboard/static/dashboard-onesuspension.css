@@ -1,0 +1,35 @@
+body {
+    background-color: rgb(10, 10, 10);
+}
+
+@media only screen and (max-width: 768px) {
+    .container {
+        display: grid;
+        grid-template-columns: 100%;
+        gap: 2px;
+        background-color: rgb(64,64,64);
+    }
+
+    .travel        { grid-column: 1;     grid-row: 1;     }
+    .travel-hist   { grid-column: 1;     grid-row: 2;     }
+    .fft           { grid-column: 1;     grid-row: 3;     }
+    .velocity-hist { grid-column: 1;     grid-row: 4;     }
+    .lr            { grid-column: 1;     grid-row: 5;     }
+    .sw            { grid-column: 1;     grid-row: 6;     }
+}
+
+@media only screen and (min-width: 768px) {
+    .container {
+        display: grid;
+        grid-template-columns: repeat(2, 50%);
+        gap: 2px;
+        background-color: rgb(64,64,64);
+    }
+
+    .travel        { grid-column: 1 / 3; grid-row: 1;     }
+    .travel-hist   { grid-column: 1;     grid-row: 2;     }
+    .fft           { grid-column: 1;     grid-row: 3;     }
+    .velocity-hist { grid-column: 2;     grid-row: 2 / 4; }
+    .lr            { grid-column: 1;     grid-row: 4;     }
+    .sw            { grid-column: 2;     grid-row: 4;     }
+}

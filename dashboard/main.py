@@ -6,7 +6,7 @@ import numpy as np
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
-from bokeh.layouts import column, layout
+from bokeh.layouts import column, layout, row
 from bokeh.palettes import Spectral11
 from pathlib import Path
 
@@ -186,31 +186,27 @@ p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calib
 '''
 Construct the layout.
 '''
-travel_hists = column()
-row2 = [travel_hists]
-row3 = []
-if telemetry.Front.Present:
-    travel_hists.children.append(p_front_travel_hist)
-    row2.append(p_front_vel_hist)
-    row2.append(p_front_vel_stats)
-    row3.append(p_front_fft)
-if telemetry.Rear.Present:
-    travel_hists.children.append(p_rear_travel_hist)
-    row2.append(p_rear_vel_hist)
-    row2.append(p_rear_vel_stats)
-    row3.append(p_rear_fft)
-if len(row2[0].children) == 1:
-    row2[0].children[0].height = 500
-
-# add graphs to layout
-l = layout(
-    children=[
-        [p_travel, p_lr, p_sw],
-        row2,
-        row3,
-    ],
-    sizing_mode='stretch_width')
+only_one_present = telemetry.Front.Present != telemetry.Rear.Present
 
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({p})"
-curdoc().add_root(l)
+curdoc().template_variables["only_one"] =  only_one_present
+curdoc().add_root(p_travel)
+if telemetry.Front.Present:
+    p_front_travel_hist.name = 'travel_hist' if only_one_present else 'front_travel_hist'
+    p_front_fft.name = 'fft' if only_one_present else 'front_fft'
+    p_front_velocity = row(name='velocity_hist' if only_one_present else 'front_velocity_hist',
+        sizing_mode='stretch_width', children=[p_front_vel_hist, p_front_vel_stats])
+    curdoc().add_root(p_front_travel_hist)
+    curdoc().add_root(p_front_fft)
+    curdoc().add_root(p_front_velocity)
+if telemetry.Rear.Present:
+    p_rear_travel_hist.name = 'travel_hist' if only_one_present else 'rear_travel_hist'
+    p_rear_fft.name = 'fft' if only_one_present else 'rear_fft'
+    p_rear_velocity = row(name='velocity_hist' if only_one_present else 'rear_velocity_hist',
+        sizing_mode='stretch_width', children=[p_rear_vel_hist, p_rear_vel_stats])
+    curdoc().add_root(p_rear_travel_hist)
+    curdoc().add_root(p_rear_fft)
+    curdoc().add_root(p_rear_velocity)
+curdoc().add_root(p_lr)
+curdoc().add_root(p_sw)

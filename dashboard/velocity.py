@@ -59,7 +59,8 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
 
     p = figure(
         title=title,
-        height=500,
+        height=600,
+        sizing_mode='stretch_width',
         y_range=[hi, lo],
         x_axis_label="Time (%)",
         y_axis_label='Speed (mm/s)',
@@ -167,7 +168,7 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         title="Speed zones\n\n\n\n", #XXX OK, this is fucking ugly, but setting title.standoff
                                      #    above a certain value somehow affects neighbouring figures...
         width=100,
-        height=500,
+        height=600,
         sizing_mode='fixed',
         tools='',
         toolbar_location=None)

@@ -25,6 +25,7 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         r=np.around(telemetry.Rear.Travel[::lod], 4,) if telemetry.Rear.Present else np.full(l, 0)[::lod],
     ))
     p = figure(
+        name='travel',
         title="Wheel travel",
         height=400,
         sizing_mode="stretch_width",
@@ -107,7 +108,7 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     source = ColumnDataSource(name='ds_hist', data=data)
     p = figure(
         title=title,
-        height=250,
+        height=300,
         sizing_mode="stretch_width",
         x_axis_label="Time (%)",
         y_axis_label='Travel (mm)',

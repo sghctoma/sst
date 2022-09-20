@@ -6,10 +6,11 @@ from bokeh.plotting import figure
 def shock_wheel_figure(coeffs, max_stroke, color):
     f = np.poly1d(np.flip(coeffs))
     p = figure(
+        name='sw',
         title="Shock - Wheel displacement",
-        height=400,
-        width=300,
-        sizing_mode='fixed',
+        height=300,
+        width=600,
+        sizing_mode='stretch_width',
         toolbar_location=None,
         active_drag=None,
         active_scroll=None,
@@ -28,10 +29,11 @@ def shock_wheel_figure(coeffs, max_stroke, color):
 
 def leverage_ratio_figure(wtlr, color):
     p = figure(
+        name='lr',
         title="Leverage Ratio",
-        height=400,
-        width=300,
-        sizing_mode='fixed',
+        height=300,
+        width=600,
+        sizing_mode='stretch_width',
         toolbar_location=None,
         active_drag=None,
         active_scroll=None,
