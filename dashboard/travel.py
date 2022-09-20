@@ -115,7 +115,6 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
         toolbar_location='above',
         tools='ypan,ywheel_zoom,reset',
         active_drag='ypan',
-        active_scroll='ywheel_zoom',
         output_backend='webgl')
     p.x_range.start = 0
     p.y_range.flipped = True

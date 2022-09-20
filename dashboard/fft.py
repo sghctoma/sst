@@ -36,7 +36,6 @@ def fft_figure(travel, tick, color, title):
         output_backend='webgl')
     wzt = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wzt)
-    p.toolbar.active_scroll = wzt
     ht = HoverTool(name='ht', tooltips="@freqs Hz", mode='vline', attachment='above')
     p.add_tools(ht)
     p.yaxis.visible = False

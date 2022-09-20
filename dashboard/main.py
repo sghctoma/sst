@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 
-from bokeh.models.widgets.markups import Div
+import glob
+import os
+
 import msgpack
 import numpy as np
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
-from bokeh.layouts import column, layout, row
+from bokeh.layouts import row
+from bokeh.models import CustomJS, Select
+from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from pathlib import Path
 
@@ -22,7 +26,16 @@ from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
 args = curdoc().session_context.request.arguments
-p = Path(args.get('psst')[0].decode('utf-8')).name
+
+psst_files = glob.glob('data/*.PSST')
+psst_files.sort(key=os.path.getmtime)
+psst_files = [Path(p).name for p in psst_files]
+if not psst_files:
+    curdoc().add_root(Div(text=f"Data directory does not contain PSST files!"))
+    raise Exception("Empty data directory")
+
+a = args.get('psst')
+p = Path(a[0].decode('utf-8')).name if a else psst_files[-1]
 psst_file = Path('data').joinpath(p)
 if not psst_file.exists():
     curdoc().add_root(Div(text=f"File not found in data directory: {p}"))
@@ -184,6 +197,12 @@ p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spect
 p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
 '''
+Dropdown box to select PSST file
+'''
+select = Select(name='pssts_files', options=psst_files, value=psst_file.name)
+select.js_on_change('value', CustomJS(code="window.location.replace('dashboard?psst=' + this.value)"))
+
+'''
 Construct the layout.
 '''
 only_one_present = telemetry.Front.Present != telemetry.Rear.Present
@@ -210,3 +229,4 @@ if telemetry.Rear.Present:
     curdoc().add_root(p_rear_velocity)
 curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
+curdoc().add_root(select)
