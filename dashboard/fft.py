@@ -8,10 +8,8 @@ from scipy.fft import rfft, rfftfreq
 
 
 def fft_data(travel, tick):
-    wf = np.kaiser(len(travel), 5)
-
     balanced_travel = travel - np.mean(travel)
-    balanced_travel_f = rfft(balanced_travel * wf)
+    balanced_travel_f = rfft(balanced_travel)
     balanced_spectrum = np.abs(balanced_travel_f)
 
     freqs= rfftfreq(len(travel), tick)
