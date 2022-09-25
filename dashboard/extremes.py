@@ -33,6 +33,8 @@ def intervals_mask(intervals, length, negate=True):
 
 def filter_airtimes(topouts, front_velocity, rear_velocity, sample_rate):
     airtimes = []
+    if len(topouts) == 0:
+        return airtimes
     v_check_interval = int(0.02 * sample_rate)
     if topouts[0][0] < v_check_interval: # beginning is not airtime
         topouts = topouts[1:] # !!! This might empty out topouts, so we need to check in the next line.
