@@ -2,6 +2,7 @@
 
 import glob
 import os
+import re
 
 import msgpack
 import numpy as np
@@ -201,6 +202,35 @@ Dropdown box to select PSST file
 '''
 select = Select(name='pssts_files', options=psst_files, value=psst_file.name)
 select.js_on_change('value', CustomJS(code="window.location.replace('dashboard?psst=' + this.value)"))
+
+
+'''
+Disable tools for mobile browsers to allow scrolling
+'''
+def disable_tools(p):
+    p.toolbar.active_drag = None
+    p.toolbar.active_scroll = None
+    p.toolbar.active_inspect= None
+
+ua = ''
+try:
+    ua = curdoc().session_context.request.headers['User-Agent']
+except:
+    pass
+if re.search('Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini', ua) is not None:
+    disable_tools(p_travel)
+    disable_tools(p_lr)
+    disable_tools(p_sw)
+    if telemetry.Front.Present:
+        disable_tools(p_front_travel_hist)
+        disable_tools(p_front_fft)
+        disable_tools(p_front_vel_hist)
+        disable_tools(p_front_vel_stats)
+    if telemetry.Rear.Present:
+        disable_tools(p_rear_travel_hist)
+        disable_tools(p_rear_fft)
+        disable_tools(p_rear_vel_hist)
+        disable_tools(p_rear_vel_stats)
 
 '''
 Construct the layout.
