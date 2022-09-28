@@ -61,7 +61,7 @@ sourcematerial/
 gosst/gosst
 
 # gosst database
-gosst/gosst.db
+gosst/data
 
 # test utilities
 gosst-convert/

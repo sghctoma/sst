@@ -140,7 +140,7 @@ func digitizeVelocity(v []float64, d *digitized) {
 func prorcessRecording(file *multipart.FileHeader, lnk linkage, fcal, rcal calibration) *processed {
     filename := path.Base(file.Filename)
     if filename == "" {
-        filename = fmt.Sprintf("%s.PSST", uuid.UUID{}.String())
+        filename = fmt.Sprintf("%s.PSST", uuid.NewString())
     } else {
         ext := path.Ext(filename)
         if ext == "" {
