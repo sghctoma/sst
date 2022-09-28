@@ -26,9 +26,11 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
+DATA_DIR = 'data'
+
 args = curdoc().session_context.request.arguments
 
-psst_files = glob.glob('data/*.PSST')
+psst_files = glob.glob(DATA_DIR + '/*.PSST')
 psst_files.sort(key=os.path.getmtime)
 psst_files = [Path(p).name for p in psst_files]
 if not psst_files:
@@ -37,7 +39,7 @@ if not psst_files:
 
 a = args.get('psst')
 p = Path(a[0].decode('utf-8')).name if a else psst_files[-1]
-psst_file = Path('data').joinpath(p)
+psst_file = Path(DATA_DIR).joinpath(p)
 if not psst_file.exists():
     curdoc().add_root(Div(text=f"File not found in data directory: {p}"))
     raise Exception("No such file")
@@ -92,7 +94,7 @@ if telemetry.Rear.Present:
     rear_travel = np.array(telemetry.Rear.Travel)
     rear_record_num = len(rear_travel)
     rear_velocity = np.array(telemetry.Rear.Velocity)
-    rear_topouts = topouts(rear_travel, telemetry.Frame.MaxRearTravel, telemetry.SampleRate)
+    rear_topouts = topouts(rear_travel, telemetry.Linkage.MaxRearTravel, telemetry.SampleRate)
     rear_topouts_mask = intervals_mask(rear_topouts, rear_record_num)
 
     if np.count_nonzero(rear_topouts_mask):
@@ -171,7 +173,7 @@ to zero travel, and suspension velocity at the end of the interval reaches a thr
 comb_topouts = combined_topouts(front_travel if telemetry.Front.Present else np.full(record_num, 0),
     telemetry.Front.Calibration.MaxStroke,
     rear_travel if telemetry.Rear.Present else np.full(record_num, 0),
-    telemetry.Frame.MaxRearTravel,
+    telemetry.Linkage.MaxRearTravel,
     telemetry.SampleRate)
 airtimes = filter_airtimes(comb_topouts,
     front_velocity if telemetry.Front.Present else np.full(record_num, 0),
@@ -194,8 +196,8 @@ if telemetry.Rear.Present:
 '''
 Leverage-related graphs. These are input data, not measured by this project.
 '''
-p_lr = leverage_ratio_figure(np.array(telemetry.Frame.WheelLeverageRatio), Spectral11[5])
-p_sw = shock_wheel_figure(telemetry.Frame.CoeffsShockWheel, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
+p_lr = leverage_ratio_figure(np.array(telemetry.Linkage.LeverageRatio), Spectral11[5])
+p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
 '''
 Dropdown box to select PSST file

@@ -17,7 +17,7 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     l = len(telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
     time = np.around(np.arange(0, l)/telemetry.SampleRate, 4) 
     front_max = telemetry.Front.Calibration.MaxStroke
-    rear_max = telemetry.Frame.MaxRearTravel
+    rear_max = telemetry.Linkage.MaxRearTravel
 
     source = ColumnDataSource(data=dict(
         t=time[::lod],

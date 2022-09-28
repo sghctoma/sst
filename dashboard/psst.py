@@ -7,9 +7,10 @@ class Digitized:
     Bins: list
 
 @dataclass
-class Frame:
-    WheelLeverageRatio: list
-    CoeffsShockWheel: list
+class Linkage:
+    Name: str
+    LeverageRatio: list
+    ShockWheelCoeffs: list
     MaxRearTravel: float
 
 @dataclass
@@ -35,7 +36,7 @@ class Telemetry:
     SampleRate: int
     Front: Suspension
     Rear: Suspension
-    Frame: Frame
+    Linkage: Linkage
 
 # source: https://stackoverflow.com/a/54769644
 def dataclass_from_dict(klass, d):
