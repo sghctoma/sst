@@ -9,10 +9,13 @@ from scipy.fft import rfft, rfftfreq
 
 def fft_data(travel, tick):
     balanced_travel = travel - np.mean(travel)
-    balanced_travel_f = rfft(balanced_travel)
+    n = len(balanced_travel)
+    if n < 10000:
+        n = 10000
+    balanced_travel_f = rfft(balanced_travel, n=n)
     balanced_spectrum = np.abs(balanced_travel_f)
 
-    freqs= rfftfreq(len(travel), tick)
+    freqs= rfftfreq(n, tick)
     freqs = freqs[freqs <= 10] # cut off FFT graph at 10 Hz
 
     # TODO put a label that shows the most prominent frequencies
