@@ -4,8 +4,6 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"os"
-	"path"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,15 +14,16 @@ import (
 )
 
 type session struct {
-    Date        time.Time `json:"date"`
-    Path        string    `json:"path"`
-    Description string    `json:"description"`
+    Date        time.Time `codec:"," json:"date"`
+    Name        string    `codec:"," json:"path"`
+    Description string    `codec:"," json:"description"`
+    Data        processed `codec:"," json:"-"`
 }
 
 type calibrationPair struct {
-    Name  string      `json:"name" binding:"required"`
-    Front calibration `json:"front" validate:"dive" binding:"required"`
-    Rear  calibration `json:"rear" validate:"dive" binding:"required"`
+    Name  string      `codec:"," json:"name" binding:"required"`
+    Front calibration `codec:"," json:"front" validate:"dive" binding:"required"`
+    Rear  calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
 }
 
 type RequestHandler struct {
@@ -36,7 +35,6 @@ func (this *RequestHandler) GetCalibrations(c *gin.Context) {
     m := make(map[string]calibrationPair)
     iter := this.Db.NewIterator(util.BytesPrefix([]byte("cal-")), nil)
     for iter.Next() {
-        log.Println("alma")
         dec := codec.NewDecoderBytes(iter.Value(), this.H)
         var cal calibrationPair
         dec.Decode(&cal)
@@ -78,10 +76,11 @@ func (this *RequestHandler) PutCalibration(c *gin.Context) {
     enc := codec.NewEncoderBytes(&b, this.H)
     enc.Encode(calibration)
 
-    if err := this.Db.Put([]byte("cal-" + uuid.NewString()), b, nil); err != nil {
+    id := uuid.NewString()
+    if err := this.Db.Put([]byte("cal-" + id), b, nil); err != nil {
         c.AbortWithStatus(http.StatusInternalServerError)
     } else {
-        c.Status(http.StatusCreated)
+        c.JSON(http.StatusCreated, gin.H{"id": id})
     }
 }
 
@@ -128,10 +127,11 @@ func (this *RequestHandler) PutLinkage(c *gin.Context) {
     enc := codec.NewEncoderBytes(&b, this.H)
     enc.Encode(linkage)
 
-    if err := this.Db.Put([]byte("lnk-" + uuid.NewString()), b, nil); err != nil {
+    id := uuid.NewString()
+    if err := this.Db.Put([]byte("lnk-" + id), b, nil); err != nil {
         c.AbortWithStatus(http.StatusInternalServerError)
     } else {
-        c.Status(http.StatusCreated)
+        c.JSON(http.StatusCreated, gin.H{"id": id})
     }
 }
 
@@ -169,6 +169,24 @@ func (this *RequestHandler) GetSession(c *gin.Context) {
     c.JSON(http.StatusOK, session)
 }
 
+func (this *RequestHandler) GetSessionData(c *gin.Context) {
+    bs, err := this.Db.Get([]byte("ses-" + c.Param("id")), nil)
+    if err != nil {
+        c.AbortWithStatus(http.StatusNotFound)
+        return
+    }
+
+    dec := codec.NewDecoderBytes(bs, this.H)
+    var session session
+    dec.Decode(&session)
+
+    var bd []byte
+    enc := codec.NewEncoderBytes(&bd, this.H)
+    enc.Encode(session.Data)
+    c.Header("Content-Disposition", "attachment; filename=" + session.Name)
+    c.Data(http.StatusOK, "application/octet-stream", bd)
+}
+
 func (this *RequestHandler) PutSession(c *gin.Context) {
     var cpair calibrationPair
     bc, err := this.Db.Get([]byte("cal-" + c.PostForm("calibration")), nil)
@@ -194,27 +212,21 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
         c.AbortWithStatus(http.StatusUnprocessableEntity)
         return
     }
-    fo, err := os.Create(path.Join("data", pd.Name))
-    if err != nil {
-        c.AbortWithStatus(http.StatusInternalServerError)
-        return
-    }
-    defer fo.Close()
-    enc := codec.NewEncoder(fo, this.H)
-    enc.Encode(pd)
 
     var bs []byte
-    enc = codec.NewEncoderBytes(&bs, this.H)
+    enc := codec.NewEncoderBytes(&bs, this.H)
     enc.Encode(&session{
         Date: time.Now(),
-        Path: pd.Name,
+        Name: pd.Name,
         Description: c.PostForm("description"),
+        Data: *pd,
     })
 
-    if err := this.Db.Put([]byte("ses-" + uuid.NewString()), bs, nil); err != nil {
+    id := uuid.NewString()
+    if err := this.Db.Put([]byte("ses-" + id), bs, nil); err != nil {
         c.AbortWithStatus(http.StatusInternalServerError)
     } else {
-        c.Status(http.StatusCreated)
+        c.JSON(http.StatusCreated, gin.H{"id": id})
     }
 }
 
@@ -251,6 +263,7 @@ func main() {
 
     router.GET("/sessions", (&RequestHandler{Db: db, H: &h}).GetSessions)
     router.GET("/session/:id", (&RequestHandler{Db: db, H: &h}).GetSession)
+    router.GET("/sessiondata/:id", (&RequestHandler{Db: db, H: &h}).GetSessionData)
     router.PUT("/session", (&RequestHandler{Db: db, H: &h}).PutSession)
     router.DELETE("/session/:id", (&RequestHandler{Db: db, H: &h}).DeleteSession)
 
