@@ -138,21 +138,19 @@ func digitizeVelocity(v []float64, d *digitized) {
 
 
 func prorcessRecording(file *multipart.FileHeader, lnk linkage, fcal, rcal calibration) *processed {
-    filename := path.Base(file.Filename)
-    if filename == "" {
-        filename = fmt.Sprintf("%s.PSST", uuid.NewString())
+    name := path.Base(file.Filename)
+    if name == "" {
+        name = uuid.NewString()
     } else {
-        ext := path.Ext(filename)
-        if ext == "" {
-            filename = fmt.Sprintf("%s.PSST", filename)
-        } else {
-            n := strings.LastIndex(filename, ext)
-            filename = fmt.Sprintf("%s.PSST", filename[:n])
+        ext := path.Ext(name)
+        if ext != "" {
+            n := strings.LastIndex(name, ext)
+            name = name[:n]
         }
     }
 
     var pd processed
-    pd.Name = filename
+    pd.Name = name
     pd.Front.Calibration = fcal
     pd.Rear.Calibration = rcal
 
