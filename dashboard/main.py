@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 
-import glob
-import os
 import re
+import sqlite3
 
 import msgpack
 import numpy as np
 
+from datetime import datetime
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
-from bokeh.layouts import row
-from bokeh.models import CustomJS, Select
+from bokeh.layouts import column, row
+from bokeh.models import CustomJS
+from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets.markups import Div
+from bokeh.models.widgets.tables import DataTable, DateFormatter, TableColumn
 from bokeh.palettes import Spectral11
-from pathlib import Path
 
 from extremes import topouts, combined_topouts
 from extremes import intervals_mask, filter_airtimes, filter_idlings
@@ -26,25 +27,33 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-DATA_DIR = '/home/sghctoma/projects/sst/gosst/data/'
+DB_FILE = '/home/sghctoma/projects/sst/gosst/data/gosst.db'
 
 args = curdoc().session_context.request.arguments
 
-psst_files = glob.glob(DATA_DIR + '/*.PSST')
-psst_files.sort(key=os.path.getmtime)
-psst_files = [Path(p).name for p in psst_files]
-if not psst_files:
-    curdoc().add_root(Div(text=f"Data directory does not contain PSST files!"))
+con = sqlite3.connect(DB_FILE)
+cur = con.cursor()
+res = cur.execute('SELECT ROWID, name, description, date FROM sessions')
+sessions = res.fetchall()
+sessions.sort(key=lambda s: s[3], reverse=True)
+
+if not sessions:
+    curdoc().add_root(Div(text=f"No sessions in the database!"))
     raise Exception("Empty data directory")
 
-a = args.get('psst')
-p = Path(a[0].decode('utf-8')).name if a else psst_files[-1]
-psst_file = Path(DATA_DIR).joinpath(p)
-if not psst_file.exists():
-    curdoc().add_root(Div(text=f"File not found in data directory: {p}"))
-    raise Exception("No such file")
-d = msgpack.unpackb(open(psst_file, 'rb').read())
+try:
+    s = int(args.get('session')[0].decode('utf-8'))
+except:
+    s = sessions[0][0]
 
+
+res = cur.execute('SELECT data FROM sessions WHERE ROWID=?', (s,))
+data = res.fetchone()
+if not data:
+    curdoc().add_root(Div(text=f"No session with ID '{s}'"))
+    raise Exception("No such session")
+
+d = msgpack.unpackb(data[0])
 telemetry = dataclass_from_dict(Telemetry, d)
 
 # lod - Level of Detail for travel graph (downsample ratio)
@@ -200,11 +209,20 @@ p_lr = leverage_ratio_figure(np.array(telemetry.Linkage.LeverageRatio), Spectral
 p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
 '''
-Dropdown box to select PSST file
+Session list
 '''
-select = Select(name='pssts_files', options=psst_files, value=psst_file.name)
-select.js_on_change('value', CustomJS(code="window.location.replace('dashboard?psst=' + this.value)"))
-
+session_divs = []
+last_day = datetime.min
+for s in sessions:
+    d = datetime.fromtimestamp(s[3])
+    desc = s[2] if s[2] else f"No description for {s[1]}"
+    if d.date() != last_day:
+        session_divs.append(Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
+        last_day = d.date()
+    session_divs.append(Div(
+        text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
+        css_classes=['tooltip']))
+sessions_list = column(name='sessions', children=session_divs)
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -240,8 +258,9 @@ Construct the layout.
 only_one_present = telemetry.Front.Present != telemetry.Rear.Present
 
 curdoc().theme = 'dark_minimal'
-curdoc().title = f"Sufni Suspension Telemetry Dashboard ({p})"
+curdoc().title = f"Sufni Suspension Telemetry Dashboard ({telemetry.Name})"
 curdoc().template_variables["only_one"] =  only_one_present
+curdoc().template_variables["name"] =  telemetry.Name
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
     p_front_travel_hist.name = 'travel_hist' if only_one_present else 'front_travel_hist'
@@ -261,4 +280,4 @@ if telemetry.Rear.Present:
     curdoc().add_root(p_rear_velocity)
 curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
-curdoc().add_root(select)
+curdoc().add_root(sessions_list)

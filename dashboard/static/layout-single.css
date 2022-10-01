@@ -12,7 +12,6 @@
     .velocity-hist { grid-column: 1;     grid-row: 4;     }
     .lr            { grid-column: 1;     grid-row: 5;     }
     .sw            { grid-column: 1;     grid-row: 6;     }
-    .pssts-files   { grid-column: 1;     grid-row: 7;     }
 }
 
 @media only screen and (min-width: 768px) {
@@ -29,5 +28,4 @@
     .velocity-hist { grid-column: 2;     grid-row: 2 / 4; }
     .lr            { grid-column: 1;     grid-row: 4;     }
     .sw            { grid-column: 2;     grid-row: 4;     }
-    .pssts-files   { grid-column: 1;     grid-row: 5;     }
 }
