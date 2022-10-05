@@ -2,17 +2,14 @@ package main
 
 import (
 	"bufio"
+    "bytes"
+    "encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
-	"mime/multipart"
-	"path"
 	"sort"
-	"strings"
 
 	"github.com/SeanJxie/polygo"
-	"github.com/google/uuid"
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
 	"gonum.org/v1/gonum/floats"
@@ -27,7 +24,8 @@ type calibration struct {
 
 type linkage struct {
     Name             string       `codec:"," json:"name" binding:"required"`
-    LeverageRatio    [][2]float64 `codec:"," json:"leverage" binding:"required"`
+    RawData          string       `codec:"-" json:"data" binding:"required"`
+    LeverageRatio    [][2]float64 `codec:"," json:"leverage"`
     ShockWheelCoeffs []float64    `codec:"," json:"coeffs"`
     MaxRearTravel    float64      `codec:"," json:"max_travel"`
 }
@@ -66,6 +64,40 @@ type processed struct {
     Linkage    linkage
 }
 
+func (this *linkage) process() error {
+    raw, err := base64.StdEncoding.DecodeString(this.RawData)
+    if err != nil {
+        return err
+    }
+
+    var wtlr [][2]float64
+    var ilr []float64
+    var wt []float64
+    scanner := bufio.NewScanner(bytes.NewReader(raw))
+    for scanner.Scan() {
+        var w, l float64
+        _, err := fmt.Sscanf(scanner.Text(), "%f,%f", &w, &l)
+        if err == nil {
+            ilr = append(ilr, 1.0/l)
+            wtlr = append(wtlr, [2]float64{w, l})
+            wt = append(wt, w)
+        }
+    }
+
+    s := make([]float64, len(ilr))
+    floats.CumSum(s, ilr)
+    s = append([]float64{0.0}, s[:len(s)-1]...)
+    
+    f := polyfit.NewFit(s, wt, 3)
+
+    this.LeverageRatio = wtlr
+    this.ShockWheelCoeffs = f.Solve()
+    this.MaxRearTravel = wt[len(wt) - 1]
+
+    return nil
+}
+
+/*
 func newLinkage(name string, data io.Reader) *linkage {
     var wtlr [][2]float64
     var ilr []float64
@@ -94,6 +126,7 @@ func newLinkage(name string, data io.Reader) *linkage {
         MaxRearTravel: wt[len(wt) - 1],
     }
 }
+*/
 
 func angleToStroke(angle uint16, calibration calibration) float64 {
     if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
@@ -137,18 +170,7 @@ func digitizeVelocity(v []float64, d *digitized) {
 }
 
 
-func prorcessRecording(file *multipart.FileHeader, lnk linkage, fcal, rcal calibration) *processed {
-    name := path.Base(file.Filename)
-    if name == "" {
-        name = uuid.NewString()
-    } else {
-        ext := path.Ext(name)
-        if ext != "" {
-            n := strings.LastIndex(name, ext)
-            name = name[:n]
-        }
-    }
-
+func processRecording(sst []byte, name string, lnk linkage, fcal, rcal calibration) *processed {
     var pd processed
     pd.Name = name
     pd.Front.Calibration = fcal
@@ -158,7 +180,7 @@ func prorcessRecording(file *multipart.FileHeader, lnk linkage, fcal, rcal calib
     lnk.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
     pd.Linkage = lnk
 
-    f, _ := file.Open()
+    f := bytes.NewReader(sst)
     headers := make([]header, 1)
     err := binary.Read(f, binary.LittleEndian, &headers)
     if err != nil {
@@ -173,7 +195,7 @@ func prorcessRecording(file *multipart.FileHeader, lnk linkage, fcal, rcal calib
         return nil
     }
 
-    records := make([]record, (file.Size - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
+    records := make([]record, (len(sst) - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
     err = binary.Read(f, binary.LittleEndian, &records)
     if err != nil {
         return nil

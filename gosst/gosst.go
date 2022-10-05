@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"log"
 	"math"
 	"net/http"
@@ -15,10 +16,11 @@ import (
 )
 
 type session struct {
-    Date        time.Time `codec:"," json:"date"`
-    Name        string    `codec:"," json:"path"`
+    Name        string    `codec:"," json:"name"`
     Description string    `codec:"," json:"description"`
-    Data        processed `codec:"," json:"-"`
+    Calibration int64     `codec:"," json:"calibration"`
+    Linkage     int64     `codec:"," json:"linkage"`
+    Data        string    `codec:"," json:"data"`
 }
 
 type calibrationPair struct {
@@ -161,10 +163,18 @@ func (this *RequestHandler) GetLinkage(c *gin.Context) {
 }
 
 func (this *RequestHandler) PutLinkage(c *gin.Context) {
-    name := c.PostForm("name")
-    file, _ := c.FormFile("leverage")
-    f, _ := file.Open()
-    linkage := newLinkage(name, f)
+    var linkage linkage
+    if err := c.ShouldBindJSON(&linkage); err != nil {
+        c.AbortWithStatus(http.StatusBadRequest)
+        return
+    }
+
+    //linkage := newLinkage(linkage.Name, bytes.NewReader(raw))
+    if linkage.process() != nil {
+        c.AbortWithStatus(http.StatusBadRequest)
+        return
+    }
+
     var data []byte
     enc := codec.NewEncoderBytes(&data, this.H)
     enc.Encode(linkage)
@@ -255,14 +265,14 @@ func (this *RequestHandler) GetSessionData(c *gin.Context) {
 }
 
 func (this *RequestHandler) PutSession(c *gin.Context) {
-    cid, err := strconv.ParseInt(c.PostForm("calibration"), 10, 64)
-    if err != nil {
+    var session session
+    if err := c.ShouldBindJSON(&session); err != nil {
         c.AbortWithStatus(http.StatusBadRequest)
         return
     }
 
     var calData []byte
-    err = this.Db.QueryRow("SELECT data FROM calibrations where ROWID = ?", cid).Scan(&calData)
+    err := this.Db.QueryRow("SELECT data FROM calibrations where ROWID = ?", session.Calibration).Scan(&calData)
     if err != nil {
         if err == sql.ErrNoRows {
             c.AbortWithStatus(http.StatusNotFound)
@@ -276,14 +286,8 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
     var cpair calibrationPair
     cdec.Decode(&cpair)
 
-    lid, err := strconv.ParseInt(c.PostForm("linkage"), 10, 64)
-    if err != nil {
-        c.AbortWithStatus(http.StatusBadRequest)
-        return
-    }
-
     var lnkData []byte
-    err = this.Db.QueryRow("SELECT data FROM linkages where ROWID = ?", lid).Scan(&lnkData)
+    err = this.Db.QueryRow("SELECT data FROM linkages where ROWID = ?", session.Linkage).Scan(&lnkData)
     if err != nil {
         if err == sql.ErrNoRows {
             c.AbortWithStatus(http.StatusNotFound)
@@ -297,8 +301,12 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
     var linkage linkage
     ldec.Decode(&linkage)
 
-    file, _ := c.FormFile("recording")
-    pd := prorcessRecording(file, linkage, cpair.Front, cpair.Rear)
+    sst, err := base64.StdEncoding.DecodeString(session.Data)
+    if err != nil {
+        c.AbortWithStatus(http.StatusBadRequest)
+        return
+    }
+    pd := processRecording(sst, session.Name, linkage, cpair.Front, cpair.Rear)
     if pd == nil {
         c.AbortWithStatus(http.StatusUnprocessableEntity)
         return
@@ -309,7 +317,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
     enc.Encode(pd)
 
     if _, err := this.Db.Exec("INSERT INTO sessions VALUES (?, ?, ?, ?)",
-            pd.Name, c.PostForm("description"), time.Now().Unix(), data); err != nil {
+            session.Name, session.Description, time.Now().Unix(), data); err != nil {
         c.AbortWithStatus(http.StatusInternalServerError)
     } else {
         c.Status(http.StatusCreated)
