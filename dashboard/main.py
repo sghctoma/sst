@@ -6,14 +6,10 @@ import sqlite3
 import msgpack
 import numpy as np
 
-from datetime import datetime
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
-from bokeh.layouts import column, row
-from bokeh.models import CustomJS
-from bokeh.models.sources import ColumnDataSource
+from bokeh.layouts import row
 from bokeh.models.widgets.markups import Div
-from bokeh.models.widgets.tables import DataTable, DateFormatter, TableColumn
 from bokeh.palettes import Spectral11
 
 from extremes import topouts, combined_topouts
@@ -22,6 +18,7 @@ from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure, update_fft
 from leverage import shock_wheel_figure, leverage_ratio_figure
 from psst import Telemetry, dataclass_from_dict
+from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure, update_travel_histogram
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
@@ -209,20 +206,10 @@ p_lr = leverage_ratio_figure(np.array(telemetry.Linkage.LeverageRatio), Spectral
 p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
 '''
-Session list
+Sessions
 '''
-session_divs = []
-last_day = datetime.min
-for s in sessions:
-    d = datetime.fromtimestamp(s[3])
-    desc = s[2] if s[2] else f"No description for {s[1]}"
-    if d.date() != last_day:
-        session_divs.append(Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
-        last_day = d.date()
-    session_divs.append(Div(
-        text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
-        css_classes=['tooltip']))
-sessions_list = column(name='sessions', children=session_divs)
+sessions_list = session_list(sessions)
+session_dialog = session_dialog(cur)
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -281,3 +268,4 @@ if telemetry.Rear.Present:
 curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
 curdoc().add_root(sessions_list)
+curdoc().add_root(session_dialog)

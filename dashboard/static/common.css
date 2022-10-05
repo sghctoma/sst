@@ -24,6 +24,63 @@ p {
     color: #d0d0d0;
 }
 
+.modal-window {
+    position: fixed;
+    background-color: rgba(255, 255, 255, 0.0);
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 999;
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: all 0.3s;
+    header {
+        color: #0a0a0a;
+        font-size: 24px; 
+        font-weight: bold;
+    }
+    h1 {
+        font-size: 150%;
+        margin: 0 0 15px;
+    }
+}
+
+.modal-window:target {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    overflow: scroll;
+    -webkit-overflow-scrolling: touch;
+}
+
+.modal-window>div {
+    width: 350;
+    position: absolute;
+    top: 50px;
+    left: 50px;
+    padding: 2em;
+    background: white;
+    border-radius: 6px;
+}
+
+.modal-close {
+    color: #aaa;
+    line-height: 50px;
+    font-size: 80%;
+    position: absolute;
+    right: 0;
+    text-align: center;
+    top: 0;
+    width: 70px;
+    text-decoration: none;
+}
+
+.modal-close:hover {
+    color: black;
+}
+
 /* Tooltip container */
 .tooltip {
     position: relative;
@@ -34,7 +91,7 @@ p {
 /* Tooltip text */
 .tooltip .tooltiptext {
     visibility: hidden;
-    width: 120px;
+    width: 200px;
     background-color: #0a0a0a;
     color: #fff;
     text-align: center;
@@ -56,7 +113,7 @@ p {
 
 .tooltip .tooltiptext {
   opacity: 0;
-  transition: opacity 1s;
+  transition: opacity 0.5s;
 }
 
 .tooltip:hover .tooltiptext {
