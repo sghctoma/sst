@@ -2,13 +2,14 @@
 
 import re
 import sqlite3
+from bokeh.models.widgets.inputs import TextAreaInput
 
 import msgpack
 import numpy as np
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
-from bokeh.layouts import row
+from bokeh.layouts import column, row
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
@@ -44,13 +45,14 @@ except:
     s = sessions[0][0]
 
 
-res = cur.execute('SELECT data FROM sessions WHERE ROWID=?', (s,))
-data = res.fetchone()
-if not data:
+res = cur.execute('SELECT data,description FROM sessions WHERE ROWID=?', (s,))
+session_data = res.fetchone()
+if not session_data:
     curdoc().add_root(Div(text=f"No session with ID '{s}'"))
     raise Exception("No such session")
 
-d = msgpack.unpackb(data[0])
+description = session_data[1]
+d = msgpack.unpackb(session_data[0])
 telemetry = dataclass_from_dict(Telemetry, d)
 
 # lod - Level of Detail for travel graph (downsample ratio)
@@ -269,3 +271,8 @@ curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
 curdoc().add_root(sessions_list)
 curdoc().add_root(session_dialog)
+#curdoc().add_root(Div(name='description', sizing_mode='stretch_both', margin=(0,0,0,0), css_classes=['inner-desc'],
+#    text=f"<h3>Notes</h3><br />{description}"))
+curdoc().add_root(column(name='description', sizing_mode='stretch_width', height=300, children=[
+    Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=30, margin=(0,0,0,0), css_classes=['inner-desc']),
+    TextAreaInput(value=description, sizing_mode='stretch_both', margin=(0,0,0,0), css_classes=['inner-desc'])]))

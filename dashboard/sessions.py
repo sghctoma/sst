@@ -10,7 +10,7 @@ from bokeh.layouts import column, row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets.buttons import Button
-from bokeh.models.widgets.inputs import FileInput, Select, Spinner
+from bokeh.models.widgets.inputs import FileInput, Select, Spinner, TextInput
 from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 from bokeh.plotting.figure import figure
@@ -42,6 +42,7 @@ def file_widgets():
         width=400,
         height=200,
         editable=True,
+        auto_edit=True,
         reorderable=False,
         index_position=None,
         source=ds,
@@ -60,21 +61,28 @@ def file_widgets():
     return file_input, file_table, ds
 
 def settings_widgets():
-    f_title = Div(text="<b>Front settings</b>", width=200)
-    f_srate = Spinner(title="Spring rate", low=0, width=200)
-    f_hsr = Spinner(title="HSR", low=0, width=200)
-    f_lsr = Spinner(title="LSR", low=0, width=200)
-    f_lsc = Spinner(title="LSC", low=0, width=200)
-    f_hsc = Spinner(title="HSC", low=0, width=200)
-    r_title = Div(text="<b>Rear settings</b>", width=200)
-    r_srate = Spinner(title="Spring rate", low=0, width=200)
-    r_hsr = Spinner(title="HSR", low=0, width=200)
-    r_lsr = Spinner(title="LSR", low=0, width=200)
-    r_lsc = Spinner(title="LSC", low=0, width=200)
-    r_hsc = Spinner(title="HSC", low=0, width=200)
     return row(sizing_mode='stretch_width', children=[
-        column(f_title, f_srate, f_hsr, f_lsr, f_lsc, f_hsc),
-        column(r_title, r_srate, r_hsr, r_lsr, r_lsc, r_hsc)])
+        column(
+            Div(text="<b>&nbsp;</b>", width=130, height=31),
+            Div(text=f"<b>Spring rate:</b>", width=130, height=31),
+            Div(text=f"<b>HSR:</b>", width=130, height=31),
+            Div(text=f"<b>LSR:</b>", width=130, height=31),
+            Div(text=f"<b>LSC:</b>", width=130, height=31),
+            Div(text=f"<b>HSC:</b>", width=130, height=31)),
+        column(
+            Div(text="<b>Front</b>", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130)),
+        column(
+            Div(text="<b>Rear</b>", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130),
+            Spinner(placeholder="n/a", width=130))])
 
 def calibrations_widgets(cur):
     res = cur.execute('SELECT ROWID, data FROM calibrations')
@@ -88,23 +96,23 @@ def calibrations_widgets(cur):
     first = calibrations[first_key]
     calibration_display = row(
         column(
-            Div(text="<b>&nbsp;</b>", width=100),
-            Div(text=f"<b>Arm:</b>", width=100),
-            Div(text=f"<b>Distance:</b>", width=100),
-            Div(text=f"<b>Angle:</b>", width=100),
-            Div(text=f"<b>Stroke:</b>", width=100)),
+            Div(text="<b>&nbsp;</b>", width=130),
+            Div(text=f"<b>Arm:</b>", width=130),
+            Div(text=f"<b>Distance:</b>", width=130),
+            Div(text=f"<b>Angle:</b>", width=130),
+            Div(text=f"<b>Stroke:</b>", width=130)),
         column(
-            Div(text="<b>Front</b>", width=200),
-            Div(text=f"{first['Front']['ArmLength']:.2f} mm", width=100),
-            Div(text=f"{first['Front']['MaxDistance']:.2f} mm", width=100),
-            Div(text=f"{first['Front']['StartAngle']*180/np.pi:.2f} °", width=100),
-            Div(text=f"{first['Front']['MaxStroke']:.2f} mm", width=100)),
+            Div(text="<b>Front</b>", width=130),
+            Div(text=f"{first['Front']['ArmLength']:.2f} mm", width=130),
+            Div(text=f"{first['Front']['MaxDistance']:.2f} mm", width=130),
+            Div(text=f"{first['Front']['StartAngle']*180/np.pi:.2f} °", width=130),
+            Div(text=f"{first['Front']['MaxStroke']:.2f} mm", width=130)),
         column(
-            Div(text="<b>Rear</b>", width=100),
-            Div(text=f"{first['Rear']['ArmLength']:.2f} mm", width=100),
-            Div(text=f"{first['Rear']['MaxDistance']:.2f} mm", width=100),
-            Div(text=f"{first['Rear']['StartAngle']*180/np.pi:.2f} °", width=100),
-            Div(text=f"{first['Rear']['MaxStroke']:.2f} mm", width=100)))
+            Div(text="<b>Rear</b>", width=130),
+            Div(text=f"{first['Rear']['ArmLength']:.2f} mm", width=130),
+            Div(text=f"{first['Rear']['MaxDistance']:.2f} mm", width=130),
+            Div(text=f"{first['Rear']['StartAngle']*180/np.pi:.2f} °", width=130),
+            Div(text=f"{first['Rear']['MaxStroke']:.2f} mm", width=130)))
     calibrations_select.js_on_change('value', CustomJS(args=dict(cd=calibration_display, ds=calibrations_ds), code='''
         let v = ds.data.data[0][this.value];
         cd.children[1].children[1].text = v.Front.ArmLength.toFixed(2) + " mm";
@@ -161,22 +169,28 @@ def session_dialog(cur):
     linkages_select, linkage_display = linkages_widgets(cur)
 
     add_button = Button(name='button_add', label="Add", button_type='success')
+    add_button.js_on_change('label', CustomJS(args=dict(), code='''
+        console.log(this.label);
+        if (this.label == "Done") {
+            window.location.replace("/dashboard");
+        } else if (this.label == "Error") {
+            alert("Could not import SST files!");
+            this.label = "Add";
+        }
+        '''))
 
     def on_addbuttonclick():
-        front = settings_display.children[0].children
-        rear = settings_display.children[1].children
-        settings_table = f"""
-            <table>
-                <tr><th>&nbsp;</th><th>Front</th><th>Rear</th></tr>
-                <tr><td>Spring</td><td>{front[1].value}</td><td>{rear[1].value}</td>
-                <tr><td>HSR</td><td>{front[2].value}</td><td>{rear[2].value}</td>
-                <tr><td>LSR</td><td>{front[3].value}</td><td>{rear[3].value}</td>
-                <tr><td>LSC</td><td>{front[4].value}</td><td>{rear[4].value}</td>
-                <tr><td>HSC</td><td>{front[5].value}</td><td>{rear[5].value}</td>
-            </table>"""
+        front = settings_display.children[1].children
+        rear = settings_display.children[2].children
+        settings_table = \
+            f"Front: Spring = {front[1].value}, " + \
+            f"HSR = {front[2].value}, LSR = {front[3].value}, LSC = {front[4].value}, HSC = {front[5].value}\n" + \
+            f"Rear: Spring = {rear[1].value}, " + \
+            f"HSR = {rear[2].value}, LSR = {rear[3].value}, LSC = {rear[4].value}, HSC = {rear[5].value}"
+
         names, notes = files_ds.data['names'], files_ds.data['notes']
         for i in range(len(names)):
-            description = f"<p>{html.escape(notes[i])}</p><hr />{settings_table}"
+            description = f"{html.escape(notes[i])}\n\nSuspension settings:\n{settings_table}"
             session = dict(
                 name=html.escape(names[i]),
                 description=description,
@@ -184,10 +198,10 @@ def session_dialog(cur):
                 linkage=int(linkages_select.value),
                 data=files_input.value[i])
             r = requests.put('http://127.0.0.1:8080/session', json=session)
-            if r == 201:
-                pass # TODO: reload page
+            if r.status_code == 201:
+                add_button.label = "Done"
             else:
-                pass # TODO: error message
+                add_button.label = "Error"
 
     add_button.on_click(on_addbuttonclick)
 

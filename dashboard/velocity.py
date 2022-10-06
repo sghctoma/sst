@@ -59,7 +59,7 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
 
     p = figure(
         title=title,
-        height=600,
+        height=606,
         sizing_mode='stretch_width',
         y_range=[hi, lo],
         x_axis_label="Time (%)",
@@ -164,10 +164,10 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
     hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
     source = ColumnDataSource(name='ds_stats', data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
-        title="Speed zones\n\n\n\n", #XXX OK, this is fucking ugly, but setting title.standoff
+        title="Speed\nzones\n\n\n",  #XXX OK, this is fucking ugly, but setting title.standoff
                                      #    above a certain value somehow affects neighbouring figures...
-        width=100,
-        height=600,
+        width=70,
+        height=606,
         sizing_mode='fixed',
         tools='',
         toolbar_location=None)
@@ -189,10 +189,10 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         'text_align': 'left',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR: {hsr:.2f}%", **text_props)
-    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f"LSR: {lsr:.2f}%", **text_props)
-    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f"LSC: {lsc:.2f}%", **text_props)
-    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f"HSC: {hsc:.2f}%", **text_props)
+    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR:\n{hsr:.2f}%", **text_props)
+    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f"LSR:\n{lsr:.2f}%", **text_props)
+    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f"LSC:\n{lsc:.2f}%", **text_props)
+    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f"HSC:\n{hsc:.2f}%", **text_props)
     p.add_layout(l_hsr)
     p.add_layout(l_lsr)
     p.add_layout(l_lsc)

@@ -24,6 +24,21 @@ p {
     color: #d0d0d0;
 }
 
+textarea {
+    color: #d0d0d0;
+    background-color: #20262B !important;
+    font-size: 110% !important;
+    padding: 12px !important;
+}
+
+.bk>.inner-desc {
+    width: 100% !important;
+    height: 100%;
+    padding: 10px;
+    background-color: #15191C;
+    color: #d0d0d0;
+}
+
 .modal-window {
     position: fixed;
     background-color: rgba(255, 255, 255, 0.0);
@@ -56,7 +71,7 @@ p {
 }
 
 .modal-window>div {
-    width: 350;
+    width: 420;
     position: absolute;
     top: 50px;
     left: 50px;
@@ -98,15 +113,12 @@ p {
     padding: 5px 0;
     border-radius: 6px;
 
-    /* Position the tooltip text - see examples below! */
     position: absolute;
     z-index: 1;
-
-    top: -70%;
-    left: 110%;
+    top: 20px;
+    left: 40px;
 }
 
-/* Show the tooltip text when you mouse over the tooltip container */
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
@@ -118,17 +130,6 @@ p {
 
 .tooltip:hover .tooltiptext {
   opacity: 1;
-}
-
-.tooltip .tooltiptext::after {
-  content: " ";
-  position: absolute;
-  top: 50%;
-  right: 100%; /* To the left of the tooltip */
-  margin-top: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: transparent black transparent transparent;
 }
 
 /* Makes sure that everything is 100% height */ 
@@ -218,7 +219,7 @@ h4 {
     overflow-x:hidden; 
     overflow-y:scroll; 
     -webkit-overflow-scrolling: touch; 
-    padding: 20px; 
+    padding: 5px; 
 }
 
 /* checked styles (menu open state) */ 
