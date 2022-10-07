@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/base64"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -338,6 +339,25 @@ func (this *RequestHandler) DeleteSession(c *gin.Context) {
     }
 }
 
+func (this *RequestHandler) PatchSessionDescription(c *gin.Context) {
+    id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+    if err != nil {
+        c.AbortWithStatus(http.StatusBadRequest)
+        return
+    }
+    desc, err := ioutil.ReadAll(c.Request.Body)
+    if err != nil {
+        c.AbortWithStatus(http.StatusBadRequest)
+        return
+    }
+
+    if _, err := this.Db.Exec("UPDATE sessions SET description = ? WHERE ROWID = ?", string(desc[:]), id); err != nil {
+        c.AbortWithStatus(http.StatusInternalServerError)
+    } else {
+        c.Status(http.StatusNoContent)
+    }
+}
+
 func main() {
     var h codec.MsgpackHandle
 
@@ -371,6 +391,7 @@ func main() {
     router.GET("/sessiondata/:id", (&RequestHandler{Db: db, H: &h}).GetSessionData)
     router.PUT("/session", (&RequestHandler{Db: db, H: &h}).PutSession)
     router.DELETE("/session/:id", (&RequestHandler{Db: db, H: &h}).DeleteSession)
+    router.PATCH("/session/:id/description", (&RequestHandler{Db: db, H: &h}).PatchSessionDescription)
 
     router.Run("127.0.0.1:8080")
 }
