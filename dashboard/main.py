@@ -2,14 +2,17 @@
 
 import re
 import sqlite3
-from bokeh.models.widgets.inputs import TextAreaInput
 
 import msgpack
 import numpy as np
+import requests
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
+from bokeh.models.callbacks import CustomJS
+from bokeh.models.widgets.buttons import Button
+from bokeh.models.widgets.inputs import TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
@@ -31,9 +34,8 @@ args = curdoc().session_context.request.arguments
 
 con = sqlite3.connect(DB_FILE)
 cur = con.cursor()
-res = cur.execute('SELECT ROWID, name, description, date FROM sessions')
+res = cur.execute('SELECT ROWID, name, description, date FROM sessions ORDER BY date DESC')
 sessions = res.fetchall()
-sessions.sort(key=lambda s: s[3], reverse=True)
 
 if not sessions:
     curdoc().add_root(Div(text=f"No sessions in the database!"))
@@ -214,6 +216,45 @@ sessions_list = session_list(sessions)
 session_dialog = session_dialog(cur)
 
 '''
+Description
+'''
+savebutton = Button(
+    label="save",
+    disabled=True,
+    sizing_mode='fixed',
+    height=20,
+    width=20,
+    button_type='success',
+    css_classes=['savebutton'])
+
+textarea = TextAreaInput(
+    value=description,
+    rows=5,
+    sizing_mode='stretch_both',
+    margin=(0,0,0,0),
+    css_classes=['inner-desc'])
+
+def on_savebuttonclick():
+    r = requests.patch(f'http://127.0.0.1:8080/session/{s}/description', data=textarea.value_input)
+    if r.status_code == 204:
+        savebutton.disabled = True
+    else:
+        savebutton.disabled = False
+
+textarea.js_on_change('value_input', CustomJS(args=dict(btn=savebutton), code='btn.disabled=false;'))
+savebutton.on_click(on_savebuttonclick)
+
+description_box = column(name='description', sizing_mode='stretch_width', height=300, children=[
+    row(
+        sizing_mode='stretch_width',
+        height=30,
+        margin=(0,0,0,0),
+        css_classes=['inner-desc'], children=[
+            Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25),
+            savebutton]),
+    textarea])
+
+'''
 Disable tools for mobile browsers to allow scrolling
 '''
 def disable_tools(p):
@@ -271,8 +312,4 @@ curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
 curdoc().add_root(sessions_list)
 curdoc().add_root(session_dialog)
-#curdoc().add_root(Div(name='description', sizing_mode='stretch_both', margin=(0,0,0,0), css_classes=['inner-desc'],
-#    text=f"<h3>Notes</h3><br />{description}"))
-curdoc().add_root(column(name='description', sizing_mode='stretch_width', height=300, children=[
-    Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=30, margin=(0,0,0,0), css_classes=['inner-desc']),
-    TextAreaInput(value=description, sizing_mode='stretch_both', margin=(0,0,0,0), css_classes=['inner-desc'])]))
+curdoc().add_root(description_box)

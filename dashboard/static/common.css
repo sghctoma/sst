@@ -31,10 +31,21 @@ textarea {
     padding: 12px !important;
 }
 
+.bk.savebutton {
+    position: unset !important;
+    margin-left: auto !important;
+    margin-right: 20px !important;
+}
+
+.savebutton>.bk-btn-group>.bk-btn-success {
+    padding: 1px 3px 3px 3px;
+    font-size: 13px;
+}
+
 .bk>.inner-desc {
     width: 100% !important;
     height: 100%;
-    padding: 10px;
+    padding: 5px;
     background-color: #15191C;
     color: #d0d0d0;
 }
