@@ -34,6 +34,15 @@ args = curdoc().session_context.request.arguments
 
 con = sqlite3.connect(DB_FILE)
 cur = con.cursor()
+
+full_access = False
+try:
+    token = curdoc().session_context.request.headers['X-Token']
+    res = cur.execute('SELECT token FROM tokens')
+    full_access = token in [r[0] for r in res.fetchall()]
+except:
+    pass
+
 res = cur.execute('SELECT ROWID, name, description, date FROM sessions ORDER BY date DESC')
 sessions = res.fetchall()
 
@@ -45,7 +54,6 @@ try:
     s = int(args.get('session')[0].decode('utf-8'))
 except:
     s = sessions[0][0]
-
 
 res = cur.execute('SELECT data,description FROM sessions WHERE ROWID=?', (s,))
 session_data = res.fetchone()
@@ -213,7 +221,7 @@ p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs, telemetry.Rear.Cal
 Sessions
 '''
 sessions_list = session_list(sessions)
-session_dialog = session_dialog(cur)
+session_dialog = session_dialog(cur, full_access)
 
 '''
 Description
@@ -244,14 +252,15 @@ def on_savebuttonclick():
 textarea.js_on_change('value_input', CustomJS(args=dict(btn=savebutton), code='btn.disabled=false;'))
 savebutton.on_click(on_savebuttonclick)
 
+children = [Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25)]
+if full_access:
+    children.append(savebutton)
 description_box = column(name='description', sizing_mode='stretch_width', height=300, children=[
     row(
         sizing_mode='stretch_width',
         height=30,
         margin=(0,0,0,0),
-        css_classes=['inner-desc'], children=[
-            Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25),
-            savebutton]),
+        css_classes=['inner-desc'], children=children),
     textarea])
 
 '''

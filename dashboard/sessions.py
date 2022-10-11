@@ -162,7 +162,10 @@ def linkages_widgets(cur):
     )
     return linkages_select, lvrg
 
-def session_dialog(cur):
+def session_dialog(cur, full_access):
+    if not full_access:
+        return column(name='dialog_session', children=[Div(text="Ah-ah-ah, your didn't say the magic word!")])
+
     files_input, files_table, files_ds = file_widgets()
     settings_display = settings_widgets()
     calibrations_select, calibration_display = calibrations_widgets(cur)
