@@ -50,6 +50,10 @@ textarea {
     color: #d0d0d0;
 }
 
+.bk-root .grid-canvas {
+    color: #15191C !important;
+}
+
 .modal-window {
     position: fixed;
     background-color: rgba(255, 255, 255, 0.0);
@@ -87,12 +91,13 @@ textarea {
     top: 50px;
     left: 50px;
     padding: 2em;
-    background: white;
+    color: #d0d0d0;
+    background-color: #15191C;
     border-radius: 6px;
 }
 
 .modal-close {
-    color: #aaa;
+    color: #d0d0d0;
     line-height: 50px;
     font-size: 80%;
     position: absolute;
@@ -104,7 +109,7 @@ textarea {
 }
 
 .modal-close:hover {
-    color: black;
+    color: #a0a0a0;
 }
 
 /* Tooltip container */
