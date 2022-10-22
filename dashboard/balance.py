@@ -86,7 +86,6 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         x_axis_label="Travel (%)",
         y_axis_label="Velocity (mm/s)",
         output_backend='webgl')
-    p_compression.legend.location = 'top_left'
     p_compression.x_range = Range1d(0, np.fmax(fc['travel'][-1], rc['travel'][-1]))
     p_compression.xaxis.ticker = FixedTicker(ticks=list(range(0,110,10)))
     p_compression.circle(
@@ -113,6 +112,7 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         line_width=2,
         color=rear_color,
         source=rear_compression_source)
+    p_compression.legend.location = 'top_left'
 
     p_rebound = figure(
         name='balance_rebound',
@@ -124,7 +124,6 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         x_axis_label="Travel (%)",
         y_axis_label="Velocity (mm/s)",
         output_backend='webgl')
-    p_rebound.legend.location = 'top_left'
     p_rebound.x_range = Range1d(0, np.fmax(fr['travel'][-1], rr['travel'][-1]))
     p_rebound.xaxis.ticker = FixedTicker(ticks=list(range(0,110,10)))
     p_rebound.y_range.flipped = True
@@ -152,6 +151,7 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         line_width=2,
         color=rear_color,
         source=rear_rebound_source)
+    p_rebound.legend.location = 'top_left'
 
     return p_compression, p_rebound
 
