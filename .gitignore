@@ -65,6 +65,7 @@ gosst/data
 
 # test utilities
 gosst-convert/
+dashboard/test.py
 
 # processed SST files 
 *.PSST
