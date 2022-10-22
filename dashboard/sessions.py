@@ -10,7 +10,7 @@ from bokeh.layouts import column, row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets.buttons import Button
-from bokeh.models.widgets.inputs import FileInput, Select, Spinner, TextInput
+from bokeh.models.widgets.inputs import FileInput, Select, Spinner
 from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 from bokeh.plotting.figure import figure
