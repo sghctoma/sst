@@ -9,9 +9,7 @@ from scipy.fft import rfft, rfftfreq
 
 def fft_data(travel, tick):
     balanced_travel = travel - np.mean(travel)
-    n = len(balanced_travel)
-    if n < 10000:
-        n = 10000
+    n = np.max([20000, len(balanced_travel)])
     balanced_travel_f = rfft(balanced_travel, n=n)
     balanced_spectrum = np.abs(balanced_travel_f)
 
