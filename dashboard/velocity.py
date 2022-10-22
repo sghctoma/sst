@@ -12,8 +12,8 @@ from scipy.stats import norm
 
 def normal_distribution_data(velocity, step):
     mu, std = norm.fit(velocity)
-    ny = np.linspace(velocity.min(), velocity.max(), 1000)
-    pdf = norm.pdf(ny, mu, std) * step * 100 
+    ny = np.linspace(velocity.min(), velocity.max(), 100)
+    pdf = norm.pdf(ny, mu, std) * step * 100
     return dict(pdf=pdf, ny=ny)
 
 def velocity_histogram_data(dt, dv, mask, step):
