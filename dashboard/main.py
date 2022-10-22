@@ -16,11 +16,12 @@ from bokeh.models.widgets.inputs import TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
+from balance import balance_figures, update_balance
 from extremes import topouts, combined_topouts
 from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure, update_fft
-from leverage import shock_wheel_figure, leverage_ratio_figure
+from leverage import leverage_ratio_figure, shock_wheel_figure
 from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure, update_travel_histogram
@@ -159,6 +160,11 @@ def on_selectiongeometry(event):
                 rear_velocity, r_mask)
             update_velocity_band_stats(p_rear_vel_stats, rear_velocity[r_mask], hst)
 
+    if telemetry.Front.Present and telemetry.Rear.Present:
+        update_balance(p_balance_compression, p_balance_rebound,
+            front_travel[mask], telemetry.Front.Calibration.MaxStroke, front_velocity[mask],
+            rear_travel[mask], telemetry.Linkage.MaxRearTravel, rear_velocity[mask])
+
 def on_doubletap():
     if telemetry.Front.Present:
         update_travel_histogram(p_front_travel_hist, front_travel, telemetry.Front.DigitizedTravel, front_topouts_mask)
@@ -173,6 +179,11 @@ def on_doubletap():
         update_velocity_histogram(p_rear_vel_hist, telemetry.Rear.DigitizedTravel, telemetry.Rear.DigitizedVelocity,
             rear_velocity, rear_topouts_mask)
         update_velocity_band_stats(p_rear_vel_stats, rear_velocity[rear_topouts_mask], hst)
+
+    if telemetry.Front.Present and telemetry.Rear.Present:
+        update_balance(p_balance_compression, p_balance_rebound,
+            front_travel, telemetry.Front.Calibration.MaxStroke, front_velocity,
+            rear_travel, telemetry.Linkage.MaxRearTravel, rear_velocity)
 
 p_travel = travel_figure(telemetry, lod, front_color, rear_color)
 p_travel.on_event(SelectionGeometry, on_selectiongeometry)
@@ -218,6 +229,14 @@ p_lr = leverage_ratio_figure(np.array(telemetry.Linkage.LeverageRatio), Spectral
 p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs, telemetry.Rear.Calibration.MaxStroke, Spectral11[5])
 
 '''
+Compression and rebound velocity balance
+'''
+if telemetry.Front.Present and telemetry.Rear.Present:
+    p_balance_compression, p_balance_rebound = balance_figures(
+        front_travel, telemetry.Front.Calibration.MaxStroke, front_velocity, front_color,
+        rear_travel, telemetry.Linkage.MaxRearTravel, rear_velocity, rear_color)
+
+'''
 Sessions
 '''
 sessions_list = session_list(sessions)
@@ -255,13 +274,14 @@ savebutton.on_click(on_savebuttonclick)
 children = [Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25)]
 if full_access:
     children.append(savebutton)
-description_box = column(name='description', sizing_mode='stretch_width', height=300, children=[
+text = column(name='description_x', sizing_mode='stretch_width', height=300, children=[
     row(
         sizing_mode='stretch_width',
         height=30,
         margin=(0,0,0,0),
         css_classes=['inner-desc'], children=children),
     textarea])
+description_box=row(name='description', sizing_mode='stretch_width', height=300, children=[p_lr, text])
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -279,7 +299,6 @@ except:
 if re.search('Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini', ua) is not None:
     disable_tools(p_travel)
     disable_tools(p_lr)
-    disable_tools(p_sw)
     if telemetry.Front.Present:
         disable_tools(p_front_travel_hist)
         disable_tools(p_front_fft)
@@ -317,8 +336,9 @@ if telemetry.Rear.Present:
     curdoc().add_root(p_rear_travel_hist)
     curdoc().add_root(p_rear_fft)
     curdoc().add_root(p_rear_velocity)
-curdoc().add_root(p_lr)
-curdoc().add_root(p_sw)
+if telemetry.Front.Present and telemetry.Rear.Present:
+    curdoc().add_root(p_balance_compression)
+    curdoc().add_root(p_balance_rebound)
 curdoc().add_root(sessions_list)
 curdoc().add_root(session_dialog)
 curdoc().add_root(description_box)
