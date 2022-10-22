@@ -189,10 +189,10 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         'text_align': 'left',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f"HSR:\n{hsr:.2f}%", **text_props)
-    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f"LSR:\n{lsr:.2f}%", **text_props)
-    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f"LSC:\n{lsc:.2f}%", **text_props)
-    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f"HSC:\n{hsc:.2f}%", **text_props)
+    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f" HSR:\n{hsr:.2f}%", **text_props)
+    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f" LSR:\n{lsr:.2f}%", **text_props)
+    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f" LSC:\n{lsc:.2f}%", **text_props)
+    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f" HSC:\n{hsc:.2f}%", **text_props)
     p.add_layout(l_hsr)
     p.add_layout(l_lsr)
     p.add_layout(l_lsc)

@@ -259,7 +259,7 @@ textarea = TextAreaInput(
     rows=5,
     sizing_mode='stretch_both',
     margin=(0,0,0,0),
-    css_classes=['inner-desc'])
+    css_classes=['inner-desc', 'big-bottom-padding'])
 
 def on_savebuttonclick():
     r = requests.patch(f'http://127.0.0.1:8080/session/{s}/description', data=textarea.value_input)

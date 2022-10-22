@@ -31,10 +31,6 @@ textarea {
     padding: 12px !important;
 }
 
-.bk>.bk-input {
-    margin-bottom: 45px !important;
-}
-
 .bk.savebutton {
     position: unset !important;
     margin-left: auto !important;
@@ -52,6 +48,11 @@ textarea {
     padding: 5px;
     background-color: #15191C;
     color: #d0d0d0;
+}
+
+.bk>.big-bottom-padding {
+    padding-top: 0px !important;
+    padding-bottom: 53px;
 }
 
 .bk-root .grid-canvas {
