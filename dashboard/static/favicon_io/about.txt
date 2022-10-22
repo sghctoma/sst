@@ -1,0 +1,7 @@
+This favicon was generated using the following font:
+
+- Font Title: Long Cang
+- Font Author: Copyright 2018 The LongCang Project Authors (https://github.com/googlefonts/longcang)
+- Font Source: http://fonts.gstatic.com/s/longcang/v17/LYjAdGP8kkgoTec8zkRgrXArXN7HWQ.ttf
+- Font License: SIL Open Font License, 1.1 (http://scripts.sil.org/OFL))
+

@@ -13,15 +13,15 @@
     .rear-fft            { grid-column: 1;     grid-row:  5;     }
     .front-velocity-hist { grid-column: 1;     grid-row:  6;     }
     .rear-velocity-hist  { grid-column: 1;     grid-row:  7;     }
-    .description         { grid-column: 1;     grid-row:  8;     }
-    .lr                  { grid-column: 1;     grid-row:  9;     }
-    .sw                  { grid-column: 1;     grid-row: 10;     }
+    .balance-compression { grid-column: 1;     grid-row:  8;     }
+    .balance-rebound     { grid-column: 1;     grid-row:  9;     }
+    .description         { grid-column: 1;     grid-row: 10;     }
 }
 
 @media only screen and (min-width: 768px) {
     .container {
         display: grid;
-        grid-template-columns: repeat(4, 25%);
+        grid-template-columns: repeat(4, 1fr);
         gap: 2px;
         background-color: rgb(64,64,64);
     }
@@ -33,27 +33,26 @@
     .rear-fft            { grid-column: 3 / 5; grid-row: 3;     }
     .front-velocity-hist { grid-column: 1 / 3; grid-row: 4;     }
     .rear-velocity-hist  { grid-column: 3 / 5; grid-row: 4;     }
-    .description         { grid-column: 1 / 3; grid-row: 5;     }
-    .lr                  { grid-column: 3;     grid-row: 5;     }
-    .sw                  { grid-column: 4;     grid-row: 5;     }
+    .balance-compression { grid-column: 1 / 5; grid-row: 5;     }
+    .balance-rebound     { grid-column: 1 / 5; grid-row: 6;     }
+    .description         { grid-column: 1 / 5; grid-row: 7;     }
 }
 
 @media only screen and (min-width: 1920px) {
     .container {
         display: grid;
-        grid-template-columns: repeat(4, 25%);
-        gap: 2px;
+        grid-template-columns: repeat(16, 1fr);
         background-color: rgb(64,64,64);
     }
 
-    .travel              { grid-column: 1 / 5; grid-row: 1;     }
-    .front-travel-hist   { grid-column: 1;     grid-row: 2;     }
-    .rear-travel-hist    { grid-column: 1;     grid-row: 3;     }
-    .front-fft           { grid-column: 2;     grid-row: 2;     }
-    .rear-fft            { grid-column: 2;     grid-row: 3;     }
-    .front-velocity-hist { grid-column: 3;     grid-row: 2 / 4; }
-    .rear-velocity-hist  { grid-column: 4;     grid-row: 2 / 4; }
-    .description         { grid-column: 1 / 3; grid-row: 4;     }
-    .lr                  { grid-column: 3;     grid-row: 4;     }
-    .sw                  { grid-column: 4;     grid-row: 4;     }
+    .travel              { grid-column:  1 / 17; grid-row: 1;     }
+    .front-travel-hist   { grid-column:  1 /  5; grid-row: 2;     }
+    .rear-travel-hist    { grid-column:  1 /  5; grid-row: 3;     }
+    .front-fft           { grid-column:  5 /  9; grid-row: 2;     }
+    .rear-fft            { grid-column:  5 /  9; grid-row: 3;     }
+    .front-velocity-hist { grid-column:  9 / 13; grid-row: 2 / 4; }
+    .rear-velocity-hist  { grid-column: 13 / 17; grid-row: 2 / 4; }
+    .balance-compression { grid-column:  1 /  6; grid-row: 4;     }
+    .balance-rebound     { grid-column:  6 / 11; grid-row: 4;     }
+    .description         { grid-column: 11 / 17; grid-row: 4;     }
 }

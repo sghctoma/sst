@@ -31,6 +31,10 @@ textarea {
     padding: 12px !important;
 }
 
+.bk>.bk-input {
+    margin-bottom: 45px !important;
+}
+
 .bk.savebutton {
     position: unset !important;
     margin-left: auto !important;
@@ -154,7 +158,7 @@ html,body {
     height: 100%;
     overflow: hidden; 
     background-color: rgb(10, 10, 10);
-} 
+}
 
 /* gets the actual input out of the way; 
 we're going to style the label instead */ 
