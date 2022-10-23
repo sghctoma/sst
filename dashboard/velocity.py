@@ -1,9 +1,10 @@
-from bokeh.models.callbacks import CustomJS
 import numpy as np
 
-from bokeh.models import ColumnDataSource
 from bokeh import events
+from bokeh.models import ColumnDataSource
 from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
+from bokeh.models.callbacks import CustomJS
+from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
@@ -70,6 +71,7 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
         tools='ypan,ywheel_zoom,reset',
         active_drag='ypan',
         output_backend='webgl')
+    p.yaxis[0].formatter = PrintfTickFormatter(format="%5d")
     p.x_range.start = 0
     palette = Spectral11[1:]
     k = list(sd.keys())
