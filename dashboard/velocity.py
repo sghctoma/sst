@@ -1,6 +1,8 @@
+from bokeh.models.callbacks import CustomJS
 import numpy as np
 
 from bokeh.models import ColumnDataSource
+from bokeh import events
 from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
@@ -89,6 +91,20 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
         left=0, fill_color='#FFFFFF', fill_alpha=0.1)
     p.add_layout(lowspeed_box)
     add_velocity_stat_labels(velocity[mask], mx, p)
+
+    p.js_on_event(events.Pan, CustomJS(args=dict(p=p), code='''
+        let top = p.y_range.end;
+        let bottom = p.y_range.start;
+        let maxr = p.select_one('s_maxr').location
+        let maxc = p.select_one('s_maxc').location
+        if (top > maxr && top < - 500) {
+            p.select_one('l_maxr').y = top;
+        }
+        if (bottom < maxc && bottom > 500) {
+            p.select_one('l_maxc').y = bottom;
+        }
+        '''))
+
     return p
 
 def add_velocity_stat_labels(velocity, mx, p):
@@ -103,6 +119,9 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(s_avgc)
     p.add_layout(s_maxc)
 
+    top = p.y_range.end
+    bottom = p.y_range.start
+
     text_props = {
         'x': mx,
         'x_units': 'data',
@@ -112,9 +131,9 @@ def add_velocity_stat_labels(velocity, mx, p):
         'text_font_size': '14px',
         'text_color': '#fefefe'}
     l_avgr = Label(name='l_avgr', y=avgr, text=f"avg. rebound vel.: {avgr:.1f} mm/s", y_offset=10, **text_props)
-    l_maxr = Label(name='l_maxr', y=maxr, text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
+    l_maxr = Label(name='l_maxr', y=np.fmax(top, maxr), text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
     l_avgc = Label(name='l_avgc', y=avgc, text=f"avg. comp. vel.: {avgc:.1f} mm/s", y_offset=-10, **text_props)
-    l_maxc = Label(name='l_maxc', y=maxc, text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
+    l_maxc = Label(name='l_maxc', y=np.fmin(bottom, maxc), text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
     p.add_layout(l_avgr)
     p.add_layout(l_maxr)
     p.add_layout(l_avgc)
