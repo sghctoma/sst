@@ -4,6 +4,8 @@ include(pico_sdk_import.cmake)
 
 project(sufni-suspension-telemetry)
 
+set(PICO_BOARD pico_w)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -29,6 +31,7 @@ target_include_directories(sufni-suspension-telemetry
 target_link_libraries(sufni-suspension-telemetry
     pico_stdlib
     pico_multicore
+    pico_cyw43_arch_none
     tinyusb_board
     tinyusb_device
     hardware_i2c

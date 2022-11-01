@@ -1,6 +1,7 @@
 #include "device/usbd.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "pico/cyw43_arch.h"
 #include "hardware/timer.h"
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
@@ -221,14 +222,14 @@ void setup_sensors(ssd1306_t *disp) {
 
 void setup_display(ssd1306_t *disp) {
     spi_init(spi1, 1000000);
-    gpio_set_function(14, GPIO_FUNC_SPI); // SCK
-    gpio_set_function(15, GPIO_FUNC_SPI); // MOSI
+    gpio_set_function(18, GPIO_FUNC_SPI); // SCK
+    gpio_set_function(19, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
     ssd1306_init(disp, 128, 32, spi1,
-            13,  // CS
-            12,  // DC
-            11); // RST
+            17,  // CS
+            16,  // DC
+            22); // RST
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -244,10 +245,8 @@ void display_message(ssd1306_t *disp, char *message) {
 }
 
 bool msc_present() {
-    // GPIO24 is VBUS sense. GPIO24 low -> no USB cable -> no MSC.
-    gpio_init(24);
-    gpio_set_dir(24, GPIO_IN);
-    if (gpio_get(24)) {
+    // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
+    if (cyw43_arch_gpio_get(2)) {
         // Wait for a maximum of 1 second for USB MSC to initialize
         uint32_t t = time_us_32();
         while (!tud_ready()) {
@@ -272,6 +271,8 @@ int main() {
 
     ssd1306_t disp;
     setup_display(&disp);
+
+    cyw43_arch_init();
 
     if (msc_present()) {
         display_message(&disp, "MSC MODE");
