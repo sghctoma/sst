@@ -22,7 +22,9 @@ int64_t longpress_callback(alarm_id_t id, void *user_data) {
     bool state = gpio_get(btn->gpio);
     if (state == btn->state) {
         btn->alarm = -1;
-        btn->onlongpress(btn->user_data);
+        if (btn->onlongpress != NULL) {
+            btn->onlongpress(btn->user_data);
+        }
     }
     return 0;
 }
@@ -33,9 +35,7 @@ int64_t debounce_callback(alarm_id_t id, void *user_data) {
     if (state != btn->state) {
         btn->state = state;
         if (state == false && btn->alarm == -1) { // button press
-            if (btn->onlongpress != NULL) {
-                btn->alarm = add_alarm_in_us(1000000, longpress_callback, btn, false);
-            }
+            btn->alarm = add_alarm_in_us(1000000, longpress_callback, btn, true);
         } else if (btn->alarm != -1) { // button release
             cancel_alarm(btn->alarm);
             btn->alarm = -1;

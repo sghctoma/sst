@@ -14,6 +14,26 @@
 #include "hw_config.h"
 #include <stdint.h>
 
+void create_button(uint, void *, void (*)(void *), void (*)(void *));
+
+enum state {
+    IDLING,
+    SLEEPING,
+    RECORDING,
+    UPLOADING,
+};
+
+enum command {
+    OPEN,
+    DUMP,
+    FINISH
+};
+
+static enum state state;
+static ssd1306_t disp;
+static repeating_timer_t data_acquisition_timer;
+static FIL recording;
+
 // ----------------------------------------------------------------------------
 // Data acquisition
 
@@ -57,40 +77,52 @@ uint16_t count = 0;
 bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
         count = 0;
+        multicore_fifo_push_blocking(DUMP);
         multicore_fifo_push_blocking((uintptr_t)active_buffer);
         active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
     }
 
     if (have_fork) {
-        active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
+        //XXX active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
+        active_buffer[count].fork_angle = 0xcafe;
     } else {
         active_buffer[count].fork_angle = 0xffff;
     }
 
     if (have_shock) {
-        active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
+        //XXX active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
+        active_buffer[count].shock_angle = 0xbabe;
     } else {
         active_buffer[count].shock_angle = 0xffff;
     }
 
     count += 1;
 
-    return true; // keep repeating
+    return state == RECORDING; // keep repeating
 }
 
 // ----------------------------------------------------------------------------
 // Data storage
 
-int open_datafile(FIL *file) {
+int setup_storage() {
     sd_card_t *sd = sd_get_by_num(0);
     FRESULT fr = f_mount(&sd->fatfs, sd->pcName, 1);
     if (fr != FR_OK) {
         return PICO_ERROR_GENERIC;
     }
 
+    fr = f_mkdir("uploaded");
+    if (!(fr == FR_OK || fr == FR_EXIST)) {
+        return PICO_ERROR_GENERIC;
+    }
+
+    return 0;
+}
+
+int open_datafile() {
     uint16_t index = 0;
     FIL index_fil;
-    fr = f_open(&index_fil, "INDEX", FA_OPEN_EXISTING | FA_READ);
+    FRESULT fr = f_open(&index_fil, "INDEX", FA_OPEN_EXISTING | FA_READ);
     if (fr == FR_OK || fr == FR_EXIST) {
         uint8_t buf[2];
         uint br;
@@ -117,35 +149,48 @@ int open_datafile(FIL *file) {
 
     char filename[10];
     sprintf(filename, "%05u.SST", index);
-    fr = f_open(file, filename, FA_CREATE_NEW | FA_WRITE);
+    fr = f_open(&recording, filename, FA_CREATE_NEW | FA_WRITE);
     if (fr != FR_OK) {
         return fr;
     }
 
     struct header h = {"SST", 2, SAMPLE_RATE};
-    f_write(file, &h, sizeof(struct header), NULL);
+    f_write(&recording, &h, sizeof(struct header), NULL);
 
     return index;
 }
 
 void data_storage_core1() {
-    FIL file;
-    int index = open_datafile(&file);
-    multicore_fifo_push_blocking(index);
-    multicore_fifo_push_blocking((uintptr_t)databuffer2);
+    int err = setup_storage();
+    multicore_fifo_push_blocking(err);
 
+    int index;
+    enum command cmd;
+    uint16_t size;
     struct record *buffer;
-    struct record b[BUFFER_SIZE];
     while (true) {
-        buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-
-        //TODO: Need this memcpy, otherwise write is not happening. Reason?
-        //     Also, is this still better performance-wise, than running data
-        //     acquisition and storage on the same core?
-        memcpy(b, buffer, sizeof(struct record)*BUFFER_SIZE);
-        multicore_fifo_push_blocking((uintptr_t)buffer);
-        f_write(&file, b, sizeof(struct record)*BUFFER_SIZE, NULL);
-        f_sync(&file);
+        cmd = (enum command)multicore_fifo_pop_blocking();
+        switch(cmd) {
+            case OPEN:
+                multicore_fifo_drain();
+                index = open_datafile();
+                multicore_fifo_push_blocking(index);
+                multicore_fifo_push_blocking((uintptr_t)databuffer2);
+                break;
+            case DUMP:
+                buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
+                multicore_fifo_push_blocking((uintptr_t)buffer);
+                f_write(&recording, buffer, sizeof(struct record)*BUFFER_SIZE, NULL);
+                f_sync(&recording);
+                break;
+            case FINISH:
+                size = (uint16_t)multicore_fifo_pop_blocking();
+                buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
+                f_write(&recording, buffer, sizeof(struct record)*size, NULL);
+                f_sync(&recording);
+                f_close(&recording);
+                break;
+        }
     }
 }
 
@@ -171,7 +216,7 @@ bool setup_baseline(i2c_inst_t *i2c) {
         uint16_t baseline = 0;
         for (int i = 0; i < 10; ++i) {
             baseline += as5600_get_raw_angle(i2c);
-            sleep_ms(100);
+            sleep_ms(10);
         }
         baseline /= 10;
         as5600_set_start_position(i2c, baseline);
@@ -190,43 +235,29 @@ bool setup_baseline(i2c_inst_t *i2c) {
     }
 }
 
-void setup_sensors(ssd1306_t *disp) {
-    ssd1306_draw_string(disp, 8, 8, 2, "NO MAGNET");
-    ssd1306_show(disp);
-
+void setup_sensors() {
+    /* XXX
     uint8_t dummy;
     while (!((as5600_connected(i2c0) && as5600_detect_magnet(i2c0)) ||
             (as5600_connected(i2c1) && as5600_detect_magnet(i2c1)))) {
         sleep_ms(500);
     }
 
-    ssd1306_clear(disp);
-
     have_fork = setup_baseline(i2c0);
     have_shock = setup_baseline(i2c1);
-
-    if (have_fork) {
-        ssd1306_draw_string(disp, 0, 0, 2, "FORK  OK");
-    } else {
-        ssd1306_draw_string(disp, 0, 0, 2, "FORK  NO");
-    }
-
-    if (have_shock) {
-        ssd1306_draw_string(disp, 0, 16, 2, "SHOCK OK");
-    } else {
-        ssd1306_draw_string(disp, 0, 16, 2, "SHOCK NO");
-    }
-
-    ssd1306_show(disp);
+    */
+    
+    have_fork = true;
+    have_shock = true;
 }
 
 void setup_display(ssd1306_t *disp) {
-    spi_init(spi1, 1000000);
+    spi_init(spi0, 1000000);
     gpio_set_function(18, GPIO_FUNC_SPI); // SCK
     gpio_set_function(19, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 32, spi1,
+    ssd1306_init(disp, 128, 32, spi0,
             17,  // CS
             16,  // DC
             22); // RST
@@ -262,42 +293,84 @@ bool msc_present() {
 }
 
 // ----------------------------------------------------------------------------
+// Button handlers
+
+void start_recording() {
+    count = 0;
+    active_buffer = databuffer1;
+    multicore_fifo_drain();
+    
+    multicore_fifo_push_blocking(OPEN);
+    int index = (int)multicore_fifo_pop_blocking();
+    if (index < 0) {
+        display_message(&disp, "FILE ERR");
+        while(true) { tight_loop_contents(); }
+    }
+
+    // Start data acquisition timer
+    if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
+        display_message(&disp, "TIMER ERR");
+        while(true) { tight_loop_contents(); }
+    }
+}
+
+void stop_recording() {
+    cancel_repeating_timer(&data_acquisition_timer);
+
+    multicore_fifo_push_blocking(FINISH);
+    multicore_fifo_push_blocking(count);
+    multicore_fifo_push_blocking((uintptr_t)active_buffer);
+}
+
+void on_left_press(void *user_data) {
+    switch(state) {
+        case IDLING:
+            state = RECORDING;
+            start_recording();
+            char msg[8];
+            sprintf(msg, "REC:%s|%s", have_fork ? "F" : ".", have_shock ? "S" : ".");
+            display_message(&disp, msg);
+            break;
+        case RECORDING:
+            state = IDLING;
+            stop_recording();
+            display_message(&disp, "IDLE");
+            break;
+        default:
+            break;
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Entry point 
 
 int main() {
     setup_i2c();
     board_init();
+    cyw43_arch_init();
     tusb_init();
 
-    ssd1306_t disp;
     setup_display(&disp);
-
-    cyw43_arch_init();
 
     if (msc_present()) {
         display_message(&disp, "MSC MODE");
         while(true) { tud_task(); }
     } else {
-        // Setup AS5600 encoder(s)
-        setup_sensors(&disp);
-
-        // Start data storage on 2nd core
+        display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
-        int index;
-        index = (int)multicore_fifo_pop_blocking();
-        if (index < 0) {
-            char s[10];
-            sprintf(s, "0x%x", index);
-            display_message(&disp, s);
+        int err = (int)multicore_fifo_pop_blocking();
+        if (err < 0) {
+            display_message(&disp, "CARD ERR");
             while(true) { tight_loop_contents(); }
         }
 
-        // Start collection timer
-        repeating_timer_t data_acquisition_timer;
-        if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
-            display_message(&disp, "TIMER ERR");
-            while(true) { tight_loop_contents(); }
-        }
+        display_message(&disp, "INIT SENS");
+        setup_sensors();
+    
+        display_message(&disp, "IDLE");
+        state = IDLING;
+
+        create_button(1, NULL, on_left_press, NULL);
 
         while (true) { tight_loop_contents(); }
     }
