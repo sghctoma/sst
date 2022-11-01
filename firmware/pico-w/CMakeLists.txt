@@ -14,7 +14,8 @@ add_subdirectory(../lib/pico-as5600 lib/pico-as5600)
 add_subdirectory(../lib/pico-ssd1306-spi lib/pico-ssd1306-spi)
 
 add_executable(sufni-suspension-telemetry
-	sst.c
+    sst.c
+    pushbutton.c
     hw_config.c
     msc_disk.c
     sst_usb_descriptors.c
