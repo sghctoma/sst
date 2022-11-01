@@ -52,7 +52,7 @@ Mkfile.old
 dkms.conf
 
 # build directories
-pico/sufni-suspension-telemetry/build/
+firmware/pico/build/
 
 # external documentations
 sourcematerial/
