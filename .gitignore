@@ -53,6 +53,7 @@ dkms.conf
 
 # build directories
 firmware/pico/build/
+firmware/pico-w/build/
 
 # external documentations
 sourcematerial/
