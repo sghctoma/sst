@@ -21,6 +21,7 @@ enum state {
     SLEEPING,
     RECORDING,
     UPLOADING,
+    MSC,
 };
 
 enum command {
@@ -29,7 +30,7 @@ enum command {
     FINISH
 };
 
-static enum state state;
+static volatile enum state state;
 static ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
@@ -300,6 +301,14 @@ void start_recording() {
     active_buffer = databuffer1;
     multicore_fifo_drain();
     
+    display_message(&disp, "INIT SENS");
+    setup_sensors();
+
+    state = RECORDING;
+    char msg[8];
+    sprintf(msg, "REC:%s|%s", have_fork ? "F" : ".", have_shock ? "S" : ".");
+    display_message(&disp, msg);
+
     multicore_fifo_push_blocking(OPEN);
     int index = (int)multicore_fifo_pop_blocking();
     if (index < 0) {
@@ -315,6 +324,8 @@ void start_recording() {
 }
 
 void stop_recording() {
+    state = IDLING;
+    display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
 
     multicore_fifo_push_blocking(FINISH);
@@ -325,17 +336,18 @@ void stop_recording() {
 void on_left_press(void *user_data) {
     switch(state) {
         case IDLING:
-            state = RECORDING;
             start_recording();
-            char msg[8];
-            sprintf(msg, "REC:%s|%s", have_fork ? "F" : ".", have_shock ? "S" : ".");
-            display_message(&disp, msg);
             break;
         case RECORDING:
-            state = IDLING;
             stop_recording();
-            display_message(&disp, "IDLE");
             break;
+        default:
+            break;
+    }
+}
+
+void on_left_longpress(void *user_data) {
+    switch(state) {
         default:
             break;
     }
@@ -352,10 +364,10 @@ int main() {
 
     setup_display(&disp);
 
-    if (msc_present()) {
-        display_message(&disp, "MSC MODE");
-        while(true) { tud_task(); }
-    } else {
+    gpio_init(5);
+    gpio_pull_up(5);
+    sleep_ms(1);
+    if (gpio_get(5)) {
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -364,15 +376,23 @@ int main() {
             while(true) { tight_loop_contents(); }
         }
 
-        display_message(&disp, "INIT SENS");
-        setup_sensors();
-    
-        display_message(&disp, "IDLE");
         state = IDLING;
+        display_message(&disp, "IDLE");
+    } else if (msc_present()) {
+        state = MSC;
+        display_message(&disp, "MSC MODE");
+    }
 
-        create_button(1, NULL, on_left_press, NULL);
+    create_button(1, NULL, on_left_press, on_left_longpress);
 
-        while (true) { tight_loop_contents(); }
+    while (true) {
+        switch(state) {
+            case MSC:
+                tud_task();
+                break;
+            default:
+                break;
+        }
     }
 
     return 0;
