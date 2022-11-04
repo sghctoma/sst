@@ -266,9 +266,9 @@ void setup_display(ssd1306_t *disp) {
 
     disp->external_vcc = false;
     ssd1306_init(disp, 128, 32, spi0,
-            17,  // CS
-            16,  // DC
-            22); // RST
+        17,  // CS
+        16,  // DC
+        22); // RST
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -355,9 +355,9 @@ void on_left_press(void *user_data) {
 
 void on_left_longpress(void *user_data) {
     switch(state) {
-		case IDLE:
-			state = CONNECT;
-			display_message(&disp, "CONNECT");
+        case IDLE:
+            state = CONNECT;
+            display_message(&disp, "CONNECT");
         default:
             break;
     }
@@ -367,23 +367,23 @@ void on_left_longpress(void *user_data) {
 // NTP callbacks
 
 void ntp_success_callback(struct tm *utc) {
-	datetime_t t = {
-		.year  = utc->tm_year + 1900,
-		.month = utc->tm_mon + 1,
-		.day   = utc->tm_mday,
-		.dotw  = 0,
-		.hour  = utc->tm_hour,
-		.min   = utc->tm_min,
-		.sec   = utc->tm_sec,
-	};
-	rtc_set_datetime(&t);
-	state = SYNC_DATA;
+    datetime_t t = {
+        .year  = utc->tm_year + 1900,
+        .month = utc->tm_mon + 1,
+        .day   = utc->tm_mday,
+        .dotw  = 0,
+        .hour  = utc->tm_hour,
+        .min   = utc->tm_min,
+        .sec   = utc->tm_sec,
+    };
+    rtc_set_datetime(&t);
+    state = SYNC_DATA;
 }
 
 void ntp_timeout_callback() {
-	display_message(&disp, "NTP ERR");
-	sleep_ms(500);
-	state = IDLE;
+    display_message(&disp, "NTP ERR");
+    sleep_ms(500);
+    state = IDLE;
 }
 
 // ----------------------------------------------------------------------------
@@ -393,30 +393,30 @@ int main() {
     setup_i2c();
     board_init();
     tusb_init();
-	rtc_init();
-	cyw43_arch_init();
+    rtc_init();
+    cyw43_arch_init();
     cyw43_arch_enable_sta_mode();
 
-	datetime_t t = {
-            .year  = 2022,
-            .month = 11,
-            .day   = 03,
-            .dotw  = 4, // 0 is Sunday, so 5 is Friday
-            .hour  = 13,
-            .min   = 37,
-            .sec   = 00
+    datetime_t t = {
+        .year  = 2022,
+        .month = 11,
+        .day   = 03,
+        .dotw  = 4, // 0 is Sunday, so 5 is Friday
+        .hour  = 13,
+        .min   = 37,
+        .sec   = 00
     };
-	rtc_set_datetime(&t);
+    rtc_set_datetime(&t);
 
     setup_display(&disp);
 
     gpio_init(5);
     gpio_pull_up(5);
     sleep_ms(1);
-	if (!gpio_get(5) && msc_present()) {
-		state = MSC;
+    if (!gpio_get(5) && msc_present()) {
+        state = MSC;
         display_message(&disp, "MSC MODE");
-	} else {
+    } else {
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -429,48 +429,48 @@ int main() {
         display_message(&disp, "IDLE");
     }
 
-	struct ntp *ntp = ntp_init(ntp_success_callback, ntp_timeout_callback);
+    struct ntp *ntp = ntp_init(ntp_success_callback, ntp_timeout_callback);
 
     create_button(1, NULL, on_left_press, on_left_longpress);
 
-	uint32_t last_time_update = time_us_32();
-	char time_str[9];
+    uint32_t last_time_update = time_us_32();
+    char time_str[9];
     while (true) {
         switch(state) {
             case MSC:
                 tud_task();
                 break;
-			case IDLE:
-				if (time_us_32() - last_time_update >= 1000000) {
-					last_time_update = time_us_32();
-					rtc_get_datetime(&t);
-					sprintf(time_str, "%02d:%02d:%02d", t.hour, t.min, t.sec);
-					display_message(&disp, time_str);
-				}
-				break;
-			case CONNECT:
-				if (cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000)) {
-					display_message(&disp, "CONN ERR");
-					sleep_ms(500);
-    				state = IDLE;
-				} else {
-					ntp->timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
-					state = SYNC_TIME;
-					display_message(&disp, "NTP SYNC");
-				}
-				break;
-			case SYNC_TIME:
-				ntp_task(ntp);
-				break;
-			case SYNC_DATA:
-				state = IDLE;
-				break;
+            case IDLE:
+                if (time_us_32() - last_time_update >= 1000000) {
+                    last_time_update = time_us_32();
+                    rtc_get_datetime(&t);
+                    sprintf(time_str, "%02d:%02d:%02d", t.hour, t.min, t.sec);
+                    display_message(&disp, time_str);
+                }
+                break;
+            case CONNECT:
+                if (cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000)) {
+                    display_message(&disp, "CONN ERR");
+                    sleep_ms(500);
+                    state = IDLE;
+                } else {
+                    ntp->timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
+                    state = SYNC_TIME;
+                    display_message(&disp, "NTP SYNC");
+                }
+                break;
+            case SYNC_TIME:
+                ntp_task(ntp);
+                break;
+            case SYNC_DATA:
+                state = IDLE;
+                break;
             default:
                 break;
         }
     }
 
-	cyw43_arch_deinit();
+    cyw43_arch_deinit();
 
     return 0;
 }
