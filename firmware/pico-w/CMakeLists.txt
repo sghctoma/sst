@@ -18,6 +18,7 @@ add_subdirectory(../lib/pico-ssd1306-spi lib/pico-ssd1306-spi)
 add_executable(sufni-suspension-telemetry
     sst.c
     pushbutton.c
+    ntp.c
     hw_config.c
     msc_disk.c
     sst_usb_descriptors.c
@@ -31,10 +32,11 @@ target_include_directories(sufni-suspension-telemetry
 target_link_libraries(sufni-suspension-telemetry
     pico_stdlib
     pico_multicore
-    pico_cyw43_arch_none
+    pico_cyw43_arch_lwip_threadsafe_background
     tinyusb_board
     tinyusb_device
     hardware_i2c
+    hardware_rtc
     FatFs_SPI
     as5600
     ssd1306_spi
