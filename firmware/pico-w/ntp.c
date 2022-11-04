@@ -7,6 +7,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "hardware/rtc.h"
 
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
@@ -17,8 +18,18 @@
 // Called with results of operation
 static void ntp_result(struct ntp *ntp, int status, time_t *result) {
     if (status == 0 && result) {
+        ntp->done = true;
         struct tm *utc = gmtime(result);
-        ntp->success_cb(utc);
+        datetime_t t = {
+            .year  = utc->tm_year + 1900,
+            .month = utc->tm_mon + 1,
+            .day   = utc->tm_mday,
+            .dotw  = 0,
+            .hour  = utc->tm_hour,
+            .min   = utc->tm_min,
+            .sec   = utc->tm_sec,
+        };
+        rtc_set_datetime(&t);
     }
 
     if (ntp->resend_alarm > 0) {
@@ -80,19 +91,15 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 }
 
 // Perform initialisation
-struct ntp * ntp_init(void (*success_cb)(struct tm *), void(*timeout_cb)()) {
-    if (success_cb == NULL || timeout_cb == NULL) {
-        return NULL;
-    }
+static struct ntp * ntp_init() {
     struct ntp *ntp = calloc(1, sizeof(struct ntp));
     if (ntp == NULL) {
         return NULL;
     }
 
+    ntp->done = false;
     ntp->dns_request_sent = false;
     ntp->timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
-    ntp->timeout_cb = timeout_cb;
-    ntp->success_cb = success_cb;
 
     ntp->pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
     if (ntp->pcb == NULL) {
@@ -103,25 +110,35 @@ struct ntp * ntp_init(void (*success_cb)(struct tm *), void(*timeout_cb)()) {
     return ntp;
 }
 
-void ntp_task(struct ntp *ntp) {
-    if (absolute_time_diff_us(get_absolute_time(), ntp->timeout_time) < 0) {
-        ntp->dns_request_sent = false;
-        ntp->timeout_cb();
-        return;
+bool sync_rtc_to_ntp() {
+    struct ntp *ntp = ntp_init();
+    if (ntp == NULL) {
+        return false;
     }
 
-    if (!ntp->dns_request_sent) {
-        ntp->resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, ntp, true);
+    while (!ntp->done && absolute_time_diff_us(get_absolute_time(), ntp->timeout_time) > 0) {
+        if (!ntp->dns_request_sent) {
+            ntp->resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, ntp, true);
 
-        cyw43_arch_lwip_begin();
-        int err = dns_gethostbyname(NTP_SERVER, &ntp->server_address, ntp_dns_found, ntp);
-        cyw43_arch_lwip_end();
-
-        ntp->dns_request_sent = true;
-        if (err == ERR_OK) {
-            ntp_request(ntp);
-        } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
-            ntp_result(ntp, -1, NULL);
+            cyw43_arch_lwip_begin();
+            int err = dns_gethostbyname(NTP_SERVER, &ntp->server_address, ntp_dns_found, ntp);
+            cyw43_arch_lwip_end();
+            ntp->dns_request_sent = true;
+            if (err == ERR_OK) { // domain name was in cache
+                ntp_request(ntp);
+            } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
+                ntp_result(ntp, -1, NULL);
+            }
         }
+
+        // If DNS request was sent and we still have time, we are just waiting
+        // for the callbacks to kick in.
     }
+
+    if (ntp->resend_alarm > 0) {
+        cancel_alarm(ntp->resend_alarm);
+    }
+    free(ntp);
+
+    return ntp->done;
 }

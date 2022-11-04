@@ -364,29 +364,6 @@ void on_left_longpress(void *user_data) {
 }
 
 // ----------------------------------------------------------------------------
-// NTP callbacks
-
-void ntp_success_callback(struct tm *utc) {
-    datetime_t t = {
-        .year  = utc->tm_year + 1900,
-        .month = utc->tm_mon + 1,
-        .day   = utc->tm_mday,
-        .dotw  = 0,
-        .hour  = utc->tm_hour,
-        .min   = utc->tm_min,
-        .sec   = utc->tm_sec,
-    };
-    rtc_set_datetime(&t);
-    state = SYNC_DATA;
-}
-
-void ntp_timeout_callback() {
-    display_message(&disp, "NTP ERR");
-    sleep_ms(500);
-    state = IDLE;
-}
-
-// ----------------------------------------------------------------------------
 // Entry point 
 
 int main() {
@@ -429,8 +406,6 @@ int main() {
         display_message(&disp, "IDLE");
     }
 
-    struct ntp *ntp = ntp_init(ntp_success_callback, ntp_timeout_callback);
-
     create_button(1, NULL, on_left_press, on_left_longpress);
 
     uint32_t last_time_update = time_us_32();
@@ -454,15 +429,22 @@ int main() {
                     sleep_ms(500);
                     state = IDLE;
                 } else {
-                    ntp->timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
                     state = SYNC_TIME;
                     display_message(&disp, "NTP SYNC");
                 }
                 break;
             case SYNC_TIME:
-                ntp_task(ntp);
+                if (sync_rtc_to_ntp()) {
+                    state = SYNC_DATA;
+                } else {
+                    display_message(&disp, "NTP ERR");
+                    sleep_ms(500);
+                    state = IDLE;
+                }
                 break;
             case SYNC_DATA:
+                display_message(&disp, "DAT SYNC");
+                sleep_ms(1000);
                 state = IDLE;
                 break;
             default:
