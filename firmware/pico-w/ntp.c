@@ -132,7 +132,9 @@ bool sync_rtc_to_ntp() {
         }
 
         // If DNS request was sent and we still have time, we are just waiting
-        // for the callbacks to kick in.
+        // for the callbacks to kick in, and polling cyw43.
+        cyw43_arch_poll();
+        sleep_ms(1);
     }
 
     if (ntp->resend_alarm > 0) {

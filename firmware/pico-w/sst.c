@@ -5,25 +5,32 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "pico/cyw43_arch.h"
+#include "pico/sleep.h"
 #include "pico/time.h"
+#include "pico/types.h"
 #include "pico/util/datetime.h"
+#include "hardware/clocks.h"
 #include "hardware/rtc.h"
+#include "hardware/rosc.h"
 #include "hardware/timer.h"
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
 #include "bsp/board.h"
+
+// For scb_hw so we can enable deep sleep
+#include "hardware/structs/scb.h"
 
 #include "hw_config.h"
 #include "tusb.h"
 #include "ssd1306_spi.h"
 #include "as5600.h"
 #include "ntp.h"
-
-void create_button(uint, void *, void (*)(void *), void (*)(void *));
+#include "pushbutton.h"
 
 enum state {
     IDLE,
     SLEEP,
+    WAKING,
     RECORD,
     CONNECT,
     SYNC_TIME,
@@ -358,10 +365,29 @@ void on_left_longpress(void *user_data) {
         case IDLE:
             state = CONNECT;
             display_message(&disp, "CONNECT");
+            break;
         default:
             break;
     }
 }
+
+void on_right_press(void *user_data) {
+    switch(state) {
+        default:
+            break;
+    }
+}
+
+void on_right_longpress(void *user_data) {
+    switch(state) {
+        case IDLE:
+            state = SLEEP;
+            break;
+        default:
+            break;
+    }
+}
+
 
 // ----------------------------------------------------------------------------
 // Entry point 
@@ -371,14 +397,12 @@ int main() {
     board_init();
     tusb_init();
     rtc_init();
-    cyw43_arch_init();
-    cyw43_arch_enable_sta_mode();
 
     datetime_t t = {
         .year  = 2022,
         .month = 11,
         .day   = 03,
-        .dotw  = 4, // 0 is Sunday, so 5 is Friday
+        .dotw  = 4,
         .hour  = 13,
         .min   = 37,
         .sec   = 00
@@ -394,6 +418,9 @@ int main() {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
+        create_button(1, NULL, on_left_press, on_left_longpress);
+        create_button(5, NULL, on_right_press, on_right_longpress);
+
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -401,12 +428,14 @@ int main() {
             display_message(&disp, "CARD ERR");
             while(true) { tight_loop_contents(); }
         }
-
+ 
         state = IDLE;
         display_message(&disp, "IDLE");
     }
 
-    create_button(1, NULL, on_left_press, on_left_longpress);
+    uint scb_orig = scb_hw->scr;
+    uint clock0_orig = clocks_hw->sleep_en0;
+    uint clock1_orig = clocks_hw->sleep_en1;
 
     uint32_t last_time_update = time_us_32();
     char time_str[9];
@@ -424,8 +453,11 @@ int main() {
                 }
                 break;
             case CONNECT:
+                cyw43_arch_init();
+                cyw43_arch_enable_sta_mode();
                 if (cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000)) {
                     display_message(&disp, "CONN ERR");
+                    cyw43_arch_deinit();
                     sleep_ms(500);
                     state = IDLE;
                 } else {
@@ -438,6 +470,7 @@ int main() {
                     state = SYNC_DATA;
                 } else {
                     display_message(&disp, "NTP ERR");
+                    cyw43_arch_deinit();
                     sleep_ms(500);
                     state = IDLE;
                 }
@@ -445,14 +478,43 @@ int main() {
             case SYNC_DATA:
                 display_message(&disp, "DAT SYNC");
                 sleep_ms(1000);
+                cyw43_arch_deinit();
                 state = IDLE;
                 break;
+            case SLEEP:
+                sleep_run_from_xosc();
+                display_message(&disp, "SLEEP.");
+
+                clocks_hw->sleep_en0 = CLOCKS_SLEEP_EN0_CLK_RTC_RTC_BITS;
+                clocks_hw->sleep_en1 = 0x0;
+                display_message(&disp, "SLEEP..");
+
+                scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
+                display_message(&disp, "SLEEP...");
+
+                disable_button(1, false);
+                disable_button(5, true);
+                ssd1306_poweroff(&disp);
+                state = WAKING;
+                __wfi();
+                break;
+            case WAKING:
+                rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
+
+                scb_hw->scr = scb_orig;
+                clocks_hw->sleep_en0 = clock0_orig;
+                clocks_hw->sleep_en1 = clock1_orig;
+                clocks_init();
+
+                ssd1306_poweron(&disp);
+                enable_button(1);
+                enable_button(5);
+                state = IDLE;
             default:
                 break;
         }
     }
 
-    cyw43_arch_deinit();
-
     return 0;
 }
+
