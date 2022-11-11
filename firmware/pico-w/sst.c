@@ -34,6 +34,59 @@ static const uint BTN_LEFT = 5;
 static const uint BTN_RIGHT = 1;
 
 // ----------------------------------------------------------------------------
+// Helper functions
+
+static void display_message(ssd1306_t *disp, char *message) {
+    ssd1306_clear(disp);
+    ssd1306_draw_string(disp, 0, 10, 2, message);
+    ssd1306_show(disp);
+}
+
+static bool msc_present() {
+    // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
+    if (cyw43_arch_gpio_get(2)) {
+        // Wait for a maximum of 1 second for USB MSC to initialize
+        uint32_t t = time_us_32();
+        while (!tud_ready()) {
+            if (time_us_32() - t > 1000000) {
+                return false;
+            }
+            tud_task();
+        }
+        return true;
+    }
+
+    return false;
+}
+
+static bool connect() {
+    cyw43_arch_init();
+    cyw43_arch_enable_sta_mode();
+    return !cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 10000);
+}
+
+static time_t rtc_timestamp() {
+    datetime_t rtc;
+    rtc_get_datetime(&rtc);
+
+    struct tm utc = {
+        .tm_year = rtc.year - 1900,
+        .tm_mon = rtc.month - 1,
+        .tm_mday = rtc.day,
+        .tm_hour = rtc.hour,
+        .tm_min = rtc.min,
+        .tm_sec = rtc.sec,
+        .tm_isdst = -1,
+        .tm_wday = 0,
+        .tm_yday = 0,
+    };
+
+    time_t t = mktime(&utc);
+
+    return t;
+}
+
+// ----------------------------------------------------------------------------
 // Data acquisition
 
 static const uint16_t SAMPLE_RATE = 1000;
@@ -142,7 +195,7 @@ static int open_datafile() {
         return fr;
     }
 
-    struct header h = {"SST", 2, SAMPLE_RATE};
+    struct header h = {"SST", 3, SAMPLE_RATE, rtc_timestamp()};
     f_write(&recording, &h, sizeof(struct header), NULL);
 
     return index;
@@ -242,39 +295,6 @@ static void setup_display(ssd1306_t *disp) {
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
-}
-
-// ----------------------------------------------------------------------------
-// Helper functions
-
-static void display_message(ssd1306_t *disp, char *message) {
-    ssd1306_clear(disp);
-    ssd1306_draw_string(disp, 0, 10, 2, message);
-    ssd1306_show(disp);
-}
-
-static bool msc_present() {
-    // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
-    if (cyw43_arch_gpio_get(2)) {
-        // Wait for a maximum of 1 second for USB MSC to initialize
-        uint32_t t = time_us_32();
-        while (!tud_ready()) {
-            if (time_us_32() - t > 1000000) {
-                return false;
-            }
-            tud_task();
-        }
-        return true;
-    }
-
-    return false;
-}
-
-static bool connect() {
-    cyw43_arch_init();
-    cyw43_arch_enable_sta_mode();
-    //return !cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000);
-    return !cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 10000);
 }
 
 // ----------------------------------------------------------------------------
