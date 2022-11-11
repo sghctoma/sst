@@ -60,9 +60,11 @@ sourcematerial/
 
 # compiled executable for gosst
 gosst/gosst
+gosstcp/gosstcp
 
 # gosst database
 gosst/data
+gosstcp/data
 
 # test utilities
 gosst-convert/
