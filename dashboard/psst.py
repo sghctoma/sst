@@ -34,6 +34,7 @@ class Telemetry:
     Name: str
     Version: int
     SampleRate: int
+    Timestamp: int
     Front: Suspension
     Rear: Suspension
     Linkage: Linkage
