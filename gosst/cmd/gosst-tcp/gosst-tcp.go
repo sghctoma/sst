@@ -121,7 +121,7 @@ func main() {
         log.Fatal("[ERR] could not create data tables")
     }
 
-    l, err := net.Listen("tcp", ":1557")
+    l, err := net.Listen("tcp", ":557")
     if err != nil {
         log.Fatal("[ERR]", err.Error())
     }
