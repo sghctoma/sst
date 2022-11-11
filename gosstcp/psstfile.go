@@ -48,6 +48,7 @@ type header struct {
     Magic [3]byte
     Version uint8
     SampleRate uint16
+    Timestamp int64
 }
 
 type record struct {
@@ -59,6 +60,7 @@ type processed struct {
     Name       string
     Version    uint8
     SampleRate uint16
+    Timestamp  int64
     Front      suspension
     Rear       suspension
     Linkage    linkage
@@ -160,6 +162,7 @@ func processRecording(sst []byte, name string, lnk linkage, fcal, rcal calibrati
     if string(fileHeader.Magic[:]) == "SST" {
         pd.Version = fileHeader.Version
         pd.SampleRate = fileHeader.SampleRate
+        pd.Timestamp = fileHeader.Timestamp
     } else {
         return nil
     }

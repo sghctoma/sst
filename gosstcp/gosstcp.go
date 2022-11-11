@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"regexp"
-	"time"
 
 	"github.com/ugorji/go/codec"
 
@@ -65,7 +64,7 @@ func putSession(db *sql.DB, h codec.Handle, name string, sst []byte) bool {
     var data []byte
     enc := codec.NewEncoderBytes(&data, h)
     enc.Encode(pd)
-    if _, err := db.Exec("INSERT INTO sessions VALUES (?, ?, ?, ?)", name, "", time.Now().Unix(), data); err != nil {
+    if _, err := db.Exec("INSERT INTO sessions VALUES (?, ?, ?, ?)", name, "", pd.Timestamp, data); err != nil {
         return false
     }
 
