@@ -97,37 +97,6 @@ func (this *linkage) process() error {
     return nil
 }
 
-/*
-func newLinkage(name string, data io.Reader) *linkage {
-    var wtlr [][2]float64
-    var ilr []float64
-    var wt []float64
-    scanner := bufio.NewScanner(data)
-    for scanner.Scan() {
-        var w, l float64
-        _, err := fmt.Sscanf(scanner.Text(), "%f,%f", &w, &l)
-        if err == nil {
-            ilr = append(ilr, 1.0/l)
-            wtlr = append(wtlr, [2]float64{w, l})
-            wt = append(wt, w)
-        }
-    }
-
-    s := make([]float64, len(ilr))
-    floats.CumSum(s, ilr)
-    s = append([]float64{0.0}, s[:len(s)-1]...)
-    
-    f := polyfit.NewFit(s, wt, 3)
-
-    return &linkage {
-        Name: name,
-        LeverageRatio: wtlr,
-        ShockWheelCoeffs: f.Solve(),
-        MaxRearTravel: wt[len(wt) - 1],
-    }
-}
-*/
-
 func angleToStroke(angle uint16, calibration calibration) float64 {
     if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
         angle = 0
