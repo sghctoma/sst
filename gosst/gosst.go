@@ -318,7 +318,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
     enc.Encode(pd)
 
     if _, err := this.Db.Exec("INSERT INTO sessions VALUES (?, ?, ?, ?)",
-            session.Name, session.Description, time.Now().Unix(), data); err != nil {
+            session.Name, session.Description, pd.Timestamp, data); err != nil {
         c.AbortWithStatus(http.StatusInternalServerError)
     } else {
         c.Status(http.StatusCreated)
