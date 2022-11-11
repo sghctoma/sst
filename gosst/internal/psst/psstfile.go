@@ -48,6 +48,7 @@ type header struct {
     Magic [3]byte
     Version uint8
     SampleRate uint16
+    Padding uint16
     Timestamp int64
 }
 
@@ -167,7 +168,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
         return nil
     }
 
-    records := make([]record, (len(sst) - 6 /* sizeof(heaeder) */) / 4 /* sizeof(record) */)
+    records := make([]record, (len(sst) - 16 /* sizeof(header) */) / 4 /* sizeof(record) */)
     err = binary.Read(f, binary.LittleEndian, &records)
     if err != nil {
         return nil
