@@ -42,7 +42,7 @@ static int64_t debounce_callback(alarm_id_t id, void *user_data) {
 static void gpio_callback(uint gpio, uint32_t events) {
     struct button *btn = buttons[gpio];
     if (NULL != btn && btn->enabled) {
-        add_alarm_in_us(200, debounce_callback, btn, true);
+        add_alarm_in_us(250, debounce_callback, btn, true);
     }
 }
 

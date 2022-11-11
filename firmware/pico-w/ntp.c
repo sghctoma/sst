@@ -140,7 +140,8 @@ bool sync_rtc_to_ntp() {
     if (ntp->resend_alarm > 0) {
         cancel_alarm(ntp->resend_alarm);
     }
-    free(ntp);
 
-    return ntp->done;
+    bool ret = ntp->done;
+    free(ntp);
+    return ret;
 }

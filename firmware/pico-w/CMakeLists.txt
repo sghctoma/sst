@@ -20,6 +20,8 @@ add_executable(sufni-suspension-telemetry
     sst.c
     pushbutton.c
     ntp.c
+    list.c
+    tcpclient.c
     hw_config.c
     msc_disk.c
     sst_usb_descriptors.c

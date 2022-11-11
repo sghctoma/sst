@@ -1,6 +1,8 @@
 #include <stdint.h>
+#include <stdio.h>
 
 #include "device/usbd.h"
+#include "include/ntp.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -20,34 +22,16 @@
 // For scb_hw so we can enable deep sleep
 #include "hardware/structs/scb.h"
 
-#include "hw_config.h"
-#include "tusb.h"
-#include "ssd1306_spi.h"
-#include "as5600.h"
-#include "ntp.h"
-#include "pushbutton.h"
-
-enum state {
-    IDLE,
-    SLEEP,
-    WAKING,
-    RECORD,
-    CONNECT,
-    SYNC_TIME,
-    SYNC_DATA,
-    MSC,
-};
-
-enum command {
-    OPEN,
-    DUMP,
-    FINISH
-};
+#include "sst.h"
+#include "list.h"
 
 static volatile enum state state;
 static ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
+
+static const uint BTN_LEFT = 5;
+static const uint BTN_RIGHT = 1;
 
 // ----------------------------------------------------------------------------
 // Data acquisition
@@ -56,17 +40,6 @@ static const uint16_t SAMPLE_RATE = 1000;
 
 static bool have_fork;
 static bool have_shock;
-
-struct header {
-    char magic[3];
-    uint8_t version;
-    uint16_t sample_rate;
-};
-
-struct record {
-    uint16_t fork_angle;
-    uint16_t shock_angle;
-};
 
 // We are using two buffers. Data acquisition happens on core #1 into the active
 // buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
@@ -89,7 +62,7 @@ struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
-bool data_acquisition_cb(repeating_timer_t *rt) {
+static bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
         count = 0;
         multicore_fifo_push_blocking(DUMP);
@@ -113,13 +86,13 @@ bool data_acquisition_cb(repeating_timer_t *rt) {
 
     count += 1;
 
-    return state == RECORD; // keep repeating
+    return state == RECORD; // keep repeating if we are still recording
 }
 
 // ----------------------------------------------------------------------------
 // Data storage
 
-int setup_storage() {
+static int setup_storage() {
     sd_card_t *sd = sd_get_by_num(0);
     FRESULT fr = f_mount(&sd->fatfs, sd->pcName, 1);
     if (fr != FR_OK) {
@@ -134,7 +107,7 @@ int setup_storage() {
     return 0;
 }
 
-int open_datafile() {
+static int open_datafile() {
     uint16_t index = 0;
     FIL index_fil;
     FRESULT fr = f_open(&index_fil, "INDEX", FA_OPEN_EXISTING | FA_READ);
@@ -175,7 +148,7 @@ int open_datafile() {
     return index;
 }
 
-void data_storage_core1() {
+static void data_storage_core1() {
     int err = setup_storage();
     multicore_fifo_push_blocking(err);
 
@@ -212,7 +185,7 @@ void data_storage_core1() {
 // ----------------------------------------------------------------------------
 // Setup functions
 
-void setup_i2c() {
+static void setup_i2c() {
     i2c_init(i2c0, 1000000);
     gpio_set_function(20, GPIO_FUNC_I2C);
     gpio_set_function(21, GPIO_FUNC_I2C);
@@ -226,7 +199,7 @@ void setup_i2c() {
     gpio_pull_up(27);
 }
 
-bool setup_baseline(i2c_inst_t *i2c) {
+static bool setup_baseline(i2c_inst_t *i2c) {
     if (as5600_connected(i2c) && as5600_detect_magnet(i2c)) {
         uint16_t baseline = 0;
         for (int i = 0; i < 10; ++i) {
@@ -250,7 +223,7 @@ bool setup_baseline(i2c_inst_t *i2c) {
     }
 }
 
-void setup_sensors() {
+static void setup_sensors() {
     /* XXX
     uint8_t dummy;
     while (!((as5600_connected(i2c0) && as5600_detect_magnet(i2c0)) ||
@@ -266,16 +239,16 @@ void setup_sensors() {
     have_shock = true;
 }
 
-void setup_display(ssd1306_t *disp) {
-    spi_init(spi0, 1000000);
-    gpio_set_function(18, GPIO_FUNC_SPI); // SCK
-    gpio_set_function(19, GPIO_FUNC_SPI); // MOSI
+static void setup_display(ssd1306_t *disp) {
+    spi_init(spi1, 1000000);
+    gpio_set_function(14, GPIO_FUNC_SPI); // SCK
+    gpio_set_function(15, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 32, spi0,
-        17,  // CS
-        16,  // DC
-        22); // RST
+    ssd1306_init(disp, 128, 32, spi1,
+        13,  // CS
+        12,  // DC
+        11); // RST
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -284,13 +257,13 @@ void setup_display(ssd1306_t *disp) {
 // ----------------------------------------------------------------------------
 // Helper functions
 
-void display_message(ssd1306_t *disp, char *message) {
+static void display_message(ssd1306_t *disp, char *message) {
     ssd1306_clear(disp);
-    ssd1306_draw_string(disp, 8, 8, 2, message);
+    ssd1306_draw_string(disp, 0, 10, 2, message);
     ssd1306_show(disp);
 }
 
-bool msc_present() {
+static bool msc_present() {
     // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
     if (cyw43_arch_gpio_get(2)) {
         // Wait for a maximum of 1 second for USB MSC to initialize
@@ -310,7 +283,7 @@ bool msc_present() {
 // ----------------------------------------------------------------------------
 // Button handlers
 
-void start_recording() {
+static void start_recording() {
     count = 0;
     active_buffer = databuffer1;
     multicore_fifo_drain();
@@ -337,7 +310,7 @@ void start_recording() {
     }
 }
 
-void stop_recording() {
+static void stop_recording() {
     state = IDLE;
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
@@ -347,7 +320,13 @@ void stop_recording() {
     multicore_fifo_push_blocking((uintptr_t)active_buffer);
 }
 
-void on_left_press(void *user_data) {
+static bool connect() {
+    cyw43_arch_init();
+    cyw43_arch_enable_sta_mode();
+    return !cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000);
+}
+
+static void on_left_press(void *user_data) {
     switch(state) {
         case IDLE:
             start_recording();
@@ -360,28 +339,30 @@ void on_left_press(void *user_data) {
     }
 }
 
-void on_left_longpress(void *user_data) {
+static void on_left_longpress(void *user_data) {
     switch(state) {
         case IDLE:
-            state = CONNECT;
-            display_message(&disp, "CONNECT");
+            state = SYNC_DATA;
             break;
         default:
             break;
     }
 }
 
-void on_right_press(void *user_data) {
-    switch(state) {
-        default:
-            break;
-    }
-}
-
-void on_right_longpress(void *user_data) {
+static void on_right_press(void *user_data) {
     switch(state) {
         case IDLE:
             state = SLEEP;
+            break;
+        default:
+            break;
+    }
+}
+
+static void on_right_longpress(void *user_data) {
+    switch(state) {
+        case IDLE:
+            state = SYNC_TIME;
             break;
         default:
             break;
@@ -413,13 +394,13 @@ int main() {
 
     gpio_init(5);
     gpio_pull_up(5);
-    sleep_ms(1);
+    sleep_ms(10);
     if (!gpio_get(5) && msc_present()) {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
-        create_button(1, NULL, on_left_press, on_left_longpress);
-        create_button(5, NULL, on_right_press, on_right_longpress);
+        create_button(BTN_LEFT, NULL, on_left_press, on_left_longpress);
+        create_button(BTN_RIGHT, NULL, on_right_press, on_right_longpress);
 
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
@@ -430,13 +411,11 @@ int main() {
         }
  
         state = IDLE;
-        display_message(&disp, "IDLE");
     }
 
-    uint scb_orig = scb_hw->scr;
-    uint clock0_orig = clocks_hw->sleep_en0;
-    uint clock1_orig = clocks_hw->sleep_en1;
-
+    uint32_t scb_orig = scb_hw->scr;
+    uint32_t clock0_orig = clocks_hw->sleep_en0;
+    uint32_t clock1_orig = clocks_hw->sleep_en1;
     uint32_t last_time_update = time_us_32();
     char time_str[9];
     while (true) {
@@ -452,32 +431,66 @@ int main() {
                     display_message(&disp, time_str);
                 }
                 break;
-            case CONNECT:
-                cyw43_arch_init();
-                cyw43_arch_enable_sta_mode();
-                if (cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000)) {
-                    display_message(&disp, "CONN ERR");
-                    cyw43_arch_deinit();
-                    sleep_ms(500);
-                    state = IDLE;
-                } else {
-                    state = SYNC_TIME;
-                    display_message(&disp, "NTP SYNC");
-                }
-                break;
             case SYNC_TIME:
-                if (sync_rtc_to_ntp()) {
-                    state = SYNC_DATA;
-                } else {
+                display_message(&disp, "NTP SYNC");
+                if (!connect()) {
+                    display_message(&disp, "CONN ERR");
+                    sleep_ms(1000);
+                } else if (!sync_rtc_to_ntp()) {
                     display_message(&disp, "NTP ERR");
-                    cyw43_arch_deinit();
-                    sleep_ms(500);
-                    state = IDLE;
+                    sleep_ms(1000);
                 }
+                cyw43_arch_deinit();
+                state = IDLE;
                 break;
             case SYNC_DATA:
-                display_message(&disp, "DAT SYNC");
-                sleep_ms(1000);
+                display_message(&disp, "CONNECT");
+                if (!connect()) {
+                    display_message(&disp, "CONN ERR");
+                    sleep_ms(1000);
+                } else {
+                    display_message(&disp, "DAT SYNC");
+                    struct list *imported = list_create();
+                    
+                    // send all .SST files in the root directory via TCP
+                    FRESULT fr;
+                    DIR dj;
+                    FILINFO fno;
+                    uint all = 0;
+                    uint succ = 0;
+                    fr = f_findfirst(&dj, &fno, "", "?????.SST");
+                    while (fr == FR_OK && fno.fname[0]) {
+                        ++all;
+                        display_message(&disp, fno.fname);
+                        if (send_file(fno.fname)) {
+                            list_push(imported, fno.fname);
+                            ++succ;
+                        }
+                        sleep_ms(100);
+                        fr = f_findnext(&dj, &fno);
+                    }
+                    f_closedir(&dj);
+
+                    // move successfully imported files to "uploaded" directory
+                    struct node *n = imported->head;
+                    while (n != NULL) {
+                        TCHAR path_new[19];
+                        sprintf(path_new, "uploaded/%s", n->data);
+                        f_rename(n->data, path_new);
+                        n = n->next;
+                    }
+                    list_delete(imported);
+
+                    // display results
+                    char s[16], a[16];
+                    sprintf(s, "S: %u", succ);
+                    sprintf(a, "A: %u", all);
+                    ssd1306_clear(&disp);
+                    ssd1306_draw_string(&disp, 0,  0, 2, s);
+                    ssd1306_draw_string(&disp, 0, 16, 2, a);
+                    ssd1306_show(&disp);
+                    sleep_ms(3000);
+                }
                 cyw43_arch_deinit();
                 state = IDLE;
                 break;
@@ -492,8 +505,8 @@ int main() {
                 scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
                 display_message(&disp, "SLEEP...");
 
-                disable_button(1, false);
-                disable_button(5, true);
+                disable_button(BTN_LEFT, false);
+                disable_button(BTN_RIGHT, true);
                 ssd1306_poweroff(&disp);
                 state = WAKING;
                 __wfi();
@@ -507,8 +520,8 @@ int main() {
                 clocks_init();
 
                 ssd1306_poweron(&disp);
-                enable_button(1);
-                enable_button(5);
+                enable_button(BTN_LEFT);
+                enable_button(BTN_RIGHT);
                 state = IDLE;
             default:
                 break;

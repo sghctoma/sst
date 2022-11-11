@@ -4,7 +4,7 @@
 #include <time.h>
 #include "pico/cyw43_arch.h"
 
-#define NTP_SERVER "pool.ntp.org"
+#define NTP_SERVER "pool.ntp.org" // XXX read from config file
 #define NTP_MSG_LEN 48
 #define NTP_PORT 123
 #define NTP_DELTA 2208988800 // seconds between 1 Jan 1900 and 1 Jan 1970
