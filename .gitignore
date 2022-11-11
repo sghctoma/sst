@@ -59,12 +59,8 @@ firmware/pico-w/build/
 sourcematerial/
 
 # compiled executable for gosst
-gosst/gosst
-gosstcp/gosstcp
-
-# gosst database
-gosst/data
-gosstcp/data
+gosst/gosst-http
+gosst/gosst-tcp
 
 # test utilities
 gosst-convert/
