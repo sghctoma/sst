@@ -1,4 +1,4 @@
-package main
+package psst
 
 import (
 	"bufio"
@@ -15,14 +15,14 @@ import (
 	"gonum.org/v1/gonum/floats"
 )
 
-type calibration struct {
+type Calibration struct {
     ArmLength   float64 `codec:"," json:"arm" binding:"required"`
     MaxDistance float64 `codec:"," json:"dist" binding:"required"` 
     MaxStroke   float64 `codec:"," json:"stroke" binding:"required"` 
     StartAngle  float64 `codec:"," json:"angle"`
 }
 
-type linkage struct {
+type Linkage struct {
     Name             string       `codec:"," json:"name" binding:"required"`
     RawData          string       `codec:"-" json:"data" binding:"required"`
     LeverageRatio    [][2]float64 `codec:"," json:"leverage"`
@@ -37,7 +37,7 @@ type digitized struct {
 
 type suspension struct {
     Present bool
-    Calibration calibration
+    Calibration Calibration
     Travel []float64
     Velocity []float64
     DigitizedTravel digitized
@@ -63,10 +63,10 @@ type processed struct {
     Timestamp  int64
     Front      suspension
     Rear       suspension
-    Linkage    linkage
+    Linkage    Linkage
 }
 
-func (this *linkage) process() error {
+func (this *Linkage) Process() error {
     raw, err := base64.StdEncoding.DecodeString(this.RawData)
     if err != nil {
         return err
@@ -99,7 +99,7 @@ func (this *linkage) process() error {
     return nil
 }
 
-func angleToStroke(angle uint16, calibration calibration) float64 {
+func angleToStroke(angle uint16, calibration Calibration) float64 {
     if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
         angle = 0
     }
@@ -141,7 +141,7 @@ func digitizeVelocity(v []float64, d *digitized) {
 }
 
 
-func processRecording(sst []byte, name string, lnk linkage, fcal, rcal calibration) *processed {
+func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibration) *processed {
     var pd processed
     pd.Name = name
     pd.Front.Calibration = fcal

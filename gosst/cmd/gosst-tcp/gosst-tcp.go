@@ -7,24 +7,26 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"regexp"
 
 	"github.com/ugorji/go/codec"
-
 	_ "modernc.org/sqlite"
+
+	psst "gosst/internal/psst"
 )
 
 type calibrationPair struct {
     Name  string      `codec:"," json:"name" binding:"required"`
-    Front calibration `codec:"," json:"front" validate:"dive" binding:"required"`
-    Rear  calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
+    Front psst.Calibration `codec:"," json:"front" validate:"dive" binding:"required"`
+    Rear  psst.Calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
 }
 
-func defaultCalibration(db *sql.DB, h codec.Handle) (calibration, calibration, error) {
+func defaultCalibration(db *sql.DB, h codec.Handle) (psst.Calibration, psst.Calibration, error) {
     var data []byte
     err := db.QueryRow("SELECT data FROM calibrations where ROWID=(SELECT ROWID FROM defaults WHERE name='calibrations')").Scan(&data)
     if err != nil {
-        return calibration{}, calibration{}, nil
+        return psst.Calibration{}, psst.Calibration{}, nil
     }
 
     cdec := codec.NewDecoderBytes(data, h)
@@ -34,15 +36,15 @@ func defaultCalibration(db *sql.DB, h codec.Handle) (calibration, calibration, e
     return cpair.Front, cpair.Rear, nil
 }
 
-func defaultLinkage(db *sql.DB, h codec.Handle) (linkage, error) {
+func defaultLinkage(db *sql.DB, h codec.Handle) (psst.Linkage, error) {
     var data []byte
     err := db.QueryRow("SELECT data FROM linkages where ROWID=(SELECT ROWID FROM defaults WHERE name='linkages')").Scan(&data)
     if err != nil {
-        return linkage{}, err
+        return psst.Linkage{}, err
     }
 
     cdec := codec.NewDecoderBytes(data, h)
-    var linkage linkage
+    var linkage psst.Linkage
     cdec.Decode(&linkage)
 
     return linkage, err
@@ -59,7 +61,7 @@ func putSession(db *sql.DB, h codec.Handle, name string, sst []byte) bool {
         return false
     }
 
-    pd := processRecording(sst, "", l, fcal, rcal)
+    pd := psst.ProcessRecording(sst, "", l, fcal, rcal)
 
     var data []byte
     enc := codec.NewEncoderBytes(&data, h)
@@ -107,7 +109,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 func main() {
     var h codec.MsgpackHandle
 
-    db, err := sql.Open("sqlite", "data/gosst.db")
+    db, err := sql.Open("sqlite", os.Args[1])
     if err != nil {
         log.Fatal("[ERR] could not open database")
     }

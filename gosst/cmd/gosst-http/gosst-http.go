@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/ugorji/go/codec"
 
 	_ "modernc.org/sqlite"
+
+	psst "gosst/internal/psst"
 )
 
 type session struct {
@@ -26,8 +29,8 @@ type session struct {
 
 type calibrationPair struct {
     Name  string      `codec:"," json:"name" binding:"required"`
-    Front calibration `codec:"," json:"front" validate:"dive" binding:"required"`
-    Rear  calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
+    Front psst.Calibration `codec:"," json:"front" validate:"dive" binding:"required"`
+    Rear  psst.Calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
 }
 
 type RequestHandler struct {
@@ -120,7 +123,7 @@ func (this *RequestHandler) DeleteCalibration (c *gin.Context) {
 }
 
 func (this *RequestHandler) GetLinkages(c *gin.Context) {
-    m := make(map[int64]linkage)
+    m := make(map[int64]psst.Linkage)
     rows, err := this.Db.Query("SELECT ROWID, data FROM linkages")
 	if err != nil {
 	    c.AbortWithStatus(http.StatusInternalServerError)
@@ -132,7 +135,7 @@ func (this *RequestHandler) GetLinkages(c *gin.Context) {
         rows.Scan(&id, &data)
 
         dec := codec.NewDecoderBytes(data, this.H)
-        var linkage linkage
+        var linkage psst.Linkage
         dec.Decode(&linkage)
         m[id] = linkage
     }
@@ -158,20 +161,20 @@ func (this *RequestHandler) GetLinkage(c *gin.Context) {
     }
 
     dec := codec.NewDecoderBytes(data, this.H)
-    var linkage linkage
+    var linkage psst.Linkage
     dec.Decode(&linkage)
     c.JSON(http.StatusOK, linkage)
 }
 
 func (this *RequestHandler) PutLinkage(c *gin.Context) {
-    var linkage linkage
+    var linkage psst.Linkage
     if err := c.ShouldBindJSON(&linkage); err != nil {
         c.AbortWithStatus(http.StatusBadRequest)
         return
     }
 
     //linkage := newLinkage(linkage.Name, bytes.NewReader(raw))
-    if linkage.process() != nil {
+    if linkage.Process() != nil {
         c.AbortWithStatus(http.StatusBadRequest)
         return
     }
@@ -299,7 +302,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
     }
 
     ldec := codec.NewDecoderBytes(lnkData, this.H)
-    var linkage linkage
+    var linkage psst.Linkage
     ldec.Decode(&linkage)
 
     sst, err := base64.StdEncoding.DecodeString(session.Data)
@@ -307,7 +310,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
         c.AbortWithStatus(http.StatusBadRequest)
         return
     }
-    pd := processRecording(sst, session.Name, linkage, cpair.Front, cpair.Rear)
+    pd := psst.ProcessRecording(sst, session.Name, linkage, cpair.Front, cpair.Rear)
     if pd == nil {
         c.AbortWithStatus(http.StatusUnprocessableEntity)
         return
@@ -361,7 +364,7 @@ func (this *RequestHandler) PatchSessionDescription(c *gin.Context) {
 func main() {
     var h codec.MsgpackHandle
 
-    db, err := sql.Open("sqlite", "data/gosst.db")
+    db, err := sql.Open("sqlite", os.Args[1])
     if err != nil {
         log.Fatal("could not open database")
     }
