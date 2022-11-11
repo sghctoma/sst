@@ -38,8 +38,8 @@ static const uint BTN_RIGHT = 1;
 
 static const uint16_t SAMPLE_RATE = 1000;
 
-static bool have_fork;
-static bool have_shock;
+static volatile bool have_fork;
+static volatile bool have_shock;
 
 // We are using two buffers. Data acquisition happens on core #1 into the active
 // buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
@@ -71,15 +71,15 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
     }
 
     if (have_fork) {
-        //XXX active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
-        active_buffer[count].fork_angle = 0xcafe;
+        active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
+        //XXX active_buffer[count].fork_angle = 0xcafe;
     } else {
         active_buffer[count].fork_angle = 0xffff;
     }
 
     if (have_shock) {
-        //XXX active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
-        active_buffer[count].shock_angle = 0xbabe;
+        active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
+        //XXX active_buffer[count].shock_angle = 0xbabe;
     } else {
         active_buffer[count].shock_angle = 0xffff;
     }
@@ -201,12 +201,7 @@ static void setup_i2c() {
 
 static bool setup_baseline(i2c_inst_t *i2c) {
     if (as5600_connected(i2c) && as5600_detect_magnet(i2c)) {
-        uint16_t baseline = 0;
-        for (int i = 0; i < 10; ++i) {
-            baseline += as5600_get_raw_angle(i2c);
-            sleep_ms(10);
-        }
-        baseline /= 10;
+        uint16_t baseline = as5600_get_raw_angle(i2c);
         as5600_set_start_position(i2c, baseline);
 
         // Power down tha DAC, we don't need it.
@@ -224,7 +219,6 @@ static bool setup_baseline(i2c_inst_t *i2c) {
 }
 
 static void setup_sensors() {
-    /* XXX
     uint8_t dummy;
     while (!((as5600_connected(i2c0) && as5600_detect_magnet(i2c0)) ||
             (as5600_connected(i2c1) && as5600_detect_magnet(i2c1)))) {
@@ -233,10 +227,6 @@ static void setup_sensors() {
 
     have_fork = setup_baseline(i2c0);
     have_shock = setup_baseline(i2c1);
-    */
-    
-    have_fork = true;
-    have_shock = true;
 }
 
 static void setup_display(ssd1306_t *disp) {
@@ -280,10 +270,17 @@ static bool msc_present() {
     return false;
 }
 
-// ----------------------------------------------------------------------------
-// Button handlers
+static bool connect() {
+    cyw43_arch_init();
+    cyw43_arch_enable_sta_mode();
+    //return !cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000);
+    return !cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 10000);
+}
 
-static void start_recording() {
+// ----------------------------------------------------------------------------
+// State handlers
+
+static void on_rec_start() {
     count = 0;
     active_buffer = databuffer1;
     multicore_fifo_drain();
@@ -310,7 +307,7 @@ static void start_recording() {
     }
 }
 
-static void stop_recording() {
+static void on_rec_stop() {
     state = IDLE;
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
@@ -320,19 +317,68 @@ static void stop_recording() {
     multicore_fifo_push_blocking((uintptr_t)active_buffer);
 }
 
-static bool connect() {
-    cyw43_arch_init();
-    cyw43_arch_enable_sta_mode();
-    return !cyw43_arch_wifi_connect_timeout_ms("sst", "yup, commiting my psk to github", CYW43_AUTH_WPA2_AES_PSK, 10000);
+static void on_sync_data() {
+    display_message(&disp, "CONNECT");
+    if (!connect()) {
+        display_message(&disp, "CONN ERR");
+        sleep_ms(1000);
+    } else {
+        display_message(&disp, "DAT SYNC");
+        struct list *imported = list_create();
+ 
+        // send all .SST files in the root directory via TCP
+        FRESULT fr;
+        DIR dj;
+        FILINFO fno;
+        uint all = 0;
+        uint succ = 0;
+        fr = f_findfirst(&dj, &fno, "", "?????.SST");
+        while (fr == FR_OK && fno.fname[0]) {
+            ++all;
+            display_message(&disp, fno.fname);
+            if (send_file(fno.fname)) {
+                list_push(imported, fno.fname);
+                ++succ;
+            }
+            sleep_ms(100);
+            fr = f_findnext(&dj, &fno);
+        }
+        f_closedir(&dj);
+
+        // move successfully imported files to "uploaded" directory
+        struct node *n = imported->head;
+        while (n != NULL) {
+            TCHAR path_new[19];
+            sprintf(path_new, "uploaded/%s", n->data);
+            f_rename(n->data, path_new);
+            n = n->next;
+        }
+        list_delete(imported);
+
+        // display results
+        char s[16], a[16];
+        sprintf(s, "S: %u", succ);
+        sprintf(a, "A: %u", all);
+        ssd1306_clear(&disp);
+        ssd1306_draw_string(&disp, 0,  0, 2, s);
+        ssd1306_draw_string(&disp, 0, 16, 2, a);
+        ssd1306_show(&disp);
+        sleep_ms(3000);
+    }
+    cyw43_arch_deinit();
+    state = IDLE;
 }
+
+// ----------------------------------------------------------------------------
+// Button handlers
 
 static void on_left_press(void *user_data) {
     switch(state) {
         case IDLE:
-            start_recording();
+            state = REC_START;
             break;
         case RECORD:
-            stop_recording();
+            state = REC_STOP;
             break;
         default:
             break;
@@ -368,7 +414,6 @@ static void on_right_longpress(void *user_data) {
             break;
     }
 }
-
 
 // ----------------------------------------------------------------------------
 // Entry point 
@@ -444,55 +489,7 @@ int main() {
                 state = IDLE;
                 break;
             case SYNC_DATA:
-                display_message(&disp, "CONNECT");
-                if (!connect()) {
-                    display_message(&disp, "CONN ERR");
-                    sleep_ms(1000);
-                } else {
-                    display_message(&disp, "DAT SYNC");
-                    struct list *imported = list_create();
-                    
-                    // send all .SST files in the root directory via TCP
-                    FRESULT fr;
-                    DIR dj;
-                    FILINFO fno;
-                    uint all = 0;
-                    uint succ = 0;
-                    fr = f_findfirst(&dj, &fno, "", "?????.SST");
-                    while (fr == FR_OK && fno.fname[0]) {
-                        ++all;
-                        display_message(&disp, fno.fname);
-                        if (send_file(fno.fname)) {
-                            list_push(imported, fno.fname);
-                            ++succ;
-                        }
-                        sleep_ms(100);
-                        fr = f_findnext(&dj, &fno);
-                    }
-                    f_closedir(&dj);
-
-                    // move successfully imported files to "uploaded" directory
-                    struct node *n = imported->head;
-                    while (n != NULL) {
-                        TCHAR path_new[19];
-                        sprintf(path_new, "uploaded/%s", n->data);
-                        f_rename(n->data, path_new);
-                        n = n->next;
-                    }
-                    list_delete(imported);
-
-                    // display results
-                    char s[16], a[16];
-                    sprintf(s, "S: %u", succ);
-                    sprintf(a, "A: %u", all);
-                    ssd1306_clear(&disp);
-                    ssd1306_draw_string(&disp, 0,  0, 2, s);
-                    ssd1306_draw_string(&disp, 0, 16, 2, a);
-                    ssd1306_show(&disp);
-                    sleep_ms(3000);
-                }
-                cyw43_arch_deinit();
-                state = IDLE;
+                on_sync_data();
                 break;
             case SLEEP:
                 sleep_run_from_xosc();
@@ -523,6 +520,12 @@ int main() {
                 enable_button(BTN_LEFT);
                 enable_button(BTN_RIGHT);
                 state = IDLE;
+            case REC_START:
+                on_rec_start();
+                break;
+            case REC_STOP:
+                on_rec_stop();
+                break;
             default:
                 break;
         }
