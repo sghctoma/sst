@@ -61,7 +61,7 @@ func putSession(db *sql.DB, h codec.Handle, name string, sst []byte) bool {
         return false
     }
 
-    pd := psst.ProcessRecording(sst, "", l, fcal, rcal)
+    pd := psst.ProcessRecording(sst, name, l, fcal, rcal)
 
     var data []byte
     enc := codec.NewEncoderBytes(&data, h)
