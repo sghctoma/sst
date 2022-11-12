@@ -540,6 +540,7 @@ int main() {
                 enable_button(BTN_LEFT);
                 enable_button(BTN_RIGHT);
                 state = IDLE;
+                break;
             case REC_START:
                 on_rec_start();
                 break;
