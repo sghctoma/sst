@@ -20,6 +20,7 @@ enum state {
     SYNC_DATA,
     MSC,
 };
+#define STATES_COUNT 9
 
 struct header {
     char magic[3];
@@ -39,9 +40,7 @@ enum command {
     FINISH
 };
 
-#define BUFFER_SIZE 2048 // Not declared as a static const, because variable
-                         // length arrays are not a thing in C.
-
+#define BUFFER_SIZE 2048
 #define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
                            // so length is always 10.
 #endif /* _SST_H */

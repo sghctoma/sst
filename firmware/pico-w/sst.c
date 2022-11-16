@@ -1,8 +1,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "cyw43.h"
+#include "cyw43_country.h"
+#include "cyw43_ll.h"
 #include "device/usbd.h"
 #include "include/ntp.h"
+#include "lwip/dhcp.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -26,6 +30,11 @@
 #include "list.h"
 
 static volatile enum state state;
+
+static uint32_t scb_orig;
+static uint32_t clock0_orig;
+static uint32_t clock1_orig;
+
 static ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
@@ -59,10 +68,16 @@ static bool msc_present() {
     return false;
 }
 
-static bool connect() {
-    cyw43_arch_init();
+static bool wifi_connect() {
+    cyw43_arch_init_with_country(CYW43_COUNTRY_HUNGARY);
     cyw43_arch_enable_sta_mode();
-    return !cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 10000);
+    return cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
+}
+
+static void wifi_disconnect() {
+    cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+    sleep_ms(100);
+    cyw43_arch_deinit();
 }
 
 static time_t rtc_timestamp() {
@@ -107,9 +122,6 @@ static volatile bool have_shock;
 //  - sends the buffer address to core #1 via FIFO 
 // 
 
-#define BUFFER_SIZE 2048 // Not declared as a static const, because variable
-                         // length arrays are not a thing in C.
-
 struct record databuffer1[BUFFER_SIZE];
 struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
@@ -125,14 +137,12 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
 
     if (have_fork) {
         active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
-        //XXX active_buffer[count].fork_angle = 0xcafe;
     } else {
         active_buffer[count].fork_angle = 0xffff;
     }
 
     if (have_shock) {
         active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
-        //XXX active_buffer[count].shock_angle = 0xbabe;
     } else {
         active_buffer[count].shock_angle = 0xffff;
     }
@@ -339,7 +349,7 @@ static void on_rec_stop() {
 
 static void on_sync_data() {
     display_message(&disp, "CONNECT");
-    if (!connect()) {
+    if (!wifi_connect()) {
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else {
@@ -385,9 +395,88 @@ static void on_sync_data() {
         ssd1306_show(&disp);
         sleep_ms(3000);
     }
-    cyw43_arch_deinit();
+    wifi_disconnect();
     state = IDLE;
 }
+
+static void on_idle() {
+    static char time_str[] = "00:00:00";
+    static datetime_t t;
+    static absolute_time_t timeout = 0;
+    if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
+        timeout = make_timeout_time_ms(1000);
+        rtc_get_datetime(&t);
+        sprintf(time_str, "%02d:%02d:%02d", t.hour, t.min, t.sec);
+        display_message(&disp, time_str);
+    }
+}
+
+static void on_sync_time() {
+    display_message(&disp, "CONNECT");
+    if (!wifi_connect()) {
+        display_message(&disp, "CONN ERR");
+        sleep_ms(1000);
+    } else {
+        display_message(&disp, "NTP SYNC");
+        if (!sync_rtc_to_ntp()) {
+            display_message(&disp, "NTP ERR");
+            sleep_ms(1000);
+        }
+    }
+    wifi_disconnect();
+    state = IDLE;
+}
+
+static void on_sleep() {
+    sleep_run_from_xosc();
+    display_message(&disp, "SLEEP.");
+
+    clocks_hw->sleep_en0 = CLOCKS_SLEEP_EN0_CLK_RTC_RTC_BITS;
+    clocks_hw->sleep_en1 = 0x0;
+    display_message(&disp, "SLEEP..");
+
+    scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
+    display_message(&disp, "SLEEP...");
+
+    disable_button(BTN_LEFT, false);
+    disable_button(BTN_RIGHT, true);
+    ssd1306_poweroff(&disp);
+    state = WAKING;
+    __wfi();
+}
+
+static void on_waking() {
+    rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
+
+    scb_hw->scr = scb_orig;
+    clocks_hw->sleep_en0 = clock0_orig;
+    clocks_hw->sleep_en1 = clock1_orig;
+    clocks_init();
+
+    ssd1306_poweron(&disp);
+    enable_button(BTN_LEFT);
+    enable_button(BTN_RIGHT);
+    state = IDLE;
+}
+
+static void on_msc() {
+    tud_task();
+}
+
+static void dummy() {
+}
+
+static void (*state_handlers[STATES_COUNT])() = {
+    on_idle,      /* IDLE */
+    on_sleep,     /* SLEEP */
+    on_waking,    /* WAKING */
+    on_rec_start, /* REC_START */
+    dummy,        /* RECORD */
+    on_rec_stop,  /* REC_STOP */
+    on_sync_time, /* SYNC_TIME */
+    on_sync_data, /* SYNC_DATA */
+    on_msc        /* MSC */
+};
 
 // ----------------------------------------------------------------------------
 // Button handlers
@@ -475,81 +564,15 @@ int main() {
             while(true) { tight_loop_contents(); }
         }
  
+        scb_orig = scb_hw->scr;
+        clock0_orig = clocks_hw->sleep_en0;
+        clock1_orig = clocks_hw->sleep_en1;
+
         state = IDLE;
     }
 
-    uint32_t scb_orig = scb_hw->scr;
-    uint32_t clock0_orig = clocks_hw->sleep_en0;
-    uint32_t clock1_orig = clocks_hw->sleep_en1;
-    uint32_t last_time_update = time_us_32();
-    char time_str[9];
     while (true) {
-        switch(state) {
-            case MSC:
-                tud_task();
-                break;
-            case IDLE:
-                if (time_us_32() - last_time_update >= 1000000) {
-                    last_time_update = time_us_32();
-                    rtc_get_datetime(&t);
-                    sprintf(time_str, "%02d:%02d:%02d", t.hour, t.min, t.sec);
-                    display_message(&disp, time_str);
-                }
-                break;
-            case SYNC_TIME:
-                display_message(&disp, "NTP SYNC");
-                if (!connect()) {
-                    display_message(&disp, "CONN ERR");
-                    sleep_ms(1000);
-                } else if (!sync_rtc_to_ntp()) {
-                    display_message(&disp, "NTP ERR");
-                    sleep_ms(1000);
-                }
-                cyw43_arch_deinit();
-                state = IDLE;
-                break;
-            case SYNC_DATA:
-                on_sync_data();
-                break;
-            case SLEEP:
-                sleep_run_from_xosc();
-                display_message(&disp, "SLEEP.");
-
-                clocks_hw->sleep_en0 = CLOCKS_SLEEP_EN0_CLK_RTC_RTC_BITS;
-                clocks_hw->sleep_en1 = 0x0;
-                display_message(&disp, "SLEEP..");
-
-                scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
-                display_message(&disp, "SLEEP...");
-
-                disable_button(BTN_LEFT, false);
-                disable_button(BTN_RIGHT, true);
-                ssd1306_poweroff(&disp);
-                state = WAKING;
-                __wfi();
-                break;
-            case WAKING:
-                rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
-
-                scb_hw->scr = scb_orig;
-                clocks_hw->sleep_en0 = clock0_orig;
-                clocks_hw->sleep_en1 = clock1_orig;
-                clocks_init();
-
-                ssd1306_poweron(&disp);
-                enable_button(BTN_LEFT);
-                enable_button(BTN_RIGHT);
-                state = IDLE;
-                break;
-            case REC_START:
-                on_rec_start();
-                break;
-            case REC_STOP:
-                on_rec_stop();
-                break;
-            default:
-                break;
-        }
+        state_handlers[state]();
     }
 
     return 0;
