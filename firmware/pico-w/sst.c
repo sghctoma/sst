@@ -281,15 +281,19 @@ static bool setup_baseline(i2c_inst_t *i2c) {
     }
 }
 
-static void setup_sensors() {
-    uint8_t dummy;
+static bool setup_sensors() {
+    absolute_time_t timeout = make_timeout_time_ms(3000);
     while (!((as5600_connected(i2c0) && as5600_detect_magnet(i2c0)) ||
             (as5600_connected(i2c1) && as5600_detect_magnet(i2c1)))) {
-        sleep_ms(500);
+        if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
+            return false;
+        }
+        sleep_ms(10);
     }
 
     have_fork = setup_baseline(i2c0);
     have_shock = setup_baseline(i2c1);
+    return have_fork || have_shock;
 }
 
 static void setup_display(ssd1306_t *disp) {
@@ -316,7 +320,12 @@ static void on_rec_start() {
     multicore_fifo_drain();
     
     display_message(&disp, "INIT SENS");
-    setup_sensors();
+    if (!setup_sensors()) {
+        display_message(&disp, "NO SENS");
+        sleep_ms(1000);
+        state = IDLE;
+        return;
+    }
 
     state = RECORD;
     char msg[8];
