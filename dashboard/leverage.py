@@ -27,6 +27,7 @@ def shock_wheel_figure(coeffs, max_stroke, color):
     p.line(x, y, line_width=2, color=color)
     return p
 
+
 def leverage_ratio_figure(wtlr, color):
     p = figure(
         name='lr',
@@ -45,8 +46,7 @@ def leverage_ratio_figure(wtlr, color):
         output_backend='webgl')
     p.hover.mode = 'vline'
 
-    x = wtlr[:,0]
-    y = wtlr[:,1]
+    x = wtlr[:, 0]
+    y = wtlr[:, 1]
     p.line(x, y, line_width=2, color=color)
     return p
-

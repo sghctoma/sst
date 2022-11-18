@@ -19,8 +19,9 @@ def normal_distribution_data(velocity, step):
     pdf = norm.pdf(ny, mu, std) * step * 100
     return dict(pdf=pdf, ny=ny)
 
+
 def velocity_histogram_data(dt, dv, mask, step):
-    hist = np.zeros(((len(dt.Bins)-1)//2, len(dv.Bins)-1))
+    hist = np.zeros(((len(dt.Bins) - 1) // 2, len(dv.Bins) - 1))
     for i in range(len(dv.Data)):
         if mask[i]:
             vbin = dv.Data[i]
@@ -38,16 +39,17 @@ def velocity_histogram_data(dt, dv, mask, step):
         if sm > 0.1:
             cutoff.append(i)
 
-    sd = {str(k): v for k,v in enumerate(hist)}
-    sd['y'] = np.array(dv.Bins[:-1])+step/2
+    sd = {str(k): v for k, v in enumerate(hist)}
+    sd['y'] = np.array(dv.Bins[:-1]) + step / 2
     hi, lo = dv.Bins[cutoff[-1]], dv.Bins[cutoff[0]]
     return sd, hi, lo, largest_bin
+
 
 def update_velocity_histogram(p, dt, dv, velocity, mask):
     ds = p.select_one('ds_hist')
     step = dv.Bins[1] - dv.Bins[0]
     sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
-    ds.data=sd
+    ds.data = sd
     p.y_range = Range1d(hi, lo)
 
     ds_normal = p.select_one('ds_normal')
@@ -55,7 +57,9 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
 
     update_velocity_stats(p, velocity, mx)
 
-def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, title):
+
+def velocity_histogram_figure(
+        dt, dv, velocity, mask, high_speed_threshold, title):
     step = dv.Bins[1] - dv.Bins[0]
     sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
     source = ColumnDataSource(name='ds_hist', data=sd)
@@ -76,10 +80,13 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
     palette = Spectral11[1:]
     k = list(sd.keys())
     k.remove('y')
-    p.hbar_stack(stackers=k, name='hb', y='y', height=step, color=palette, line_color='black', source=source)
+    p.hbar_stack(stackers=k, name='hb', y='y', height=step,
+                 color=palette, line_color='black', source=source)
 
-    source_normal = ColumnDataSource(name='ds_normal', data=normal_distribution_data(velocity[mask], step))
-    p.line(x='pdf', y='ny', line_width=2, source=source_normal, line_dash='dashed', color=Spectral11[-2])
+    source_normal = ColumnDataSource(
+        name='ds_normal', data=normal_distribution_data(velocity[mask], step))
+    p.line(x='pdf', y='ny', line_width=2, source=source_normal,
+           line_dash='dashed', color=Spectral11[-2])
 
     mapper = LinearColorMapper(palette=palette, low=0, high=100)
     color_bar = ColorBar(
@@ -89,8 +96,12 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
         ticker=FixedTicker(ticks=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]))
     p.add_layout(color_bar, 'above')
 
-    lowspeed_box = BoxAnnotation(top=high_speed_threshold, bottom=-high_speed_threshold,
-        left=0, fill_color='#FFFFFF', fill_alpha=0.1)
+    lowspeed_box = BoxAnnotation(
+        top=high_speed_threshold,
+        bottom=-high_speed_threshold,
+        left=0,
+        fill_color='#FFFFFF',
+        fill_alpha=0.1)
     p.add_layout(lowspeed_box)
     add_velocity_stat_labels(velocity[mask], mx, p)
 
@@ -109,13 +120,18 @@ def velocity_histogram_figure(dt, dv, velocity, mask, high_speed_threshold, titl
 
     return p
 
+
 def add_velocity_stat_labels(velocity, mx, p):
     avgr, maxr, avgc, maxc = velocity_stats(velocity)
 
-    s_avgr = Span(name='s_avgr', location=avgr, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
-    s_maxr = Span(name='s_maxr', location=maxr, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
-    s_avgc = Span(name='s_avgc', location=avgc, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
-    s_maxc = Span(name='s_maxc', location=maxc, dimension='width', line_color='gray', line_dash='dashed', line_width=2)
+    s_avgr = Span(name='s_avgr', location=avgr, dimension='width',
+                  line_color='gray', line_dash='dashed', line_width=2)
+    s_maxr = Span(name='s_maxr', location=maxr, dimension='width',
+                  line_color='gray', line_dash='dashed', line_width=2)
+    s_avgc = Span(name='s_avgc', location=avgc, dimension='width',
+                  line_color='gray', line_dash='dashed', line_width=2)
+    s_maxc = Span(name='s_maxc', location=maxc, dimension='width',
+                  line_color='gray', line_dash='dashed', line_width=2)
     p.add_layout(s_avgr)
     p.add_layout(s_maxr)
     p.add_layout(s_avgc)
@@ -132,14 +148,39 @@ def add_velocity_stat_labels(velocity, mx, p):
         'text_align': 'right',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_avgr = Label(name='l_avgr', y=avgr, text=f"avg. rebound vel.: {avgr:.1f} mm/s", y_offset=10, **text_props)
-    l_maxr = Label(name='l_maxr', y=np.fmax(top, maxr), text=f"max. rebound vel.: {maxr:.1f} mm/s", y_offset=-10, **text_props)
-    l_avgc = Label(name='l_avgc', y=avgc, text=f"avg. comp. vel.: {avgc:.1f} mm/s", y_offset=-10, **text_props)
-    l_maxc = Label(name='l_maxc', y=np.fmin(bottom, maxc), text=f"max. comp. vel.: {maxc:.1f} mm/s", y_offset=10, **text_props)
+    l_avgr = Label(
+        name='l_avgr',
+        y=avgr,
+        text=f"avg. rebound vel.: {avgr:.1f} mm/s",
+        y_offset=10,
+        **text_props)
+    l_maxr = Label(
+        name='l_maxr',
+        y=np.fmax(
+            top,
+            maxr),
+        text=f"max. rebound vel.: {maxr:.1f} mm/s",
+        y_offset=-10,
+        **text_props)
+    l_avgc = Label(
+        name='l_avgc',
+        y=avgc,
+        text=f"avg. comp. vel.: {avgc:.1f} mm/s",
+        y_offset=-10,
+        **text_props)
+    l_maxc = Label(
+        name='l_maxc',
+        y=np.fmin(
+            bottom,
+            maxc),
+        text=f"max. comp. vel.: {maxc:.1f} mm/s",
+        y_offset=10,
+        **text_props)
     p.add_layout(l_avgr)
     p.add_layout(l_maxr)
     p.add_layout(l_avgc)
     p.add_layout(l_maxc)
+
 
 def velocity_stats(velocity):
     avgr = np.average(velocity[velocity < 0])
@@ -148,6 +189,7 @@ def velocity_stats(velocity):
     maxc = np.max(velocity[velocity > 0])
     return avgr, maxr, avgc, maxc
 
+
 def update_velocity_stats(p, velocity, mx):
     avgr, maxr, avgc, maxc = velocity_stats(velocity)
 
@@ -155,7 +197,7 @@ def update_velocity_stats(p, velocity, mx):
     p.select_one('s_avgc').location = avgc
     p.select_one('s_maxr').location = maxr
     p.select_one('s_maxc').location = maxc
-    
+
     l_avgr = p.select_one('l_avgr')
     l_avgr.x = mx
     l_avgr.y = avgr
@@ -172,21 +214,27 @@ def update_velocity_stats(p, velocity, mx):
     l_maxc.x = mx
     l_maxc.y = maxc
     l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
-    
+
+
 def velocity_band_stats(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
-    lsr = np.count_nonzero((velocity > -high_speed_threshold) & (velocity < 0)) / count * 100
-    lsc = np.count_nonzero((velocity > 0) & (velocity < high_speed_threshold)) / count * 100
+    lsr = np.count_nonzero((velocity > -high_speed_threshold)
+                           & (velocity < 0)) / count * 100
+    lsc = np.count_nonzero((velocity > 0) & (
+        velocity < high_speed_threshold)) / count * 100
     hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
     return hsr, lsr, lsc, hsc
 
+
 def velocity_band_stats_figure(velocity, high_speed_threshold):
     hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
-    source = ColumnDataSource(name='ds_stats', data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
+    source = ColumnDataSource(name='ds_stats', data=dict(
+        x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
-        title="Speed\nzones\n\n\n",  #XXX OK, this is fucking ugly, but setting title.standoff
-                                     #    above a certain value somehow affects neighbouring figures...
+        # XXX OK, this is fucking ugly, but setting title.standoff
+        title="Speed\nzones\n\n\n",
+        #    above a certain value somehow affects neighbouring figures...
         width=70,
         height=606,
         sizing_mode='fixed',
@@ -197,10 +245,10 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
     p.xaxis.visible = False
     p.yaxis.visible = False
     p.vbar_stack(['hsc', 'lsc', 'lsr', 'hsr'], x='x',
-        width=2,
-        color=['#303030', '#282828', '#282828', '#303030'],
-        line_color=['gray']*4,
-        source=source)
+                 width=2,
+                 color=['#303030', '#282828', '#282828', '#303030'],
+                 line_color=['gray'] * 4,
+                 source=source)
 
     text_props = {
         'x_units': 'data',
@@ -210,24 +258,29 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         'text_align': 'left',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_hsr = Label(name='l_hsr', x=0, y=hsc+lsc+lsr+hsr/2, text=f" HSR:\n{hsr:.2f}%", **text_props)
-    l_lsr = Label(name='l_lsr', x=0, y=hsc+lsc+lsr/2, text=f" LSR:\n{lsr:.2f}%", **text_props)
-    l_lsc = Label(name='l_lsc', x=0, y=hsc+lsc/2, text=f" LSC:\n{lsc:.2f}%", **text_props)
-    l_hsc = Label(name='l_hsc', x=0, y=hsc/2, text=f" HSC:\n{hsc:.2f}%", **text_props)
+    l_hsr = Label(name='l_hsr', x=0, y=hsc + lsc + lsr + hsr / 2,
+                  text=f" HSR:\n{hsr:.2f}%", **text_props)
+    l_lsr = Label(name='l_lsr', x=0, y=hsc + lsc + lsr / 2,
+                  text=f" LSR:\n{lsr:.2f}%", **text_props)
+    l_lsc = Label(name='l_lsc', x=0, y=hsc + lsc / 2,
+                  text=f" LSC:\n{lsc:.2f}%", **text_props)
+    l_hsc = Label(name='l_hsc', x=0, y=hsc / 2,
+                  text=f" HSC:\n{hsc:.2f}%", **text_props)
     p.add_layout(l_hsr)
     p.add_layout(l_lsr)
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
-    p.y_range = Range1d(0, hsr+lsr+lsc+hsc)
+    p.y_range = Range1d(0, hsr + lsr + lsc + hsc)
     p.x_range = Range1d(0, 1)
     return p
+
 
 def update_velocity_band_stats(p, velocity, high_speed_threshold):
     ds = p.select_one('ds_stats')
     hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
-    ds.data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
-    
+    ds.data = dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
+
     l_hsr = p.select_one('l_hsr')
     l_hsr.text = f"HSR: {hsr:.2f}%"
     l_hsr.y = hsc + lsc + lsr + hsr / 2
@@ -240,5 +293,5 @@ def update_velocity_band_stats(p, velocity, high_speed_threshold):
     l_hsc = p.select_one('l_hsc')
     l_hsc.text = f"HSC: {hsc:.2f}%"
     l_hsc.y = hsc / 2
-    
-    p.y_range = Range1d(0, hsr+lsr+lsc+hsc)
+
+    p.y_range = Range1d(0, hsr + lsr + lsc + hsc)

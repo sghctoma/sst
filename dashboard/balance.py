@@ -9,13 +9,13 @@ from bokeh.plotting import figure
 def strokes(v):
     zero_crossings = np.where(np.diff(np.sign(v)))[0] + 1
     if len(zero_crossings) == 0:
-        return [],[]
+        return [], []
     zero_crossings = np.insert(zero_crossings, 0, 0)
-    zero_crossings = np.append(zero_crossings, len(v)-1)
-    compressions, rebounds = [],[]
-    for i in range(len(zero_crossings)-1):
+    zero_crossings = np.append(zero_crossings, len(v) - 1)
+    compressions, rebounds = [], []
+    for i in range(len(zero_crossings) - 1):
         start = zero_crossings[i]
-        end = zero_crossings[i+1]
+        end = zero_crossings[i + 1]
         if start == end:
             continue
         if v[start] > 0:
@@ -24,16 +24,17 @@ def strokes(v):
             rebounds.append((start, end))
     return compressions, rebounds
 
+
 def travel_velocity(travel, travel_max, velocity):
     compressions, rebounds = strokes(velocity)
     ct, cv, rt, rv = [], [], [], []
     for c in compressions:
         v_max = np.max(velocity[c[0]:c[1]])
-        ct.append(travel[c[1]]/travel_max*100)
+        ct.append(travel[c[1]] / travel_max * 100)
         cv.append(v_max)
     for r in rebounds:
         v_min = np.min(velocity[r[0]:r[1]])
-        rt.append(travel[r[0]]/travel_max*100)
+        rt.append(travel[r[0]] / travel_max * 100)
         rv.append(v_min)
     ct = np.array(ct)
     cv = np.array(cv)
@@ -43,8 +44,11 @@ def travel_velocity(travel, travel_max, velocity):
     rp = rt.argsort()
     return ct[cp], cv[cp], rt[rp], rv[rp]
 
-def balance_data(front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity):
-    fct, fcv, frt, frv = travel_velocity(front_travel, front_max, front_velocity)
+
+def balance_data(front_travel, front_max, front_velocity,
+                 rear_travel, rear_max, rear_velocity):
+    fct, fcv, frt, frv = travel_velocity(
+        front_travel, front_max, front_velocity)
     rct, rcv, rrt, rrv = travel_velocity(rear_travel, rear_max, rear_velocity)
     fcp = np.poly1d(np.polyfit(fct, fcv, 1))
     frp = np.poly1d(np.polyfit(frt, frv, 1))
@@ -58,19 +62,25 @@ def balance_data(front_travel, front_max, front_velocity, rear_travel, rear_max,
 
     return fc, rc, fr, rr
 
-def update_balance(pc, pr, front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity):
+
+def update_balance(pc, pr, front_travel, front_max,
+                   front_velocity, rear_travel, rear_max, rear_velocity):
     ds_fc = pc.select_one('ds_fc')
     ds_rc = pc.select_one('ds_rc')
     ds_fr = pr.select_one('ds_fr')
     ds_rr = pr.select_one('ds_rr')
     ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = balance_data(
         front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity)
-    pc.x_range = Range1d(0, np.fmax(ds_fc.data['travel'][-1], ds_rc.data['travel'][-1]))
-    pr.x_range = Range1d(0, np.fmax(ds_fr.data['travel'][-1], ds_rr.data['travel'][-1]))
+    pc.x_range = Range1d(0, np.fmax(
+        ds_fc.data['travel'][-1], ds_rc.data['travel'][-1]))
+    pr.x_range = Range1d(0, np.fmax(
+        ds_fr.data['travel'][-1], ds_rr.data['travel'][-1]))
+
 
 def balance_figures(front_travel, front_max, front_velocity, front_color,
-                   rear_travel, rear_max, rear_velocity, rear_color):
-    fc, rc, fr, rr = balance_data(front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity)
+                    rear_travel, rear_max, rear_velocity, rear_color):
+    fc, rc, fr, rr = balance_data(
+        front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)
     rear_compression_source = ColumnDataSource(name='ds_rc', data=rc)
     front_rebound_source = ColumnDataSource(name='ds_fr', data=fr)
@@ -86,8 +96,9 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         x_axis_label="Travel (%)",
         y_axis_label="Velocity (mm/s)",
         output_backend='webgl')
-    p_compression.x_range = Range1d(0, np.fmax(fc['travel'][-1], rc['travel'][-1]))
-    p_compression.xaxis.ticker = FixedTicker(ticks=list(range(0,110,10)))
+    p_compression.x_range = Range1d(
+        0, np.fmax(fc['travel'][-1], rc['travel'][-1]))
+    p_compression.xaxis.ticker = FixedTicker(ticks=list(range(0, 110, 10)))
     p_compression.circle(
         'travel', 'velocity',
         legend_label="Front",
@@ -125,7 +136,7 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
         y_axis_label="Velocity (mm/s)",
         output_backend='webgl')
     p_rebound.x_range = Range1d(0, np.fmax(fr['travel'][-1], rr['travel'][-1]))
-    p_rebound.xaxis.ticker = FixedTicker(ticks=list(range(0,110,10)))
+    p_rebound.xaxis.ticker = FixedTicker(ticks=list(range(0, 110, 10)))
     p_rebound.y_range.flipped = True
     p_rebound.circle(
         'travel', 'velocity',
@@ -154,4 +165,3 @@ def balance_figures(front_travel, front_max, front_velocity, front_color,
     p_rebound.legend.location = 'top_left'
 
     return p_compression, p_rebound
-

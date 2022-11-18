@@ -14,15 +14,18 @@ from extremes import bottomouts
 
 
 def travel_figure(telemetry, lod, front_color, rear_color):
-    l = len(telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
-    time = np.around(np.arange(0, l)/telemetry.SampleRate, 4) 
+    l = len(
+        telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
+    time = np.around(np.arange(0, l) / telemetry.SampleRate, 4)
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Linkage.MaxRearTravel
 
     source = ColumnDataSource(data=dict(
         t=time[::lod],
-        f=np.around(telemetry.Front.Travel[::lod], 4) if telemetry.Front.Present else np.full(l, 0)[::lod],
-        r=np.around(telemetry.Rear.Travel[::lod], 4,) if telemetry.Rear.Present else np.full(l, 0)[::lod],
+        f=np.around(telemetry.Front.Travel[::lod], 4) if telemetry.Front.Present else np.full(
+            l, 0)[::lod],
+        r=np.around(telemetry.Rear.Travel[::lod], 4,) if telemetry.Rear.Present else np.full(
+            l, 0)[::lod],
     ))
     p = figure(
         name='travel',
@@ -33,7 +36,8 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         tools='xpan,reset,hover',
         active_inspect=None,
         active_drag='xpan',
-        tooltips=[("elapsed time", "@t s"), ("front wheel", "@f mm"), ("rear wheel", "@r mm")],
+        tooltips=[("elapsed time", "@t s"), ("front wheel",
+                                             "@f mm"), ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
         y_range=(front_max, 0),
@@ -62,20 +66,41 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         source=source)
     p.legend.level = 'overlay'
 
-    left_unselected = BoxAnnotation(left=p.x_range.start, right=p.x_range.start, fill_alpha=0.8, fill_color='#000000')
-    right_unselected = BoxAnnotation(left=p.x_range.end, right=p.x_range.end, fill_alpha=0.8, fill_color='#000000')
+    left_unselected = BoxAnnotation(
+        left=p.x_range.start,
+        right=p.x_range.start,
+        fill_alpha=0.8,
+        fill_color='#000000')
+    right_unselected = BoxAnnotation(
+        left=p.x_range.end,
+        right=p.x_range.end,
+        fill_alpha=0.8,
+        fill_color='#000000')
     p.add_layout(left_unselected)
     p.add_layout(right_unselected)
 
     bs = BoxSelectTool(dimensions="width")
     p.add_tools(bs)
-    p.js_on_event(DoubleTap, CustomJS(args=dict(lu=left_unselected, ru=right_unselected, end=p.x_range.end), code='''
+    p.js_on_event(
+        DoubleTap,
+        CustomJS(
+            args=dict(
+                lu=left_unselected,
+                ru=right_unselected,
+                end=p.x_range.end),
+            code='''
         lu.right = 0;
         ru.left = end;
         lu.change.emit();
         ru.change.emit();
         '''))
-    p.js_on_event(SelectionGeometry, CustomJS(args=dict(lu=left_unselected, ru=right_unselected), code='''
+    p.js_on_event(
+        SelectionGeometry,
+        CustomJS(
+            args=dict(
+                lu=left_unselected,
+                ru=right_unselected),
+            code='''
         const geometry = cb_obj['geometry'];
         lu.right = geometry['x0'];
         ru.left = geometry['x1'];
@@ -86,20 +111,22 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
-   
+
     p.hover.mode = 'vline'
     p.hover.renderers = [l]
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
     return p
 
+
 def travel_histogram_data(digitized, mask):
-    hist = np.zeros(len(digitized.Bins)-1)
+    hist = np.zeros(len(digitized.Bins) - 1)
     for i in range(len(digitized.Data)):
         if mask[i]:
             hist[digitized.Data[i]] += 1
     hist = hist / np.count_nonzero(mask) * 100
     return dict(y=digitized.Bins[:-1], right=hist)
+
 
 def travel_histogram_figure(digitized, travel, mask, color, title):
     bins = digitized.Bins
@@ -118,9 +145,11 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
         output_backend='webgl')
     p.x_range.start = 0
     p.y_range.flipped = True
-    p.hbar(y='y', height=max_travel/(len(bins)-1), left=0, right='right', source=source, color=color, line_color='black')
+    p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0,
+           right='right', source=source, color=color, line_color='black')
     add_travel_stat_labels(travel[mask], max_travel, np.max(data['right']), p)
     return p
+
 
 def travel_stats(travel, max_travel):
     avg = np.average(travel)
@@ -130,12 +159,13 @@ def travel_stats(travel, max_travel):
     mx_text = f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / {len(bo)} bottom outs"
     return avg, mx, avg_text, mx_text
 
+
 def add_travel_stat_labels(travel, max_travel, hist_max, p):
     avg, mx, avg_text, mx_text = travel_stats(travel, max_travel)
     s_avg = Span(name='s_avg', location=avg, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
+                 line_color='gray', line_dash='dashed', line_width=2)
     s_max = Span(name='s_max', location=mx, dimension='width',
-            line_color='gray', line_dash='dashed', line_width=2)
+                 line_color='gray', line_dash='dashed', line_width=2)
     p.add_layout(s_avg)
     p.add_layout(s_max)
 
@@ -147,10 +177,12 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
         'text_align': 'right',
         'text_font_size': '14px',
         'text_color': '#fefefe'}
-    l_avg = Label(name='l_avg', y=avg, text=avg_text, y_offset=-10, **text_props)
+    l_avg = Label(name='l_avg', y=avg, text=avg_text,
+                  y_offset=-10, **text_props)
     l_max = Label(name='l_max', y=mx, text=mx_text, y_offset=10, **text_props)
     p.add_layout(l_avg)
     p.add_layout(l_max)
+
 
 def update_travel_histogram(p, travel, digitized, mask):
     ds = p.select_one('ds_hist')
@@ -169,4 +201,3 @@ def update_travel_histogram(p, travel, digitized, mask):
     s_avg.location = avg
     s_max = p.select_one('s_max')
     s_max.location = mx
-

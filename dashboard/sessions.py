@@ -23,16 +23,19 @@ def session_list(sessions):
         d = datetime.fromtimestamp(s[3])
         desc = s[2] if s[2] else f"No description for {s[1]}"
         if d.date() != last_day:
-            session_divs.append(Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
+            session_divs.append(
+                Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
             last_day = d.date()
         session_divs.append(Div(
             text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
             css_classes=['tooltip']))
     return column(name='sessions', children=session_divs)
 
+
 def file_widgets():
     file_input = FileInput(name='input_sst', accept='.sst', multiple=True)
-    ds = ColumnDataSource(name='ds_sst', data=dict(files=[], names=[], notes=[]))
+    ds = ColumnDataSource(name='ds_sst', data=dict(
+        files=[], names=[], notes=[]))
     dc = [
         TableColumn(field='files', title='File', editor=CellEditor()),
         TableColumn(field='names', title='Name'),
@@ -57,8 +60,9 @@ def file_widgets():
         ds.data = new_data;
         ds.change.emit();
         ''')
-    )
+                            )
     return file_input, file_table, ds
+
 
 def settings_widgets():
     return row(sizing_mode='stretch_width', children=[
@@ -84,6 +88,7 @@ def settings_widgets():
             Spinner(placeholder="n/a", width=130),
             Spinner(placeholder="n/a", width=130))])
 
+
 def calibrations_widgets(cur):
     res = cur.execute('SELECT ROWID, data FROM calibrations')
     calibrations = {}
@@ -92,7 +97,13 @@ def calibrations_widgets(cur):
         calibrations[r[0]] = c
     calibrations_ds = ColumnDataSource(data=dict(data=[calibrations]))
     first_key = list(calibrations.keys())[0]
-    calibrations_select = Select(name='select_cal', options=[(str(k), v['Name']) for k,v in calibrations.items()], value=str(first_key))
+    calibrations_select = Select(
+        name='select_cal',
+        options=[
+            (str(k),
+             v['Name']) for k,
+            v in calibrations.items()],
+        value=str(first_key))
     first = calibrations[first_key]
     calibration_display = row(
         column(
@@ -113,7 +124,10 @@ def calibrations_widgets(cur):
             Div(text=f"{first['Rear']['MaxDistance']:.2f} mm", width=130),
             Div(text=f"{first['Rear']['StartAngle']*180/np.pi:.2f} °", width=130),
             Div(text=f"{first['Rear']['MaxStroke']:.2f} mm", width=130)))
-    calibrations_select.js_on_change('value', CustomJS(args=dict(cd=calibration_display, ds=calibrations_ds), code='''
+    calibrations_select.js_on_change(
+        'value', CustomJS(
+            args=dict(
+                cd=calibration_display, ds=calibrations_ds), code='''
         let v = ds.data.data[0][this.value];
         cd.children[1].children[1].text = v.Front.ArmLength.toFixed(2) + " mm";
         cd.children[1].children[2].text = v.Front.MaxDistance.toFixed(2) + " mm";
@@ -123,9 +137,9 @@ def calibrations_widgets(cur):
         cd.children[2].children[2].text = v.Rear.MaxDistance.toFixed(2) + " mm";
         cd.children[2].children[3].text = (v.Rear.StartAngle * 180 / Math.PI).toFixed(2) + " °";
         cd.children[2].children[4].text = v.Rear.MaxStroke.toFixed(2) + " mm";
-        ''')
-    )
+        '''))
     return calibrations_select, calibration_display
+
 
 def linkages_widgets(cur):
     res = cur.execute('SELECT ROWID, data FROM linkages')
@@ -135,13 +149,15 @@ def linkages_widgets(cur):
         linkages[r[0]] = l
     linkages_ds = ColumnDataSource(data=dict(data=[linkages]))
     first_key = list(linkages.keys())[0]
-    linkages_select = Select(name='select_lnk', options=[(str(k), v['Name']) for k,v in linkages.items()], value=str(first_key))
+    linkages_select = Select(name='select_lnk', options=[(
+        str(k), v['Name']) for k, v in linkages.items()], value=str(first_key))
     wtlr = np.array(linkages[first_key]['LeverageRatio'])
-    lvrg_ds = ColumnDataSource(name='ds_lvrg', data=dict(wt=wtlr[:,0], lr=wtlr[:,1]))
+    lvrg_ds = ColumnDataSource(
+        name='ds_lvrg', data=dict(wt=wtlr[:, 0], lr=wtlr[:, 1]))
     lvrg = figure(
         height=150,
         width=400,
-        margin=(2,10,10,10),
+        margin=(2, 10, 10, 10),
         sizing_mode='fixed',
         toolbar_location=None,
         active_drag=None,
@@ -151,20 +167,24 @@ def linkages_widgets(cur):
         tooltips=[("wheel travel", "@x"), ("leverage ratio", "@y")],
         output_backend='webgl')
     lvrg.line('wt', 'lr', source=lvrg_ds, line_width=2)
-    linkages_select.js_on_change('value', CustomJS(args=dict(lvrg_ds=lvrg_ds, lnks_ds=linkages_ds), code='''
+    linkages_select.js_on_change(
+        'value', CustomJS(
+            args=dict(
+                lvrg_ds=lvrg_ds, lnks_ds=linkages_ds), code='''
         let v = lnks_ds.data.data[0][this.value];
         let wt = v.LeverageRatio.map(d => d[0]);
         let lr = v.LeverageRatio.map(d => d[1]);
         lvrg_ds.data['wt'] = wt;
         lvrg_ds.data['lr'] = lr;
         lvrg_ds.change.emit();
-        ''')
-    )
+        '''))
     return linkages_select, lvrg
+
 
 def session_dialog(cur, full_access):
     if not full_access:
-        return column(name='dialog_session', children=[Div(text="Ah-ah-ah, your didn't say the magic word!")])
+        return column(name='dialog_session', children=[
+                      Div(text="Ah-ah-ah, your didn't say the magic word!")])
 
     files_input, files_table, files_ds = file_widgets()
     settings_display = settings_widgets()
