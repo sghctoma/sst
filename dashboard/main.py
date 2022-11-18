@@ -30,7 +30,7 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-DB_FILE = '/home/sghctoma/projects/sst/gosst/data/gosst.db'
+DB_FILE = '/home/sghctoma/documents/gosst.db'
 
 args = curdoc().session_context.request.arguments
 
@@ -439,18 +439,23 @@ if re.search(
 '''
 Construct the layout.
 '''
-only_one = telemetry.Front.Present != telemetry.Rear.Present
+suspension_count = 0
+if telemetry.Front.Present:
+    suspension_count += 1
+if telemetry.Rear.Present:
+    suspension_count += 1
 
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({telemetry.Name})"
-curdoc().template_variables["only_one"] = only_one
+curdoc().template_variables["suspension_count"] = suspension_count
 curdoc().template_variables["name"] = telemetry.Name
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
-    p_front_travel_hist.name = 'travel_hist' if only_one else 'front_travel_hist'
-    p_front_fft.name = 'fft' if only_one else 'front_fft'
+    prefix = 'front_' if suspension_count == 2 else ''
+    p_front_travel_hist.name = f'{prefix}travel_hist'
+    p_front_fft.name = f'{prefix}fft'
     p_front_velocity = row(
-        name='velocity_hist' if only_one else 'front_velocity_hist',
+        name=f'{prefix}velocity_hist',
         sizing_mode='stretch_width',
         children=[
             p_front_vel_hist,
@@ -459,10 +464,11 @@ if telemetry.Front.Present:
     curdoc().add_root(p_front_fft)
     curdoc().add_root(p_front_velocity)
 if telemetry.Rear.Present:
-    p_rear_travel_hist.name = 'travel_hist' if only_one else 'rear_travel_hist'
-    p_rear_fft.name = 'fft' if only_one else 'rear_fft'
+    prefix = 'rear_' if suspension_count == 2 else ''
+    p_rear_travel_hist.name = f'{prefix}travel_hist'
+    p_rear_fft.name = f'{prefix}fft'
     p_rear_velocity = row(
-        name='velocity_hist' if only_one else 'rear_velocity_hist',
+        name=f'{prefix}velocity_hist',
         sizing_mode='stretch_width',
         children=[
             p_rear_vel_hist,
@@ -470,7 +476,7 @@ if telemetry.Rear.Present:
     curdoc().add_root(p_rear_travel_hist)
     curdoc().add_root(p_rear_fft)
     curdoc().add_root(p_rear_velocity)
-if telemetry.Front.Present and telemetry.Rear.Present:
+if suspension_count == 2:
     curdoc().add_root(p_balance_compression)
     curdoc().add_root(p_balance_rebound)
 curdoc().add_root(sessions_list)
