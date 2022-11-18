@@ -63,14 +63,7 @@ gosst/gosst-http
 gosst/gosst-tcp
 
 # test utilities
-gosst-convert/
 dashboard/test.py
-
-# processed SST files 
-*.PSST
-
-# generated dashboards
-*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
