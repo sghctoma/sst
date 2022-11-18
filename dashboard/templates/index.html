@@ -1,0 +1,58 @@
+{% extends base %}
+
+<!-- goes in head -->
+{% block preamble %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="apple-touch-icon" sizes="180x180" href="dashboard/static/favicon_io/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="dashboard/static/favicon_io/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="dashboard/static/favicon_io/favicon-16x16.png">
+<link rel="manifest" href="dashboard/static/favicon_io/site.webmanifest">
+<link href="dashboard/static/common.css" rel="stylesheet"/>
+{% if suspension_count == 1 -%}
+<link href="dashboard/static/layout-single.css" rel="stylesheet"/>
+{%- elif suspension_count == 2 %}
+<link href="dashboard/static/layout-double.css" rel="stylesheet"/>
+{% endif %}
+{% endblock %}
+
+<!-- goes in body -->
+{% block contents %}
+
+<input type="checkbox" id="drawer-toggle" name="drawer-toggle"/>
+<label for="drawer-toggle" id="drawer-toggle-label"></label>
+<header>sufni suspension telemetry - {{name}}</header>
+<nav id="drawer">
+    <h4>Sessions</h4><a href="#open-modal">(add new...)</a>
+    <div class="sessions">{{ embed(roots.sessions) }}</div>
+</nav>
+
+<div id="page-content" class="container">
+    <div class="travel">{{ embed(roots.travel) }}</div>
+    <div class="description">{{ embed(roots.description) }}</div>
+
+    {% if suspension_count == 1 -%}
+    <div class="travel-hist">{{ embed(roots.travel_hist) }}</div>
+    <div class="fft">{{ embed(roots.fft) }}</div>
+    <div class="velocity-hist">{{ embed(roots.velocity_hist) }}</div>
+    {%- elif suspension_count == 2 %}
+    <div class="travel">{{ embed(roots.travel) }}</div>
+    <div class="front-travel-hist">{{ embed(roots.front_travel_hist) }}</div>
+    <div class="rear-travel-hist">{{ embed(roots.rear_travel_hist) }}</div>
+    <div class="front-fft">{{ embed(roots.front_fft) }}</div>
+    <div class="rear-fft">{{ embed(roots.rear_fft) }}</div>
+    <div class="front-velocity-hist">{{ embed(roots.front_velocity_hist) }}</div>
+    <div class="rear-velocity-hist">{{ embed(roots.rear_velocity_hist) }}</div>
+    <div class="balance-compression">{{ embed(roots.balance_compression) }}</div>
+    <div class="balance-rebound">{{ embed(roots.balance_rebound) }}</div>
+    {% endif %}
+</div>
+
+<div id="open-modal" class="modal-window">
+  <div>
+      <a href="#" title="Close" class="modal-close">Close</a>
+      <h1>New session group</h1>
+      {{ embed(roots.dialog_session) }}
+  </div>
+</div>
+
+{% endblock %}
