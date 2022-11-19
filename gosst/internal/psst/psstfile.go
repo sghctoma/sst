@@ -3,11 +3,11 @@ package psst
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/SeanJxie/polygo"
 	"github.com/openacid/slimarray/polyfit"
@@ -16,18 +16,21 @@ import (
 )
 
 type Calibration struct {
-	ArmLength   float64 `codec:"," json:"arm" binding:"required"`
-	MaxDistance float64 `codec:"," json:"dist" binding:"required"`
-	MaxStroke   float64 `codec:"," json:"stroke" binding:"required"`
-	StartAngle  float64 `codec:"," json:"angle"`
+	Id          int     `db:"calibration_id" json:"id"`
+	Name        string  `db:"name"           json:"name"   binding:"required"`
+	ArmLength   float64 `db:"arm"            json:"arm"    binding:"required"`
+	MaxDistance float64 `db:"dist"           json:"dist"   binding:"required"`
+	MaxStroke   float64 `db:"stroke"         json:"stroke" binding:"required"`
+	StartAngle  float64 `db:"angle"          json:"angle"`
 }
 
 type Linkage struct {
-	Name             string       `codec:"," json:"name" binding:"required"`
-	RawData          string       `codec:"-" json:"data" binding:"required"`
-	LeverageRatio    [][2]float64 `codec:"," json:"leverage"`
-	ShockWheelCoeffs []float64    `codec:"," json:"coeffs"`
-	MaxRearTravel    float64      `codec:"," json:"max_travel"`
+	Id               int          `db:"linkage_id"  json:"id"`
+	Name             string       `db:"name"        json:"name"       binding:"required"`
+	RawData          string       `db:"raw_lr_data" json:"data"       binding:"required"`
+	LeverageRatio    [][2]float64 `                 json:"leverage"`
+	ShockWheelCoeffs []float64    `                 json:"coeffs"`
+	MaxRearTravel    float64      `                 json:"max_travel"`
 }
 
 type digitized struct {
@@ -68,15 +71,10 @@ type processed struct {
 }
 
 func (this *Linkage) Process() error {
-	raw, err := base64.StdEncoding.DecodeString(this.RawData)
-	if err != nil {
-		return err
-	}
-
 	var wtlr [][2]float64
 	var ilr []float64
 	var wt []float64
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner := bufio.NewScanner(strings.NewReader(this.RawData))
 	for scanner.Scan() {
 		var w, l float64
 		_, err := fmt.Sscanf(scanner.Text(), "%f,%f", &w, &l)
