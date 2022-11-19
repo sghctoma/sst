@@ -4,106 +4,123 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/binary"
+	"encoding/hex"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"regexp"
 
+	"github.com/blockloop/scan"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
 	psst "gosst/internal/psst"
+	schema "gosst/internal/schema"
 )
 
-type calibrationPair struct {
-	Name  string           `codec:"," json:"name" binding:"required"`
-	Front psst.Calibration `codec:"," json:"front" validate:"dive" binding:"required"`
-	Rear  psst.Calibration `codec:"," json:"rear" validate:"dive" binding:"required"`
-}
-
-func defaultCalibration(db *sql.DB, h codec.Handle) (psst.Calibration, psst.Calibration, error) {
-	var data []byte
-	err := db.QueryRow("SELECT data FROM calibrations where ROWID=(SELECT ROWID FROM defaults WHERE name='calibrations')").Scan(&data)
+func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) error {
+	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
+	q := `SELECT S.setup_id, S.linkage_id, S.front_calibration_id, S.rear_calibration_id
+		  FROM setups S JOIN boards B
+          WHERE
+		    B.board_id = ? AND
+            S.setup_id = B.setup_id;`
+	err := db.QueryRow(q, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
-		return psst.Calibration{}, psst.Calibration{}, nil
+		return err
 	}
 
-	cdec := codec.NewDecoderBytes(data, h)
-	var cpair calibrationPair
-	cdec.Decode(&cpair)
-
-	return cpair.Front, cpair.Rear, nil
-}
-
-func defaultLinkage(db *sql.DB, h codec.Handle) (psst.Linkage, error) {
-	var data []byte
-	err := db.QueryRow("SELECT data FROM linkages where ROWID=(SELECT ROWID FROM defaults WHERE name='linkages')").Scan(&data)
-	if err != nil {
-		return psst.Linkage{}, err
-	}
-
-	cdec := codec.NewDecoderBytes(data, h)
 	var linkage psst.Linkage
-	cdec.Decode(&linkage)
-
-	return linkage, err
-}
-
-func putSession(db *sql.DB, h codec.Handle, name string, sst []byte) bool {
-	l, err := defaultLinkage(db, h)
+	rows, err := db.Query("SELECT * FROM linkages WHERE linkage_id = ?", linkageId)
 	if err != nil {
-		return false
+		return err
+	}
+	err = scan.RowStrict(&linkage, rows)
+	if err != nil {
+		return err
+	}
+	err = linkage.Process()
+	if err != nil {
+		return err
 	}
 
-	fcal, rcal, err := defaultCalibration(db, h)
+	var frontCalibration psst.Calibration
+	rows, err = db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", frontCalibrationId)
 	if err != nil {
-		return false
+		return err
+	}
+	err = scan.RowStrict(&frontCalibration, rows)
+	if err != nil {
+		return err
 	}
 
-	pd := psst.ProcessRecording(sst, name, l, fcal, rcal)
+	var rearCalibration psst.Calibration
+	rows, err = db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", rearCalibrationId)
+	if err != nil {
+		return err
+	}
+	err = scan.RowStrict(&rearCalibration, rows)
+	if err != nil {
+		return err
+	}
+
+	pd := psst.ProcessRecording(sst, name, linkage, frontCalibration, rearCalibration)
 
 	var data []byte
 	enc := codec.NewEncoderBytes(&data, h)
 	enc.Encode(pd)
-	if _, err := db.Exec("INSERT INTO sessions VALUES (?, ?, ?, ?)", name, "", pd.Timestamp, data); err != nil {
-		return false
+	if _, err := db.Exec("INSERT INTO sessions (name, timestamp, description, setup_id, data) VALUES (?, ?, ?, ?, ?)",
+		name, pd.Timestamp, "", setupId, data); err != nil {
+
+		return err
 	}
 
 	log.Print("[OK] session '", name, "' was successfully imported")
+	return nil
+}
 
-	return true
+type header struct {
+	BoardId [8]byte
+	Size    uint64
+	Name    [9]byte
 }
 
 func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
-	bufHeader := make([]byte, 18)
+	bufHeader := make([]byte, 25)
 	l, err := conn.Read(bufHeader)
-	if err != nil || l != 18 {
+	if err != nil || l != 25 {
+		log.Println("[ERR] Could not fetch header")
 		return
 	}
 	defer conn.Close()
 
 	reader := bytes.NewReader(bufHeader)
-	var size uint64
-	err = binary.Read(reader, binary.LittleEndian, &size)
-	if err != nil || size > 32*1024*1024 {
-		log.Println("[ERR] Invalid data")
-		return
-	}
-
-	name := string(bufHeader[8:])
-	if m, _ := regexp.MatchString("[0-9]{5}\\.SST", name); !m {
-		log.Println("[ERR] Invalid data")
-		return
-	}
-
-	bufData, err := ioutil.ReadAll(conn)
+	var header header
+	err = binary.Read(reader, binary.LittleEndian, &header)
 	if err != nil {
-		log.Println("[ERR]", err)
+		log.Println("[ERR] Invalid data")
 		return
 	}
 
-	putSession(db, h, name, bufData)
+	if header.Size > 32*1024*1024 {
+		log.Println("[ERR] Size exceeds maximum")
+		return
+	}
+
+	name := string(header.Name[:])
+	if m, _ := regexp.MatchString("[0-9]{5}\\.SST", name); !m {
+		log.Println("[ERR] Wrong name format")
+		return
+	}
+
+	data, err := ioutil.ReadAll(conn)
+	if err != nil || uint64(len(data)) != header.Size {
+		log.Println("[ERR] Could not fetch data")
+		return
+	}
+
+	putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data)
 }
 
 func main() {
@@ -113,15 +130,11 @@ func main() {
 	if err != nil {
 		log.Fatal("[ERR] could not open database")
 	}
-	if _, err := db.Exec(`
-            CREATE TABLE IF NOT EXISTS calibrations(data BLOB);
-            CREATE TABLE IF NOT EXISTS linkages(data BLOB);
-            CREATE TABLE IF NOT EXISTS defaults(name TEXT, id INTEGER);
-            CREATE TABLE IF NOT EXISTS sessions(name TEXT, description TEXT, date INTEGER, data BLOB);`); err != nil {
+	if _, err := db.Exec(schema.Sql); err != nil {
 		log.Fatal("[ERR] could not create data tables")
 	}
 
-	l, err := net.Listen("tcp", ":557")
+	l, err := net.Listen("tcp", ":1557")
 	if err != nil {
 		log.Fatal("[ERR]", err.Error())
 	}

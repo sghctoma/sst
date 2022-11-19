@@ -98,7 +98,7 @@ func (this *RequestHandler) GetSetup(c *gin.Context) {
 	}
 
 	var setup setup
-	rows, err := this.Db.Query("SELECT * FROM setup where setup_id = ?", id)
+	rows, err := this.Db.Query("SELECT * FROM setup WHERE setup_id = ?", id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
