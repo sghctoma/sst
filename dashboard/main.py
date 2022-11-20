@@ -30,7 +30,7 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-DB_FILE = '/home/sghctoma/documents/gosst.db'
+DB_FILE = '/home/sghctoma/projects/sst/gosst/gosst.db'
 
 args = curdoc().session_context.request.arguments
 
@@ -46,7 +46,7 @@ except BaseException:
     pass
 
 res = cur.execute(
-    'SELECT ROWID, name, description, date FROM sessions ORDER BY date DESC')
+    'SELECT session_id, name, description, timestamp FROM sessions ORDER BY timestamp DESC')
 sessions = res.fetchall()
 
 if not sessions:
@@ -58,7 +58,7 @@ try:
 except BaseException:
     s = sessions[0][0]
 
-res = cur.execute('SELECT data,description FROM sessions WHERE ROWID=?', (s,))
+res = cur.execute('SELECT data,description FROM sessions WHERE session_id=?', (s,))
 session_data = res.fetchone()
 if not session_data:
     curdoc().add_root(Div(text=f"No session with ID '{s}'"))

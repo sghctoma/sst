@@ -17,6 +17,7 @@ class Linkage:
 
 @dataclass
 class Calibration:
+    Name: str
     ArmLength: float
     MaxDistance: float
     MaxStroke: float
