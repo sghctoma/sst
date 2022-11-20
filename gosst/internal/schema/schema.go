@@ -1,6 +1,9 @@
 package schema
 
 var Sql = `
+	CREATE TABLE IF NOT EXISTS tokens (
+		token TEXT NOT NULL
+	);
 	CREATE TABLE IF NOT EXISTS boards (
 		board_id TEXT PRIMARY KEY,
 		setup_id INTEGER NOT NULL,
