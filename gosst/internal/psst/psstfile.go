@@ -16,21 +16,21 @@ import (
 )
 
 type Calibration struct {
-	Id          int     `db:"calibration_id" json:"id"`
-	Name        string  `db:"name"           json:"name"   binding:"required"`
-	ArmLength   float64 `db:"arm"            json:"arm"    binding:"required"`
-	MaxDistance float64 `db:"dist"           json:"dist"   binding:"required"`
-	MaxStroke   float64 `db:"stroke"         json:"stroke" binding:"required"`
-	StartAngle  float64 `db:"angle"          json:"angle"`
+	Id          int     `codec:"-" db:"calibration_id" json:"id"`
+	Name        string  `codec:"," db:"name"           json:"name"   binding:"required"`
+	ArmLength   float64 `codec:"," db:"arm"            json:"arm"    binding:"required"`
+	MaxDistance float64 `codec:"," db:"dist"           json:"dist"   binding:"required"`
+	MaxStroke   float64 `codec:"," db:"stroke"         json:"stroke" binding:"required"`
+	StartAngle  float64 `codec:"," db:"angle"          json:"angle"`
 }
 
 type Linkage struct {
-	Id               int          `db:"linkage_id"  json:"id"`
-	Name             string       `db:"name"        json:"name"       binding:"required"`
-	RawData          string       `db:"raw_lr_data" json:"data"       binding:"required"`
-	LeverageRatio    [][2]float64 `                 json:"leverage"`
-	ShockWheelCoeffs []float64    `                 json:"coeffs"`
-	MaxRearTravel    float64      `                 json:"max_travel"`
+	Id               int          `codec:"-" db:"linkage_id"  json:"id"`
+	Name             string       `codec:"," db:"name"        json:"name"       binding:"required"`
+	RawData          string       `codec:"-" db:"raw_lr_data" json:"data"       binding:"required"`
+	LeverageRatio    [][2]float64 `codec:","                  json:"leverage"`
+	ShockWheelCoeffs []float64    `codec:","                  json:"coeffs"`
+	MaxRearTravel    float64      `codec:","                  json:"max_travel"`
 }
 
 type digitized struct {
