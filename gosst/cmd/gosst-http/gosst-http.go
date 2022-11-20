@@ -32,7 +32,7 @@ type setup struct {
 type session struct {
 	Id          int    `db:"session_id"  json:"id"`
 	Name        string `db:"name"        json:"name"           binding:"required"`
-	Timestamp   uint64 `db:"timestamp"   json:"timestamp"`
+	Timestamp   int64  `db:"timestamp"   json:"timestamp"`
 	Description string `db:"description" json:"description"    binding:"required"`
 	Setup       int    `db:"setup_id"    json:"setup"          binding:"required"`
 	RawData     string `                 json:"data,omitempty" binding:"required"`
@@ -422,6 +422,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	enc := codec.NewEncoderBytes(&data, &h)
 	enc.Encode(pd)
 	session.Processed = data
+	session.Timestamp = pd.Timestamp
 
 	cols := []string{"name", "timestamp", "description", "setup_id", "data"}
 	vals, _ := scan.Values(cols, &session)
