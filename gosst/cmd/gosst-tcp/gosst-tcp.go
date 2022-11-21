@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/hex"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -76,7 +76,6 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) erro
 		return err
 	}
 
-	log.Print("[OK] session '", name, "' was successfully imported")
 	return nil
 }
 
@@ -91,6 +90,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 25 {
 		log.Println("[ERR] Could not fetch header")
+		conn.Write([]byte{0xf1 /* ERR_CLSD from LwIP */})
 		return
 	}
 	defer conn.Close()
@@ -100,27 +100,39 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 	err = binary.Read(reader, binary.LittleEndian, &header)
 	if err != nil {
 		log.Println("[ERR] Invalid data")
+		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		return
 	}
 
 	if header.Size > 32*1024*1024 {
 		log.Println("[ERR] Size exceeds maximum")
+		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		return
 	}
 
 	name := string(header.Name[:])
 	if m, _ := regexp.MatchString("[0-9]{5}\\.SST", name); !m {
 		log.Println("[ERR] Wrong name format")
+		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		return
 	}
+	conn.Write([]byte{3 /* STATUS_HEADER_OK */})
 
-	data, err := ioutil.ReadAll(conn)
-	if err != nil || uint64(len(data)) != header.Size {
+	data := make([]byte, header.Size)
+	_, err = io.ReadFull(conn, data)
+	if err != nil {
 		log.Println("[ERR] Could not fetch data")
+		conn.Write([]byte{0xf1 /* ERR_CLSD from LwIP */})
 		return
 	}
 
-	putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data)
+	if putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data) == nil {
+		conn.Write([]byte{5 /* STATUS_SUCCESS */})
+		log.Print("[OK] session '", name, "' was successfully imported")
+	} else {
+		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
+		log.Print("[ERR] session '", name, "' could not be imported")
+	}
 }
 
 func main() {
@@ -134,7 +146,7 @@ func main() {
 		log.Fatal("[ERR] could not create data tables")
 	}
 
-	l, err := net.Listen("tcp", ":1557")
+	l, err := net.Listen("tcp", ":557")
 	if err != nil {
 		log.Fatal("[ERR]", err.Error())
 	}

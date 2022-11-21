@@ -11,14 +11,18 @@
 #define SERVER_IP "40.68.254.87" // XXX read from config file
 #define POLL_TIME_S 5
 
+#define STATUS_INIT        1
+#define STATUS_CONNECTED   2
+#define STATUS_HEADER_OK   3
+#define STATUS_DATA_SENT   4
+#define STATUS_SUCCESS     5
+
 struct connection {
     struct tcp_pcb *pcb;
     ip_addr_t remote_addr;
     uint32_t data_len;
     uint32_t sent_len;
-    bool connected;
-    bool done;
-    bool success;
+    int8_t status;
 };
 
 bool send_file(const char *filename);

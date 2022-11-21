@@ -1,5 +1,6 @@
 #include "include/lwipopts.h"
 #include "lwip/tcpbase.h"
+#include "pico/unique_id.h"
 #include "pico/cyw43_arch.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
@@ -27,10 +28,9 @@ static err_t tcp_client_close(void *arg) {
     return err;
 }
 
-static err_t tcp_result(void *arg, int status) {
+static err_t tcp_result(void *arg, int8_t status) {
     struct connection *conn = (struct connection *)arg;
-    conn->success = (status == 0);
-    conn->done = true;
+    conn->status = status;
     return tcp_client_close(arg);
 }
 
@@ -39,7 +39,7 @@ static err_t tcp_client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     conn->sent_len += len;
 
     if (conn->sent_len == conn->data_len) {
-        tcp_result(arg, 0);
+        conn->status = STATUS_DATA_SENT;
     }
 
     return ERR_OK;
@@ -50,7 +50,7 @@ static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
         return tcp_result(arg, err);
     }
     struct connection *conn = (struct connection *)arg;
-    conn->connected = true;
+    conn->status = STATUS_CONNECTED;
     return ERR_OK;
 }
 
@@ -64,6 +64,28 @@ static void tcp_client_err(void *arg, err_t err) {
     }
 }
 
+err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
+    struct connection *conn= (struct connection *)arg;
+    if (NULL == p) {
+        return tcp_result(arg, -1);
+    }
+
+    cyw43_arch_lwip_check();
+    if (p->tot_len > 0) {
+        int8_t s = *(int8_t *)p->payload;
+        tcp_recved(tpcb, p->tot_len);
+        
+        if (s < 0 || s == STATUS_SUCCESS) {
+            tcp_result(arg, s);
+        } else {
+            conn->status = s;
+        }        
+    }
+    pbuf_free(p);
+
+    return ERR_OK;
+}
+
 static bool tcp_client_open(void *arg) {
     struct connection *conn = (struct connection *)arg;
     conn->pcb = tcp_new_ip_type(IP_GET_TYPE(&conn->remote_addr));
@@ -74,6 +96,7 @@ static bool tcp_client_open(void *arg) {
     tcp_arg(conn->pcb, conn);
     tcp_poll(conn->pcb, tcp_client_poll, POLL_TIME_S * 2);
     tcp_sent(conn->pcb, tcp_client_sent);
+    tcp_recv(conn->pcb, tcp_client_recv);
     tcp_err(conn->pcb, tcp_client_err);
 
     cyw43_arch_lwip_begin();
@@ -89,9 +112,7 @@ static struct connection * tcp_client_init() {
         return NULL;
     }
 
-    conn->connected = false;
-    conn->done = false;
-    conn->success = false;
+    conn->status = STATUS_INIT;
     conn->sent_len = 0;
     ipaddr_aton(SERVER_IP, &conn->remote_addr);
     
@@ -99,6 +120,9 @@ static struct connection * tcp_client_init() {
 }
 
 bool send_file(const char *filename) {
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+
     FILINFO finfo;
     FRESULT fr = f_stat(filename, &finfo);
     if (fr != FR_OK) {
@@ -120,31 +144,46 @@ bool send_file(const char *filename) {
         return false;
     }
 
-    while (!conn->connected) {
+    while (conn->status != STATUS_CONNECTED) {
+        if (conn->status < 0) {
+            return false;
+        }
         cyw43_arch_poll();
         sleep_ms(1);
     }
-    conn->data_len = sizeof(FSIZE_t) + FILENAME_LENGTH + finfo.fsize;
+
+    conn->data_len =
+        PICO_UNIQUE_BOARD_ID_SIZE_BYTES +
+        sizeof(FSIZE_t) +
+        (FILENAME_LENGTH - 1) + // we don't send the terminating null byte
+        finfo.fsize;
 
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-
     cyw43_arch_lwip_begin();
-    tcp_write(conn->pcb, &finfo.fsize, sizeof(FSIZE_t), TCP_WRITE_FLAG_MORE);
-    tcp_write(conn->pcb, filename, FILENAME_LENGTH, 0); 
+    tcp_write(conn->pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
+    tcp_write(conn->pcb, &finfo.fsize, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
+    tcp_write(conn->pcb, filename, FILENAME_LENGTH - 1, TCP_WRITE_FLAG_COPY); 
     tcp_output(conn->pcb);
     cyw43_arch_lwip_end();
 
-    cyw43_arch_poll();
-    sleep_ms(1);
+    while (conn->status != STATUS_HEADER_OK) {
+        if (conn->status < 0) {
+            return false;
+        }
+        cyw43_arch_poll();
+        sleep_ms(1);
+    }
 
     uint8_t buffer[READ_BUF_LEN];
     uint br = READ_BUF_LEN;
+    FSIZE_t total_read = 0;
     while (br == READ_BUF_LEN) {
         fr = f_read(&f, buffer, READ_BUF_LEN, &br);
         if (fr != FR_OK) {
             tcp_result(conn, -1);
             return false;
         }
+        total_read += br;
 
         while (tcp_sndbuf(conn->pcb) < br) {
             cyw43_arch_poll();
@@ -152,21 +191,29 @@ bool send_file(const char *filename) {
         }
         
         cyw43_arch_lwip_begin();
-        tcp_write(conn->pcb, buffer, br, (br == READ_BUF_LEN ? TCP_WRITE_FLAG_MORE : 0));
-        tcp_output(conn->pcb);
+        tcp_write(conn->pcb, buffer, br, TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
         cyw43_arch_lwip_end();
+
+        if (total_read == finfo.fsize) {
+            cyw43_arch_lwip_begin();
+            tcp_output(conn->pcb);
+            cyw43_arch_lwip_end();
+            break;
+        }
     }
 
     f_close(&f);
 
-    while (!conn->done) {
+    while (conn->status != STATUS_SUCCESS) {
+        if (conn->status < 0) {
+            return false;
+        }
         cyw43_arch_poll();
         sleep_ms(1);
     }
 
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-
-    bool ret = conn->success;
     free(conn);
-    return ret;
+
+    return true;
 }
