@@ -57,11 +57,28 @@ func (this *RequestHandler) PutBoard(c *gin.Context) {
 
 	cols := []string{"board_id", "setup_id"}
 	vals, _ := scan.Values(cols, &board)
-	_, err := this.Db.Exec("INSERT INTO boards ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
+	tx, err := this.Db.Begin()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO boards ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	var lastInsertedId int
+	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = tx.Commit()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		c.Status(http.StatusCreated)
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
@@ -121,11 +138,28 @@ func (this *RequestHandler) PutSetup(c *gin.Context) {
 
 	cols := []string{"name", "linkage_id", "front_calibration_id", "rear_calibration_id"}
 	vals, _ := scan.Values(cols, &setup)
-	_, err := this.Db.Exec("INSERT INTO setups ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?)", vals...)
+	tx, err := this.Db.Begin()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO setups ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?)", vals...)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	var lastInsertedId int
+	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = tx.Commit()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		c.Status(http.StatusCreated)
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
@@ -197,11 +231,28 @@ func (this *RequestHandler) PutCalibration(c *gin.Context) {
 
 	cols := []string{"name", "arm", "dist", "stroke", "angle"}
 	vals, _ := scan.Values(cols, &cal)
-	_, err := this.Db.Exec("INSERT INTO calibrations ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
+	tx, err := this.Db.Begin()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO calibrations ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	var lastInsertedId int
+	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = tx.Commit()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		c.Status(http.StatusCreated)
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
@@ -281,11 +332,28 @@ func (this *RequestHandler) PutLinkage(c *gin.Context) {
 
 	cols := []string{"name", "raw_lr_data"}
 	vals, _ := scan.Values(cols, &linkage)
-	_, err := this.Db.Exec("INSERT INTO linkages ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
+	tx, err := this.Db.Begin()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO linkages ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	var lastInsertedId int
+	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = tx.Commit()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		c.Status(http.StatusCreated)
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
@@ -426,11 +494,28 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 
 	cols := []string{"name", "timestamp", "description", "setup_id", "data"}
 	vals, _ := scan.Values(cols, &session)
-	_, err = this.Db.Exec("INSERT INTO sessions ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
+	tx, err := this.Db.Begin()
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec("INSERT INTO sessions ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	var lastInsertedId int
+	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = tx.Commit()
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		c.Status(http.StatusCreated)
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
