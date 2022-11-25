@@ -42,6 +42,12 @@ textarea {
     font-size: 13px;
 }
 
+.bk>.bk-input {
+    color: #d0d0d0;
+    background-color: #20262B !important;
+    font-size: 110% !important;
+}
+
 .bk>.inner-desc {
     width: 100% !important;
     height: 100%;

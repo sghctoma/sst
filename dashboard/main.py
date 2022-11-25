@@ -16,7 +16,7 @@ from bokeh.io import curdoc
 from bokeh.layouts import column, row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.widgets.buttons import Button
-from bokeh.models.widgets.inputs import TextAreaInput
+from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
@@ -363,6 +363,12 @@ savebutton = Button(
     button_type='success',
     css_classes=['savebutton'])
 
+name_input = TextInput(
+    value=sessions[s][1],
+    sizing_mode='stretch_width',
+    margin=(0, 0, 0, 0),
+    css_classes=['inner-desc'])
+
 textarea = TextAreaInput(
     value=description,
     rows=5,
@@ -372,9 +378,11 @@ textarea = TextAreaInput(
 
 
 def on_savebuttonclick():
+    n = name_input.value_input if name_input.value_input else name_input.value
+    d = textarea.value_input if textarea.value_input else textarea.value
     r = requests.patch(
-        f'http://127.0.0.1:8080/session/{s}/description',
-        data=textarea.value_input)
+        f'http://127.0.0.1:8080/session/{s}',
+        json={"name": n, "desc": d})
     if r.status_code == 204:
         savebutton.disabled = True
     else:
@@ -382,6 +390,8 @@ def on_savebuttonclick():
 
 
 textarea.js_on_change('value_input', CustomJS(
+    args=dict(btn=savebutton), code='btn.disabled=false;'))
+name_input.js_on_change('value_input', CustomJS(
     args=dict(btn=savebutton), code='btn.disabled=false;'))
 savebutton.on_click(on_savebuttonclick)
 
@@ -393,12 +403,10 @@ text = column(name='description_x',
               height=300,
               children=[row(sizing_mode='stretch_width',
                             height=30,
-                            margin=(0,
-                                    0,
-                                    0,
-                                    0),
+                            margin=(0, 0, 0, 0),
                             css_classes=['inner-desc'],
                             children=children),
+                        name_input,
                         textarea])
 description_box = row(
     name='description',
@@ -452,9 +460,9 @@ if telemetry.Rear.Present:
 utc = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
 utc_str = utc.strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
-curdoc().title = f"Sufni Suspension Telemetry Dashboard ({telemetry.Name})"
+curdoc().title = f"Sufni Suspension Telemetry Dashboard ({sessions[s][1]})"
 curdoc().template_variables["suspension_count"] = suspension_count
-curdoc().template_variables["name"] = f"{telemetry.Name} ({utc_str} UTC)"
+curdoc().template_variables["name"] = f"{sessions[s][1]} ({utc_str} UTC)"
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''
