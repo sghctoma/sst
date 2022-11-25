@@ -62,14 +62,15 @@ try:
 except BaseException:
     s = sessions[0][0]
 
-res = cur.execute('SELECT data,description FROM sessions WHERE session_id=?', (s,))
+res = cur.execute('SELECT name,description,data FROM sessions WHERE session_id=?', (s,))
 session_data = res.fetchone()
 if not session_data:
     curdoc().add_root(Div(text=f"No session with ID '{s}'"))
     raise Exception("No such session")
 
+session_name = session_data[0]
 description = session_data[1]
-d = msgpack.unpackb(session_data[0])
+d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
 # lod - Level of Detail for travel graph (downsample ratio)
@@ -364,7 +365,7 @@ savebutton = Button(
     css_classes=['savebutton'])
 
 name_input = TextInput(
-    value=sessions[s][1],
+    value=session_name,
     sizing_mode='stretch_width',
     margin=(0, 0, 0, 0),
     css_classes=['inner-desc'])
@@ -460,9 +461,9 @@ if telemetry.Rear.Present:
 utc = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
 utc_str = utc.strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
-curdoc().title = f"Sufni Suspension Telemetry Dashboard ({sessions[s][1]})"
+curdoc().title = f"Sufni Suspension Telemetry Dashboard ({session_name})"
 curdoc().template_variables["suspension_count"] = suspension_count
-curdoc().template_variables["name"] = f"{sessions[s][1]} ({utc_str} UTC)"
+curdoc().template_variables["name"] = f"{session_name} ({utc_str} UTC)"
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''
