@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/base64"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -533,39 +532,24 @@ func (this *RequestHandler) DeleteSession(c *gin.Context) {
 	}
 }
 
-func (this *RequestHandler) PatchSessionDescription(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	desc, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	if _, err := this.Db.Exec("UPDATE sessions SET description = ? WHERE session_id = ?", string(desc[:]), id); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-	} else {
-		c.Status(http.StatusNoContent)
-	}
-}
-
-func (this *RequestHandler) PatchSessionName(c *gin.Context) {
+func (this *RequestHandler) PatchSession(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
-	name := c.Query("name")
-	if name == "" {
+	var sessionMeta struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"desc" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&sessionMeta); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
-	if _, err := this.Db.Exec("UPDATE sessions SET name = ? WHERE session_id = ?", name, id); err != nil {
+	if _, err := this.Db.Exec("UPDATE sessions SET (name, description) = (?, ?) WHERE session_id = ?",
+		sessionMeta.Name, sessionMeta.Description, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -608,8 +592,7 @@ func main() {
 	router.GET("/sessiondata/:id", (&RequestHandler{Db: db}).GetSessionData)
 	router.PUT("/session", (&RequestHandler{Db: db}).PutSession)
 	router.DELETE("/session/:id", (&RequestHandler{Db: db}).DeleteSession)
-	router.PATCH("/session/:id/description", (&RequestHandler{Db: db}).PatchSessionDescription)
-	router.PATCH("/session/:id/name", (&RequestHandler{Db: db}).PatchSessionName)
+	router.PATCH("/session/:id", (&RequestHandler{Db: db}).PatchSession)
 
 	router.Run("127.0.0.1:8080")
 }
