@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 
 import re
+import pytz
 import sqlite3
 import sys
 
 import msgpack
 import numpy as np
 import requests
+
+from datetime import datetime
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
@@ -446,10 +449,12 @@ if telemetry.Front.Present:
 if telemetry.Rear.Present:
     suspension_count += 1
 
+utc = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
+utc_str = utc.strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({telemetry.Name})"
 curdoc().template_variables["suspension_count"] = suspension_count
-curdoc().template_variables["name"] = telemetry.Name
+curdoc().template_variables["name"] = f"{telemetry.Name} ({utc_str} UTC)"
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''
