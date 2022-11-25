@@ -15,6 +15,7 @@ from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
 from bokeh.models.callbacks import CustomJS
+from bokeh.models.layouts import Row
 from bokeh.models.widgets.buttons import Button
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.models.widgets.markups import Div
@@ -386,6 +387,15 @@ def on_savebuttonclick():
         json={"name": n, "desc": d})
     if r.status_code == 204:
         savebutton.disabled = True
+        curdoc().title = f"Sufni Suspension Telemetry Dashboard ({n})"
+        session_rows = curdoc().select({'name': 'session', 'type': Row})
+        for r in session_rows:
+            if r.children[0].id == s:
+                r.children[0].text = f"""
+                    &nbsp;&nbsp;
+                    <a href='dashboard?session={s}'>{n}</a>
+                    <span class='tooltiptext'>{d}</span>
+                    """
     else:
         savebutton.disabled = False
 
@@ -394,6 +404,11 @@ textarea.js_on_change('value_input', CustomJS(
     args=dict(btn=savebutton), code='btn.disabled=false;'))
 name_input.js_on_change('value_input', CustomJS(
     args=dict(btn=savebutton), code='btn.disabled=false;'))
+savebutton.js_on_change('disabled', CustomJS(args=dict(n=name_input), code='''
+    if (this.disabled) {
+        document.getElementById("sname").innerHTML = n.value;
+    }
+    '''))
 savebutton.on_click(on_savebuttonclick)
 
 children = [Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25)]
@@ -463,7 +478,8 @@ utc_str = utc.strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({session_name})"
 curdoc().template_variables["suspension_count"] = suspension_count
-curdoc().template_variables["name"] = f"{session_name} ({utc_str} UTC)"
+curdoc().template_variables["name"] = session_name
+curdoc().template_variables["date"] = utc_str
 curdoc().add_root(p_travel)
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''

@@ -20,7 +20,7 @@
 
 <input type="checkbox" id="drawer-toggle" name="drawer-toggle"/>
 <label for="drawer-toggle" id="drawer-toggle-label"></label>
-<header>sufni suspension telemetry - {{name}}</header>
+<header>sufni suspension telemetry - <span id="sname">{{name}}</span> ({{date}})</header>
 <nav id="drawer">
     <h4>Sessions</h4><a href="#open-modal">(add new...)</a>
     <div class="sessions">{{ embed(roots.sessions) }}</div>

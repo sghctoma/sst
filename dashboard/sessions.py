@@ -5,7 +5,9 @@ from functools import partial
 
 import requests
 
+from bokeh.io import curdoc
 from bokeh.layouts import column, row
+from bokeh.models.layouts import Row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets.buttons import Button
@@ -15,16 +17,22 @@ from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
 def session_list(sessions):
+
+
+    def deletesession(event, id):
+        r = requests.delete(f'http://127.0.0.1:8080/session/{id}')
+        to_remove = None
+        if r.status_code == 204:
+            rows = curdoc().select({'name': 'session', 'type': Row})
+            for r in rows:
+                if r.children[1].id == event._model_id:
+                    to_remove = r
+            sessions = curdoc().select_one({'name': 'sessions'})
+            sessions.children.remove(to_remove)
+
+
     session_rows = []
     last_day = datetime.min
-
-
-    def deletesession(id):
-        r = requests.delete(f'http://127.0.0.1:8080/session/{id}')
-        if r.status_code == 204:
-            pass #TODO: refresh page (or just the session list)
-
-
     for s in sessions:
         d = datetime.fromtimestamp(s[3])
         desc = s[2] if s[2] else f"No description for {s[1]}"
@@ -39,8 +47,11 @@ def session_list(sessions):
             button_type='danger',
             css_classes=['deletebutton'])
         b.on_click(partial(deletesession, id=s[0]))
-        session_rows.append(row(width=245, children=[
-            Div(text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
+        session_rows.append(row(width=245, name='session', children=[
+            Div(id=s[0], text=f"""
+                    &nbsp;&nbsp;
+                    <a href='dashboard?session={s[0]}'>{s[1]}</a>
+                    <span class='tooltiptext'>{desc}</span>""",
                 css_classes=['tooltip']),
             b]))
     return column(name='sessions', width=245, children=session_rows)
