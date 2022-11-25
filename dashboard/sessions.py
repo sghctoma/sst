@@ -1,6 +1,7 @@
 import html
 
 from datetime import datetime
+from functools import partial
 
 import requests
 
@@ -14,19 +15,35 @@ from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
 def session_list(sessions):
-    session_divs = []
+    session_rows = []
     last_day = datetime.min
+
+
+    def deletesession(id):
+        r = requests.delete(f'http://127.0.0.1:8080/session/{id}')
+        if r.status_code == 204:
+            pass #TODO: refresh page (or just the session list)
+
+
     for s in sessions:
         d = datetime.fromtimestamp(s[3])
         desc = s[2] if s[2] else f"No description for {s[1]}"
         if d.date() != last_day:
-            session_divs.append(
-                Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
+            session_rows.append(Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
             last_day = d.date()
-        session_divs.append(Div(
-            text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
-            css_classes=['tooltip']))
-    return column(name='sessions', children=session_divs)
+        b = Button(
+            label="x",
+            sizing_mode='fixed',
+            height=20,
+            width=20,
+            button_type='danger',
+            css_classes=['deletebutton'])
+        b.on_click(partial(deletesession, id=s[0]))
+        session_rows.append(row(width=245, children=[
+            Div(text=f"&nbsp;&nbsp;<a href='dashboard?session={s[0]}'>{s[1]}</a><span class='tooltiptext'>{desc}</span>",
+                css_classes=['tooltip']),
+            b]))
+    return column(name='sessions', width=245, children=session_rows)
 
 
 def file_widgets():

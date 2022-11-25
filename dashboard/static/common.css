@@ -38,7 +38,18 @@ textarea {
 }
 
 .savebutton>.bk-btn-group>.bk-btn-success {
-    padding: 1px 3px 3px 3px;
+    padding: 0px 3px 0px 3px;
+    font-size: 13px;
+}
+
+.bk.deletebutton {
+    position: unset !important;
+    margin-left: auto !important;
+    margin-right: 5px !important;
+}
+
+.deletebutton>.bk-btn-group>.bk-btn-danger {
+    padding: 0px 3px 0px 3px;
     font-size: 13px;
 }
 
