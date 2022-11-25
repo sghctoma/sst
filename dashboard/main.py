@@ -2,6 +2,7 @@
 
 import re
 import sqlite3
+import sys
 
 import msgpack
 import numpy as np
@@ -30,7 +31,7 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-DB_FILE = '/home/sghctoma/projects/sst/gosst/gosst.db'
+DB_FILE = sys.argv[1]
 
 args = curdoc().session_context.request.arguments
 
