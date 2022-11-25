@@ -105,11 +105,14 @@ def session_dialog(cur, full_access):
 
     add_button = Button(name='button_add', label="Add", button_type='success')
     add_button.js_on_change('label', CustomJS(args=dict(), code='''
-        if (this.label.startsWith("Done")) {
-            //TODO: redirect to last imported
-            //      indicate if some imports failed
-            window.location.replace("/dashboard");
-        } else if (this.label == "Error") {
+        let m = this.label.split(/ |\//);
+        console.log(m);
+        if (m[0] == "Done") {
+            if (m[1] < m[2]) {
+                alert(m[2] - m[1] + " of the " + m[2] + " sessions could not be imported!");
+            }
+            window.location.replace("/dashboard?session=" + this.tags[0]);
+        } else if (m[0] == "Error") {
             alert("None of the SST files could be imported!");
             this.label = "Add";
         }
@@ -135,6 +138,7 @@ def session_dialog(cur, full_access):
                 data=files_input.value[i])
             r = requests.put('http://127.0.0.1:8080/session', json=session)
             if r.status_code == 201:
+                add_button.tags.append(r.json()['id'])
                 success += 1
         if success != 0:
             add_button.label = f"Done {success}/{len(names)}"
