@@ -12,10 +12,11 @@
 #define POLL_TIME_S 5
 
 #define STATUS_INIT        1
-#define STATUS_CONNECTED   2
-#define STATUS_HEADER_OK   3
-#define STATUS_DATA_SENT   4
-#define STATUS_SUCCESS     5
+#define STATUS_DNS_FOUND   2
+#define STATUS_CONNECTED   3
+#define STATUS_HEADER_OK   4
+#define STATUS_DATA_SENT   5
+#define STATUS_SUCCESS     6
 
 struct connection {
     struct tcp_pcb *pcb;

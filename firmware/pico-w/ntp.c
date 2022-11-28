@@ -14,6 +14,7 @@
 #include "lwip/udp.h"
 
 #include "ntp.h"
+#include "config.h"
 
 // Called with results of operation
 static void ntp_result(struct ntp *ntp, int status, time_t *result) {
@@ -121,7 +122,7 @@ bool sync_rtc_to_ntp() {
             ntp->resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, ntp, true);
 
             cyw43_arch_lwip_begin();
-            int err = dns_gethostbyname(NTP_SERVER, &ntp->server_address, ntp_dns_found, ntp);
+            int err = dns_gethostbyname(config.ntp_server , &ntp->server_address, ntp_dns_found, ntp);
             cyw43_arch_lwip_end();
             ntp->dns_request_sent = true;
             if (err == ERR_OK) { // domain name was in cache

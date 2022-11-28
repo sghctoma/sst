@@ -1,13 +1,16 @@
 #include "include/lwipopts.h"
+#include "lwip/ip_addr.h"
 #include "lwip/tcpbase.h"
 #include "pico/unique_id.h"
 #include "pico/cyw43_arch.h"
+#include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
 #include "hw_config.h"
 #include "pico/time.h"
 #include "tcpclient.h"
+#include "config.h"
 
 static err_t tcp_client_close(void *arg) {
     struct connection *conn = (struct connection *)arg;
@@ -86,13 +89,38 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     return ERR_OK;
 }
 
+static void dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {
+    struct connection *conn = (struct connection *)arg;
+    if (ipaddr != NULL) {
+        conn->remote_addr = *ipaddr;
+        conn->status = STATUS_DNS_FOUND;
+    }
+}
+
 static bool tcp_client_open(void *arg) {
     struct connection *conn = (struct connection *)arg;
+    
+    cyw43_arch_lwip_begin();
+    err_t err = dns_gethostbyname(config.sst_server , &conn->remote_addr, dns_found, conn);
+    cyw43_arch_lwip_end();
+  
+    if (err == ERR_OK) { // domain name was in cache
+        conn->status = STATUS_DNS_FOUND;
+    }
+    while (conn->status != STATUS_DNS_FOUND) {
+        if (conn->status < 0) {
+            free(conn);
+            return false;
+        }
+        cyw43_arch_poll();
+        sleep_ms(1);
+    }
+    
     conn->pcb = tcp_new_ip_type(IP_GET_TYPE(&conn->remote_addr));
     if (conn->pcb == NULL) {
         return false;
     }
-
+    
     tcp_arg(conn->pcb, conn);
     tcp_poll(conn->pcb, tcp_client_poll, POLL_TIME_S * 2);
     tcp_sent(conn->pcb, tcp_client_sent);
@@ -100,7 +128,7 @@ static bool tcp_client_open(void *arg) {
     tcp_err(conn->pcb, tcp_client_err);
 
     cyw43_arch_lwip_begin();
-    err_t err = tcp_connect(conn->pcb, &conn->remote_addr, SERVER_PORT, tcp_client_connected);
+    err = tcp_connect(conn->pcb, &conn->remote_addr, config.sst_server_port, tcp_client_connected);
     cyw43_arch_lwip_end();
 
     return err == ERR_OK;
@@ -114,8 +142,7 @@ static struct connection * tcp_client_init() {
 
     conn->status = STATUS_INIT;
     conn->sent_len = 0;
-    ipaddr_aton(SERVER_IP, &conn->remote_addr);
-    
+
     return conn;
 }
 

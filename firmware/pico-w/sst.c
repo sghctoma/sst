@@ -28,6 +28,7 @@
 
 #include "sst.h"
 #include "list.h"
+#include "config.h"
 
 static volatile enum state state;
 
@@ -35,7 +36,7 @@ static uint32_t scb_orig;
 static uint32_t clock0_orig;
 static uint32_t clock1_orig;
 
-static ssd1306_t disp;
+/*static*/ ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
 
@@ -71,7 +72,7 @@ static bool msc_present() {
 static bool wifi_connect() {
     cyw43_arch_init_with_country(CYW43_COUNTRY_HUNGARY);
     cyw43_arch_enable_sta_mode();
-    return cyw43_arch_wifi_connect_timeout_ms("sst", "c9Aw-deLd-g3HR-Rvff", CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
+    return cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
 }
 
 static void wifi_disconnect() {
@@ -570,6 +571,11 @@ int main() {
         int err = (int)multicore_fifo_pop_blocking();
         if (err < 0) {
             display_message(&disp, "CARD ERR");
+            while(true) { tight_loop_contents(); }
+        }
+        
+        if (!load_config()) {
+            display_message(&disp, "CONF ERR");
             while(true) { tight_loop_contents(); }
         }
  
