@@ -116,7 +116,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		return
 	}
-	conn.Write([]byte{3 /* STATUS_HEADER_OK */})
+	conn.Write([]byte{4 /* STATUS_HEADER_OK */})
 
 	data := make([]byte, header.Size)
 	_, err = io.ReadFull(conn, data)
@@ -127,7 +127,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 	}
 
 	if putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data) == nil {
-		conn.Write([]byte{5 /* STATUS_SUCCESS */})
+		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Print("[OK] session '", name, "' was successfully imported")
 	} else {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
