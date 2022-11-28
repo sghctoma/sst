@@ -541,7 +541,7 @@ func (this *RequestHandler) PatchSession(c *gin.Context) {
 
 	var sessionMeta struct {
 		Name        string `json:"name" binding:"required"`
-		Description string `json:"desc" binding:"required"`
+		Description string `json:"desc"`
 	}
 	if err := c.ShouldBindJSON(&sessionMeta); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
