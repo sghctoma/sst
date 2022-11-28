@@ -16,7 +16,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
-def session_list(sessions):
+def session_list(sessions, full_access):
 
 
     def deletesession(event, id):
@@ -39,21 +39,23 @@ def session_list(sessions):
         if d.date() != last_day:
             session_rows.append(Div(text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />"))
             last_day = d.date()
-        b = Button(
-            label="x",
-            sizing_mode='fixed',
-            height=20,
-            width=20,
-            button_type='danger',
-            css_classes=['deletebutton'])
-        b.on_click(partial(deletesession, id=s[0]))
-        session_rows.append(row(width=245, name='session', children=[
+        children = [
             Div(id=s[0], text=f"""
                     &nbsp;&nbsp;
                     <a href='dashboard?session={s[0]}'>{s[1]}</a>
                     <span class='tooltiptext'>{desc}</span>""",
-                css_classes=['tooltip']),
-            b]))
+                css_classes=['tooltip'])]
+        if full_access:
+            b = Button(
+                label="x",
+                sizing_mode='fixed',
+                height=20,
+                width=20,
+                button_type='danger',
+                css_classes=['deletebutton'])
+            b.on_click(partial(deletesession, id=s[0]))
+            children.append(b)
+        session_rows.append(row(width=245, name='session', children=children))
     return column(name='sessions', width=245, children=session_rows)
 
 

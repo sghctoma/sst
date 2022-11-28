@@ -350,7 +350,7 @@ if telemetry.Front.Present and telemetry.Rear.Present:
 '''
 Sessions
 '''
-sessions_list = session_list(sessions)
+sessions_list = session_list(sessions, full_access)
 session_dialog = session_dialog(cur, full_access)
 
 '''
