@@ -369,24 +369,28 @@ name_input = TextInput(
     value=session_name,
     sizing_mode='stretch_width',
     margin=(0, 0, 0, 0),
-    css_classes=['inner-desc'])
+    css_classes=['inner-desc'],
+    tags=[session_name])
 
-textarea = TextAreaInput(
+desc_input = TextAreaInput(
     value=description,
     rows=5,
     sizing_mode='stretch_both',
     margin=(0, 0, 0, 0),
-    css_classes=['inner-desc', 'big-bottom-padding'])
+    css_classes=['inner-desc', 'big-bottom-padding'],
+    tags=[description])
 
 
 def on_savebuttonclick():
     n = name_input.value_input if name_input.value_input else name_input.value
-    d = textarea.value_input if textarea.value_input else textarea.value
+    d = desc_input.value_input if desc_input.value_input else desc_input.value
     r = requests.patch(
         f'http://127.0.0.1:8080/session/{s}',
         json={"name": n, "desc": d})
     if r.status_code == 204:
         savebutton.disabled = True
+        name_input.tags[0] = n
+        desc_input.tags[0] = d
         curdoc().title = f"Sufni Suspension Telemetry Dashboard ({n})"
         session_rows = curdoc().select({'name': 'session', 'type': Row})
         for r in session_rows:
@@ -400,14 +404,22 @@ def on_savebuttonclick():
         savebutton.disabled = False
 
 
-textarea.js_on_change('value_input', CustomJS(
-    args=dict(btn=savebutton), code='btn.disabled=false;'))
+desc_input.js_on_change('value_input', CustomJS(
+    args=dict(btn=savebutton, n=name_input), code='''
+    let name_changed = (n.value != n.tags[0]);
+    let name_empty = (n.value == "");
+    let desc_changed = (this.value_input != this.tags[0]);
+    btn.disabled = name_empty || !(name_changed || desc_changed);
+    '''))
 name_input.js_on_change('value_input', CustomJS(
-    args=dict(btn=savebutton), code='btn.disabled=false;'))
-savebutton.js_on_change('disabled', CustomJS(args=dict(n=name_input), code='''
-    if (this.disabled) {
-        document.getElementById("sname").innerHTML = n.value;
-    }
+    args=dict(btn=savebutton, d=desc_input), code='''
+    let name_changed = (this.value_input != this.tags[0]);
+    let name_empty = (this.value_input == "");
+    let desc_changed = (d.value != d.tags[0]);
+    btn.disabled = name_empty || !(name_changed || desc_changed);
+    '''))
+name_input.js_on_change('tags', CustomJS(args=dict(), code='''
+    document.getElementById("sname").innerHTML = this.value;
     '''))
 savebutton.on_click(on_savebuttonclick)
 
@@ -423,7 +435,7 @@ text = column(name='description_x',
                             css_classes=['inner-desc'],
                             children=children),
                         name_input,
-                        textarea])
+                        desc_input])
 description_box = row(
     name='description',
     sizing_mode='stretch_width',
