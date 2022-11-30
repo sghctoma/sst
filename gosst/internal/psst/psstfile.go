@@ -172,12 +172,9 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	if err != nil {
 		return nil
 	}
-	// TODO: Using index 1 here to be compatible with SST files generated with
-	// an earlier firmware version that contained an off-by-one error. This
-	// should no cause any trouble, but should eventually set back to 0.
-	var hasFront = records[1].ForkAngle != 0xffff
+	var hasFront = records[0].ForkAngle != 0xffff
 	pd.Front.Present = hasFront
-	var hasRear = records[1].ShockAngle != 0xffff
+	var hasRear = records[0].ShockAngle != 0xffff
 	pd.Rear.Present = hasRear
 
 	if hasFront {
