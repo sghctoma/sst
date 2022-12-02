@@ -29,6 +29,7 @@
 #include "sst.h"
 #include "list.h"
 #include "config.h"
+#include "pin_config.h"
 
 static volatile enum state state;
 
@@ -39,9 +40,6 @@ static uint32_t clock1_orig;
 /*static*/ ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
-
-static const uint BTN_LEFT = 5;
-static const uint BTN_RIGHT = 1;
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -137,13 +135,13 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
     }
 
     if (have_fork) {
-        active_buffer[count].fork_angle = as5600_get_scaled_angle(i2c0);
+        active_buffer[count].fork_angle = as5600_get_scaled_angle(FORK_I2C);
     } else {
         active_buffer[count].fork_angle = 0xffff;
     }
 
     if (have_shock) {
-        active_buffer[count].shock_angle = as5600_get_scaled_angle(i2c1);
+        active_buffer[count].shock_angle = as5600_get_scaled_angle(SHOCK_I2C);
     } else {
         active_buffer[count].shock_angle = 0xffff;
     }
@@ -250,13 +248,13 @@ static void data_storage_core1() {
 // Setup functions
 
 static void setup_i2c() {
-    i2c_init(i2c0, 1000000);
+    i2c_init(FORK_I2C, 1000000);
     gpio_set_function(20, GPIO_FUNC_I2C);
     gpio_set_function(21, GPIO_FUNC_I2C);
     gpio_pull_up(20);
     gpio_pull_up(21);
 
-    i2c_init(i2c1, 1000000);
+    i2c_init(SHOCK_I2C, 1000000);
     gpio_set_function(26, GPIO_FUNC_I2C);
     gpio_set_function(27, GPIO_FUNC_I2C);
     gpio_pull_up(26);
@@ -284,29 +282,29 @@ static bool setup_baseline(i2c_inst_t *i2c) {
 
 static bool setup_sensors() {
     absolute_time_t timeout = make_timeout_time_ms(3000);
-    while (!((as5600_connected(i2c0) && as5600_detect_magnet(i2c0)) ||
-            (as5600_connected(i2c1) && as5600_detect_magnet(i2c1)))) {
+    while (!((as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) ||
+            (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)))) {
         if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
             return false;
         }
         sleep_ms(10);
     }
 
-    have_fork = setup_baseline(i2c0);
-    have_shock = setup_baseline(i2c1);
+    have_fork = setup_baseline(FORK_I2C);
+    have_shock = setup_baseline(SHOCK_I2C);
     return have_fork || have_shock;
 }
 
 static void setup_display(ssd1306_t *disp) {
-    spi_init(spi1, 1000000);
-    gpio_set_function(14, GPIO_FUNC_SPI); // SCK
-    gpio_set_function(15, GPIO_FUNC_SPI); // MOSI
+    spi_init(DISPLAY_SPI, 1000000);
+    gpio_set_function(DISPLAY_PIN_SCK, GPIO_FUNC_SPI);  // SCK
+    gpio_set_function(DISPLAY_PIN_MOSI, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 32, spi1,
-        13,  // CS
-        12,  // DC
-        11); // RST
+    ssd1306_init(disp, 128, 32, DISPLAY_SPI,
+        DISPLAY_PIN_CS,   // CS
+        DISPLAY_PIN_MISO, // DC
+        DISPLAY_PIN_RST); // RST
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -448,8 +446,8 @@ static void on_sleep() {
     scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
     display_message(&disp, "SLEEP...");
 
-    disable_button(BTN_LEFT, false);
-    disable_button(BTN_RIGHT, true);
+    disable_button(BUTTON_LEFT, false);
+    disable_button(BUTTON_RIGHT, true);
     ssd1306_poweroff(&disp);
     state = WAKING;
     __wfi();
@@ -464,8 +462,8 @@ static void on_waking() {
     clocks_init();
 
     ssd1306_poweron(&disp);
-    enable_button(BTN_LEFT);
-    enable_button(BTN_RIGHT);
+    enable_button(BUTTON_LEFT);
+    enable_button(BUTTON_RIGHT);
     state = IDLE;
 }
 
@@ -563,8 +561,8 @@ int main() {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
-        create_button(BTN_LEFT, NULL, on_left_press, on_left_longpress);
-        create_button(BTN_RIGHT, NULL, on_right_press, on_right_longpress);
+        create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
+        create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
 
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
