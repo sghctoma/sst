@@ -15,8 +15,8 @@ var Sql = `
 		linkage_id INTEGER NOT NULL,
 		front_calibration_id INTEGER NOT NULL,
 		rear_calibration_id INTEGER NOT NULL,
-		FOREIGN KEY (linkage_id) REFERENCES linkages (linkage_id)
-		FOREIGN KEY (front_calibration_id) REFERENCES calibrations (calibration_id)
+		FOREIGN KEY (linkage_id) REFERENCES linkages (linkage_id),
+		FOREIGN KEY (front_calibration_id) REFERENCES calibrations (calibration_id),
 		FOREIGN KEY (rear_calibration_id) REFERENCES calibrations (calibration_id)
 	);
     CREATE TABLE IF NOT EXISTS calibrations (
