@@ -1,111 +1,407 @@
-# SST - DIY mountain bike suspension telemetry
+Sufni Suspension Telemetry
+==========================
 
-Sufni Suspension Telemetry aims to be a cheap MTB fork and shock telemetry solution - mainly to satisfy my curiosity, but maybe somebody else will also find it interesting, or even useful.
+Sufni\* Suspension Telemetry aims to be a very affordable mountain bike
+suspension telemetry solution that can be put together with a bit of
+soldering and creativity. It consists of four main components:
+ 
+ - The hardware (central unit and sensors).
+ - The firmware, currently maintained for the Raspberry Pico W.
+ - Preprocessor servers (HTTP and a plain TCP) to upload sessions.
+ - A dashboard built around the Bokeh visualization library.
 
-## The current state 
+Right now the system is not user friendly, both the software and hardware
+need some tinkering, but my goal is to eventually offer a step-by-step guide and
+exact parts list so that anyone who can "follow a recipe" is able to make it.
+Another big drawback compared to commercial solutions is that I do not have the
+years of experience and know-how on translating data to actual settings. I think
+this lack of knowledge on my part can be offset if more experienced riders use
+telemetry and share their data though.
 
-As of 2022.08.27., the project uses
+I would also like to add that although the system described here works as a
+whole, the components are not tightly glued together, and I am planning to make
+it possible to use the analyzer part of the package (basically the dashboard)
+with arbitrary sensor data (sort of an input plugin system for the preprocessor).
 
- - magnetic rotary encoders (AS5600) to measure distance, that connect to the head unit via phone cables / RJ11 connectors,
- - a Raspberry Pi Pico as "brain", neatly packed into a box with the battery and a not-yet-too-useful display.
- - mechanical parts made of LEGO instead of random quadcopter parts to increase reproducability,
- - a dashboard built with [Bokeh](http://bokeh.org/) to help analyse the data. There's also a utility called `gosst` (written in Go) that performs parts of analysis that were awefully slow with Python.
+\* *The word "sufni" means tool shed in Hungarian, but also used as an adjective
+denoting something as DIY, garage hack, etc.*
 
-The dashboard is perhaps the biggest change from previous versions. It contains a number of graphs that should be useful based on my current knowledge of suspension theory. This knowledge mainly comes from sources that deal with automotive of motorcycle suspension - not much concrete information regarding MTBs are out there. I have listed these source at the end of this section.
+Dashboard
+---------
 
-|[![The new dashboard](pics/kiserdo.png)](pics/kiserdo.png)|
-|:--:|
-|The new dashboard|
+The dashboard is a web application built around [Bokeh](https://bokeh.org) that
+provides various graphs and statistics commonly used for suspension setup
+purposes. 
 
-The plots from top to bottom, left to righ:
+![dashboard](pics/dashboard.png)
 
- - Wheel travel (Front and rear together). Also marks jumps, and displays air time, although this feature is stil rudimentary.
- - Rear wheel travel - Leverage ratio graph (This is input data, not something measured by this project).
- - Shock stroke - rear wheel travel graph.
- - Front and rear travel histogram that also shows averages and maximums (including number of bottom-outs).
- - Front and rear velocity histograms. This also shows the travel distribution for each velocity bin via bar colors. Low-speed zone is marked, and there's a dashed line that show normal distribution. Supposedly, a setup that follows normal distribution more closely should be closer to ideal.
- - Front and rear velocity distribution that displays the time percentage spent in HSR, LSR, zero velocity, LSC and HSC.
- - Front and rear frequencies (FFT of travel)
+The **time - travel** graph gives an overall picture of suspension movement over
+the recorded session. Rear travel is calculated from raw shock movement using the
+leverage ratio data of the frame. The graph indicates periods spent in the air (
+red overlay) and in stationary position (black overlay). These are excluded from
+any statistics calculations. You can select a portion of the graph, which updates
+all other graphs to include only the selected period. By default, the dashboard
+displays only every 5th datapoint for performance reason, but this can be
+configured with the `lod` query string parameter (e.g.`/dashboard?session=1&lod=1`
+will display every datapoint).
 
-Finally, some picture of the hardware parts:
 
-|[![Front mech](pics/lego_front.jpg)](pics/lego_front.jpg)|[![Front mech closeup](pics/lego_front_closeup.jpg)](pics/lego_front_closeup.jpg)|[![Rear mech](pics/lego_rear.jpg)](pics/lego_rear.jpg)|
-|:--:|:--:|:--:|
-|Front mech|Front mech closeup|Rear mech|
+**Travel histograms** show what percentage of the total time was spent in a given
+10 mm travel range. This graph can be used to evaluate and adjust suspension
+spring rate and progression. Knowing the **average and maximum travel** helps
+this assessment, so they are shown on the graph too, along with the **number of
+bottom-outs**.
 
-### Sources
+This whole project started with [ShockCraft's 1 Page Suspension Setup Guide](https://www.shockcraft.co.nz/technical-support/setup-suspension/1-page-suspension-setup-guide),
+because I wanted to quantify suspension frequencies (I do not necessarily trust
+my sense of rythm :) ), so it was obbious from the get-go that the dashboard
+will include a graph that represents the data in the frequency domain. These
+**Frequency diagrams** display the Fourier-transformation of the time - travel
+data. I do not think this graph is really useful for a full run, but when
+filtered for e.g. a few bounces, it can show spring rate difference  between
+the front and back, and it also might be useful when changing suspension (you
+can aim for a frequency that was good for the previous one).
 
- - [Histograms and Suspension Velocity Analysis](https://www.datamc.org/data-acquisition/suspension-data-analysis/histograms-and-suspension-velocity-analysis/)
- - [How to Set Up a Suspension (Time) Histogram v2](https://pdfcoffee.com/how-to-set-up-a-suspension-time-histogram-v2-pdf-free.html)
- - [Shock Tuning User Guide](https://s100.iracing.com/wp-content/uploads/2021/08/Shock-Tuning-User-Guide.pdf)
- - [Tuning shock absorbers using the shock speed histogram](http://fsae.scripts.mit.edu/motorhead/images/4/4d/Shockspeedarticle.doc)
- - [Histogram Summary Excel sheet](https://www.datamc.org/wp-content/uploads/2019/01/suspension_histograms_v1.0.xlsx)
+The previous two graphs deal with spring rate, the next ones are helpful for
+damping setup. Damping relates to shaft velocity, so we need to use the first
+derivative of the time - travel data. Similarly to their travel counterparts,
+**Speed histograms** display what percentage of the total time was spent in a
+given 50 mm/s velocity range, and also show the **average and maximum shaft
+velocity** for both compression (positive values, bottom half of the graph)
+and rebound (negative values, top half of the graph). Bar colors represent
+travel range percentages for a given velocity range (so they are basically
+another histogram). I have not found explicitly MTB-specific information
+on suspension speed histograms, but all the automotive and motorcycle
+suspension tuning guides use them. The main goal here is to make the graph
+as symmetric as possible - this is the reason the normal distribution
+curve is overlayed (dashed red line) as a sort of visual aid. Besides the
+histogram, displaying what time percentage was spent in the HSR, LSR, LSC and
+HSC ranges is also common. The **Speed zones** bars next to the histograms
+does exactly this. One thing to note here is that the low speed - high speed
+threshold is set to 100 mm/s based on motorcycle guides and trying to analyze
+my data, but I have no idea how close it is to the value suspension designers
+aim for. Therefore, this value is also configurable with a query string
+parameter called `hst` (high-speed threshold).
 
-## History
+The last pair of graphs are present only when a session has data from both
+the front and rear sensors. The reason is, that these **Velocity balance**
+graphs aim to show the balance between the front and rear for compression
+and rebound. I have first seen in a forum post that a travel - velocity
+graph could be very useful for this purpose, and then I found a bit more
+information in a [MotionIQ blog post](https://motioninstruments.com/blogs/blog/the-science-of-using-data-to-tune-modern-mountain-bikes).
+Each dot represent a compression or a rebound event, the vertical axis showing
+the maximum velocity during the event, and the horizontal axis showing the at
+what travel percentage that maximum velocity occured. The lines are trend lines
+fitted on the dots, and the closer they are to each other, the more balanced
+the front and rear suspension is.
 
- I started thinking about this when I was looking for a frame to replace my 2014 Giant Trance, and took a deep dive into frame kinematics and suspension in general. The final push was when I stumbled upon Dougal's [1 Page Suspension Setup Guide](http://www.shockcraft.co.nz/media/wysiwyg/shockcraft_1_page_suspension_setup_guide_v0.pdf) on a [Mara Pro forum](https://www.mtbr.com/threads/manitou-mara-pro.1126919), and the frequency-based suspension setup described in the guide got my attention. I thought it would be cool to graph fork and shock movement in the frequency domain to supplement the guide.
+A **Leverage ratio** graph is also displayed on the dashboard as well as a
+textbox with arbitrary comments and the session's name.
 
-My Clash arrived in April, and that's when I started working on this project. The first version used a [Sharp GP2Y0A41SK0F](https://www.pololu.com/product/2464) IR distance sensor hooked to a Raspberry Pi Zero. This seemed to work OK-ish inside, when I was just pushing down on the handlebar, so replaced the Pi Zero with a [Teensy 3.2](https://www.pjrc.com/store/teensy32.html) microcontroller, and went to the local trails.
+The dashboard currently does not have a full-blown authentication and
+authorization subsystem. It is a read-only interface unless you have a valid
+API token sent as the `X-Token` HTTP header, in which case you have access to
+the following functionality:
 
-|![First version with IR distance sensor](pics/ir.jpg)|
-|:--:|
-|IR distance sensor on the bike|
+ - You can import sessions from raw data files.
+ - You can modify session names.
+ - You can edit session comments.
+ - You can delete sessions.
 
-|![First version with IR distance sensor](pics/ir-closeup.jpg)|
-|:--:|
-|IR distance sensor closeup|
+Central unit
+------------
 
-It was a disaster. The data was noisy as hell, and got really unreliable at around 17cm (this is the 4-30 cm version), it was clear it had to go.
+The central unit collects data from the sensors, and stores them on a MicroSD
+card. The card is also used to store a configuration file in the root directory
+called `CONFIG` with the following default content:
 
-Next idea was to use a linear encoder, but they are not cheap, so I decided to use a rotary encoder - the AMS [AS5600](https://ams.com/en/as5600#:~:text=The%20AS5600%20is%20an%20easy,diametric%20magnetized%20on%2Daxis%20magnet.) seemed like a good choice. I was toying with the idea of a rack and pinion solution, but I could not find any suitable, readily available racks so scratched that idea too. I have finally settled on the arrangement you see on the following pictures.
+```
+SSID=sst
+PSK=changemeplease
+NTP_SERVER=pool.ntp.org
+SST_SERVER=40.68.254.87
+SST_SERVER_PORT=557
+```
 
-|![Sensor and mechanics for the fork](pics/fork-sensor.jpg)|
-|:--:|
-|Fork sensor unit with the AS5600 and the Teensy|
+These default values are also used when the configuration file does not exist.
 
-|![Fork sensor attached](pics/fork.jpg)|
-|:--:|
-|Fork sensor unit on the bike|
+ When started, the display will show a clock with a dummy time (13:37:00). A
+***long press of the right button*** will initiate a time synchronization with
+the time server specified as `NTP_SERVER`. This is done via a WiFi connection
+for which the network name and password are specified in the config file as
+well (`SSID` and `PSK`).
 
-|![Fork sensor attached](pics/fork-zoom.jpg)|
-|:--:|
-|Fork sensor unit on the bike - closeup|
+A ***short left press*** will start a session, during which the display will show
+which of the two sensors are available (e.g. "`REC:F|S`" for both, "`REC:F|.`" for
+fork only). A second ***short left press*** will end the session.
 
-|![Shock sensor attached](pics/shock.jpg)|
-|:--:|
-|Shock sensor unit on the bike. The precision bamboo chopstick + electrical tape axle definitely worth a closer look ;) |
+A ***long left press*** will try to upload all not yet uploaded sessions to the
+server specified by `SST_SERVER` and `SST_SERVER_PORT` (default values are my
+own server). The session file currently uploading is shown on the display, and
+there is a summary at end of the process showing how many sessions the unit
+tried to upload (" `A:n`"), and how many of those were a success ("`S:m`").
 
-As you can see on the pictures, the whole thing is very much in a proof-of-concept state, and most of it is created from scrapped quadcopter parts. It works by attaching two same-length poles connected with a rotating joint to the two moving parts (i.e. the lowers, and the CSU of a fork), thus creating an isosceles triangle. We know the length of the equal sides, so if we measure one angle, we can calculate the distance between the attachment points. To get real distance values, we also need either the starting angle or the starting distance. Both can be measured easily, but right now my code does not implement this calibration; it uses baked-in dummy values instead. Using real values will stretch the graphs in the vertical direction, but it wont affect the overall shape of it.
+A ***short right press*** will send the unit to a low-energy sleep mode, from
+which another ***short right press*** wakes it up.
 
-Back to the electronics. The two AS5600s are connected to the Teensy on I2C, both are sampled 5000 times per second, and data is stored on a MicroSD card. When connected to a USB host, the Teensy appears as an MTP device, and makes the data available without the need of removing the card. This version works quite well, as - hopefully :) - evidenced by the graphs below.
+If the unit is powered down (battery removed) and connected to a computer via
+USB while keeping the left button pressed, it will act as a mass storage device,
+and gives read-write access to the content of the MicroSD card. During this, the
+display will show "`MSC MODE`".
 
-|![Mara Pro rebound 0, 4, 8, 12 and 17 clicks](pics/MaraPro-rebound.png)|
-|:--:|
-|This is me slamming my ass down on the seat while coasting. Low-speed rebound damping was at 0, 4, 8, 12 and 17 clicks on the Mara Pro. These graphs show nicely how osciallation decreases with more damping. It does not disappear though even with LSR fully on, which was a bit of a surprise.|
+Preprocessor
+------------
 
-|![Pedaling around in a parking lot](pics/general.png)|
-|:--:|
-|Some riding around in a parking lot|
+Initial calculations (where raw sensor data is transformed into millimeters)
+were painfully slow in Python, so I separated that functionality into a native
+executable, the so-called preprocessor. Since then, `gosst` received a bit more
+functionality (e.g. calculates speed, precalculates histograms), and it exposes
+this functionality via two servers. The first one is an HTTP API that basically
+gives access to the underlying database, and is currently used by the dashboard
+to import sessions. The database looks like this:
 
-|![Bouncing in a parking lot](pics/bounce.png)|
-|:--:|
-|Same parking lot, but bouncing around :)|
+![Database schema](pics/db-schema.png)
 
-|![Bunny hop](pics/bunny.png)|
-|:--:|
-|Parking lot again, this time a bunny hop attempt. You can see how at first I was pedalling seated (only the shock moves), stood up at 4 seconds (fork started moving), compressed a bit after the 8th second (dip on the graph), and jumped (both graphs jump to 0 travel, and stay there for a while).|
+A **setup** describes a bike: it consist of a **linkage** which is the leverage
+ratio data for the frame, and a front and rear **calibration** which describe
+sensor setup (more on that later). The information contained in a **setup**
+is used to preprocess the **session** data.
 
-This setup was working so well, of course I had to take it apart :) I wanted to replace the Teensy with something much cheaper, and also wanted to pack the whole thing together into one package, without an external battery. The [Raspberry Pi Pico](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html) seemed like an interesting choice, the documentation also looked quite good, so I decided it will be the brain of the next version. I packed it into a power bank box with one 18650 battery, the MicroSD reader, an on-off switch, and two RJ11 connectors to make the sensor units detachable. The OLED display is currently outside, but I plan to protect it somehow.
+The second server allows the central unit to upload sessions over a simplistic
+protocol. This is the server specified in the configuration file as `SST_SERVER`
+and `SST_SERVER_PORT`. Since the upload process is not interactive, we have to
+have an association between a particular central unit and a **setting**. This
+is what the **boards** table is for: it contains Pico board identifier (obtained
+with `pico_get_unique_board_id()`) - **setup** id pairs.
 
-|![Pico version](pics/sst-pico_1.jpg)|
-|:--:|
-|The Pico version packed in a power bank box - display side|
+The **tokens** table contains API
+tokens for a very rudimentary authorization control, and it has nothing to do
+with `gosst`.
 
-|![Pico version](pics/sst-pico_2.jpg)|
-|:--:|
-|The Pico version packed in a power bank box - connector side|
+Building from source
+====================
 
-I ported my code from the Teensy with two important changes:
+Prerequisities
+--------------
 
- - This version presents itself as a mass storage device instead of MTP.
- - The Pico has two cores, so one of them collects data, and the other dumps it on the card.
+In order the build sst's components, you wil need 
+
+ - Python3, pip and venv for the dashboard
+ - [Raspberry Pico SDK](https://github.com/raspberrypi/pico-sdk) for the firmware
+ - Go compiler for `gosst`
+
+Please refer to your OS/package manager documentation on how to install these. With
+all the prerequisities installed, you can get the source, and start buliding the components.
+
+```
+$ git clone --recurse-submodules https://github.com/sghctoma/sst
+```
+
+Gosst
+-----
+
+```
+$ cd sst/gosst
+$ make
+```
+
+Dashboard
+---------
+
+```
+$ cd sst/dashboard
+$ python3 -mvenv venv
+$ . ./venv/bin/activate
+$ pip install -r requirements.txt
+```
+
+Firmware
+--------
+
+First you need to adjust `include/pin_config.h` to reflect the hardware setup -
+basically which peripheral is connected to which GPIO pins. The default setup
+follows the arrangement show in the Using the hardware section. After the
+adjustment you can build and install the firmware:
+
+```
+$ cd sst/firmware/pico-w
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make -j4
+````
+
+Hardware setup
+==============
+
+You will need the following electronics components to mirror the central unit
+I'm using:
+
+ - Raspberry Pi Pico W
+ - 2 AS5600 rotary encoders
+ - 2 pairs of 4-pin JWPF connectors
+ - SPI MicroSD card reader + card
+ - 2 push buttons
+ - SPI OLED display
+ - battery
+
+![KiCAD schematic](pics/kicad.png)
+
+The previously compiled firmware needs to be loaded to the Pico:
+```
+$ cd sst/firmware/pico-w
+$ sudo picotool load sufni-suspension-telemetry.uf2
+```
+
+Sensors
+-------
+
+Since I'm using rotary encoders to measure distance, sensor setup needs to be
+done carefully - this is a big drawback compared to linear encoders, but the
+price difference does worth it in my opinion (AS5600 boards are a few dollars).
+
+We want to create an isosceles triangle according to the following sketch:
+
+![Sensor calibration|300px](pics/calibration.png)
+
+Care must be taken that the line between the two attachment points is
+parallel to the shaft movement vector, and the maximum distance and arm
+length must be known.
+
+*These two values are used to calculate the start angle. The rotation
+measured by the rotary encoder is added to this start angle, and the result is
+used to calculate the leg adjacent to the angle. Subtracting the leg's double
+from the maximum distance gives us the shaft travel.*
+
+I have used LEGO pieces for the mechanical parts as a proof-of-concept, but
+eventually there will be properly designed attachment hardware. A few pictures
+of my setups:
+
+![Mezzer Pro](pics/mezzer.png)
+
+![Mara Pro](pics/mara.png)
+
+![Durolux36](pics/durolux.png)
+
+Running the servers
+===================
+
+The backend consists of three parts: the dashboard, the HTTP API and the SST
+server.
+
+Start the `gosst` servers
+-------------------------
+
+```
+$ sudo sst/gosst/gosst-tcp <path-to-sqlite-db>
+$ sst/gosst/gosst-http <path-to-sqlite-db>
+```
+
+Please note that `gosst-tcp` listens on 0.0.0.0:557, which means on *nix-like
+systems you need root permission to run it (or, on Linux, the binary needs to
+have the `CAP_NET_BIND_SERVICE` capability). The HTTP API listens on
+127.0.0.1:8080, so no need for root with that.
+
+Populate the database
+---------------------
+
+Starting either of these creates the database schema, but for the system to
+work, at least one **setup** has to exist.
+
+### Create a **linkage**
+
+For this, you will need leverage ratio data for your frame as 
+"`travel in mm`,`leverage ratio`" pairs separated by newlines. For my bike,
+I have used [graphreader.com](http://www.graphreader.com/) on an
+[LR graph screenshot](https://ep1.pinkbike.org/p5pb22577901/p5pb22577901.jpg\n0)
+I've found online. The screenshot is from [Linkage X3](https://www.bikechecker.com/),
+which has a pretty big online repository of bike frames. With the data in hand,
+the **linkage** can be created using the HTTP API:
+
+```
+$ curl -XPUT http://localhost:8080/linkage --json '{ \
+  "name": "Clash 2022 (sensitive)", \
+  "data":"0,3.18\n1,3.173\n2,3.165\n ... 171,2.374\n172,2.371\n173,2.368\n174,2.366"}'
+{"id":1}
+```
+
+### Create **calibration**s
+
+You need the arm length and maximum distance mentioned in the hardware setup
+chapter as well as the maximum travel. Arm length and maximum distance can be
+given as a LEGO units (7.9375 mm) by setting the `lego` query parameter to `1`.
+
+```
+$ curl -XPUT http://localhost:8080/calibration?lego=1 --json '{ \
+  "name":"clash-mezzer", \
+  "arm":17, \
+  "dist":29.5, \
+  "stroke":180}'
+{"id":1}
+```
+
+Please note that you will need to create separate **calibration**s for front
+and rear suspension.
+
+### Create a **setup**
+
+With the created **linkage** and **calibration** ids, we can craete a **setup**.
+
+```
+$ curl -XPUT http://localhost:8080/setup --json '{ \
+  "name":"Clash (Manitou,sensitive)", \
+  "linkage":1, \
+  "front-calibration":1, \
+  "rear-calibration":2}'
+{"id":1}
+```
+
+Start the dashboard
+-------------------
+
+```
+$ cd sst/dashboard
+$ . ./venv/bin/activate
+$ bokeh serve --port 5100 --address 127.0.0.1 --allow-websocket-origin=<your-domain> . --args <path-to-sqlite-db>
+```
+
+If you want to be able to access the modify features (session import, delete,
+name change, comment edit), you will need to insert an API token (an arbitrary
+string, for security purposes make it a long randomly generated one) into the
+**tokens** table.
+
+```
+$ python -c 'import secrets; print(secrets.token_urlsafe(32))'
+nUeJBq9NQVyNCEYjNNS8dHRWED3No2Jl5oqx4mVGbbk
+$ sqlite3 <path-to-sqlite-db>
+sqlite> insert intok tokens values 'nUeJBq9NQVyNCEYjNNS8dHRWED3No2Jl5oqx4mVGbbk';
+sqlite> .q
+```
+Now you just need to include the `X-Token: nUeJBq9NQVyNCEYjNNS8dHRWED3No2Jl5oqx4mVGbbk`
+header with every request you issue to the dashboard. Until a proper
+authentication / authorization feature is added (where the token would be
+automatically sent), you will have to figure out how to do this in your browser.
+I'm using [qutebrowser](https://qutebrowser.org), where it's a simple line in
+the configuration file:
+
+`config.set('content.headers.custom', {'X-Token': 'nUeJBq9NQVyNCEYjNNS8dHRWED3No2Jl5oqx4mVGbbk'}, 'localhost')`
+
+With the token included in the request, the `http://localhost:5100/dashboard#open-modal`
+URL will open the import dialog, where you can upload raw .SST files (but it's much more
+convenient to upload them directly from the central unit as described previously).
+
+References
+==========
+
+ - https://www.shimrestackor.com/Physics/model-physics.htm
+ - https://motioninstruments.com/blogs/blog/visualizing-damper-performance
+ - https://motioninstruments.com/blogs/blog/the-first-run-what-do-you-look-for
+ - https://motioninstruments.com/blogs/blog/the-science-of-using-data-to-tune-modern-mountain-bikes
+ - https://www.theproscloset.com/blogs/news/using-data-for-pro-level-suspension-tuning
+ - https://www.mtbr.com/threads/suspension-velocities.1132949/
+ - https://www.mtbr.com/threads/determining-air-spring-psi-with-frequency-tuning.1133537/
+ - https://www.datamc.org/data-acquisition/suspension-data-analysis/histograms-and-suspension-velocity-analysis/
+ - https://pdfcoffee.com/how-to-set-up-a-suspension-time-histogram-v2-pdf-free.html
+ - https://s100.iracing.com/wp-content/uploads/2021/08/Shock-Tuning-User-Guide.pdf
+ - http://fsae.scripts.mit.edu/motorhead/images/4/4d/Shockspeedarticle.doc
+ - https://www.thumpertalk.com/forums/topic/1264005-baseline-suspension-setup/
