@@ -13,6 +13,8 @@ from scipy.stats import norm
 
 
 HISTOGRAM_RANGE_MULTIPLIER = 1.5
+HISTOGRAM_RANGE_HIGH = 2000
+HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
 
 
 def strokes(velocity, travel=None, threshold=5):
@@ -58,29 +60,25 @@ def velocity_histogram_data(dt, dv, mask, step):
 
     thist = np.transpose(hist)
     largest_bin = 0
-    cutoff = []
     for i in range(len(thist)):
         sm = np.sum(thist[i])
         if sm > largest_bin:
             largest_bin = sm
-        if sm > 0.1:
-            cutoff.append(i)
 
     sd = {str(k): v for k, v in enumerate(hist)}
     sd['y'] = np.array(dv.Bins[:-1]) + step / 2
-    hi, lo = dv.Bins[cutoff[-1]], dv.Bins[cutoff[0]]
-    return sd, hi, lo, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
+    return sd, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
 
 
 def update_velocity_histogram(p, dt, dv, velocity, mask):
     ds = p.select_one('ds_hist')
     step = dv.Bins[1] - dv.Bins[0]
-    sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
+    sd, mx = velocity_histogram_data(dt, dv, mask, step)
     ds.data = sd
     p.x_range.start = 0
     p.x_range.end = mx
-    p.y_range.start = hi
-    p.y_range.end = lo
+    p.y_range.start = HISTOGRAM_RANGE_HIGH
+    p.y_range.end = HISTOGRAM_RANGE_LOW
 
     ds_normal = p.select_one('ds_normal')
     ds_normal.data = normal_distribution_data(velocity[mask], step)
@@ -91,14 +89,14 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
 def velocity_histogram_figure(
         dt, dv, velocity, mask, high_speed_threshold, title):
     step = dv.Bins[1] - dv.Bins[0]
-    sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
+    sd, mx = velocity_histogram_data(dt, dv, mask, step)
     source = ColumnDataSource(name='ds_hist', data=sd)
 
     p = figure(
         title=title,
         height=606,
         sizing_mode='stretch_width',
-        y_range=[hi, lo],
+        y_range=[HISTOGRAM_RANGE_HIGH, HISTOGRAM_RANGE_LOW],
         x_axis_label="Time (%)",
         y_axis_label='Speed (mm/s)',
         toolbar_location='above',
