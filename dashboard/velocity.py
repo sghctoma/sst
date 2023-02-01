@@ -85,7 +85,7 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
     ds_normal = p.select_one('ds_normal')
     ds_normal.data = normal_distribution_data(velocity[mask], step)
 
-    update_velocity_stats(p, velocity, mx)
+    update_velocity_stats(p, velocity[mask], mx)
 
 
 def velocity_histogram_figure(
