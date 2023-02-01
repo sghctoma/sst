@@ -52,6 +52,7 @@ sourcematerial/
 # compiled executable for gosst
 gosst/gosst-http
 gosst/gosst-tcp
+gosst/gosst-file
 
 # test utilities
 dashboard/test.py
@@ -60,3 +61,6 @@ dashboard/test.py
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Small utilities for debuging, etc.
+tools/

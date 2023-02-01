@@ -70,6 +70,22 @@ type processed struct {
 	Linkage    Linkage
 }
 
+func NewCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *Calibration {
+	if useLegoModule {
+		// 1M = 5/16 inch = 7.9375 mm
+		armLength = armLength * 7.9375
+		maxDistance = maxDistance * 7.9375
+	}
+	a := math.Acos(maxDistance / 2.0 / armLength)
+	return &Calibration{
+		Name:        "",
+		ArmLength:   armLength,
+		MaxDistance: maxDistance,
+		MaxStroke:   maxStroke,
+		StartAngle:  a,
+	}
+}
+
 func (this *Linkage) Process() error {
 	var wtlr [][2]float64
 	var ilr []float64
