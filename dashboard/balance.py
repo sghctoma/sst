@@ -5,28 +5,11 @@ import numpy as np
 from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
 
-
-def strokes(v):
-    zero_crossings = np.where(np.diff(np.sign(v)))[0] + 1
-    if len(zero_crossings) == 0:
-        return [], []
-    zero_crossings = np.insert(zero_crossings, 0, 0)
-    zero_crossings = np.append(zero_crossings, len(v) - 1)
-    compressions, rebounds = [], []
-    for i in range(len(zero_crossings) - 1):
-        start = zero_crossings[i]
-        end = zero_crossings[i + 1]
-        if start == end:
-            continue
-        if v[start] > 0:
-            compressions.append((start, end))
-        if v[start] < 0:
-            rebounds.append((start, end))
-    return compressions, rebounds
+from velocity import strokes
 
 
 def travel_velocity(travel, travel_max, velocity):
-    compressions, rebounds = strokes(velocity)
+    compressions, rebounds = strokes(velocity, travel)
     ct, cv, rt, rv = [], [], [], []
     for c in compressions:
         v_max = np.max(velocity[c[0]:c[1]])

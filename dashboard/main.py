@@ -31,6 +31,7 @@ from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
 from travel import update_travel_histogram
+from velocity import strokes
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
@@ -91,6 +92,8 @@ tick = 1.0 / telemetry.SampleRate  # time step length in seconds
 front_travel, rear_travel = [], []
 front_velocity, rear_velocity = [], []
 front_topouts, rear_topouts = [], []
+front_compressions, rear_compressions = [], []
+front_rebounds, rear_rebounds = [], []
 front_color, rear_color = Spectral11[1], Spectral11[2]
 front_record_num, rear_record_num, record_num = 0, 0, 0
 
@@ -111,6 +114,12 @@ if telemetry.Front.Present:
         telemetry.SampleRate)
     front_topouts_mask = intervals_mask(front_topouts, front_record_num)
 
+    front_compressions, front_rebounds = strokes(
+        front_velocity, travel=front_travel)
+    front_stroke_mask = intervals_mask(
+        np.array(front_compressions+front_rebounds),
+        front_record_num, False)
+
     if np.count_nonzero(front_topouts_mask):
         p_front_travel_hist = travel_histogram_figure(
             telemetry.Front.DigitizedTravel,
@@ -122,11 +131,11 @@ if telemetry.Front.Present:
             telemetry.Front.DigitizedTravel,
             telemetry.Front.DigitizedVelocity,
             front_velocity,
-            front_topouts_mask,
+            front_topouts_mask & front_stroke_mask,
             hst,
             "Speed histogram (front)")
         p_front_vel_stats = velocity_band_stats_figure(
-            front_velocity[front_topouts_mask], hst)
+            front_velocity[front_topouts_mask & front_stroke_mask], hst)
         p_front_fft = fft_figure(
             front_travel[front_topouts_mask],
             tick,
@@ -143,6 +152,12 @@ if telemetry.Rear.Present:
         rear_travel, telemetry.Linkage.MaxRearTravel, telemetry.SampleRate)
     rear_topouts_mask = intervals_mask(rear_topouts, rear_record_num)
 
+    rear_compressions, rear_rebounds = strokes(
+        rear_velocity, travel=rear_travel)
+    rear_stroke_mask = intervals_mask(
+        np.array(rear_compressions+rear_rebounds),
+        rear_record_num, False)
+
     if np.count_nonzero(rear_topouts_mask):
         p_rear_travel_hist = travel_histogram_figure(
             telemetry.Rear.DigitizedTravel,
@@ -154,11 +169,11 @@ if telemetry.Rear.Present:
             telemetry.Rear.DigitizedTravel,
             telemetry.Rear.DigitizedVelocity,
             rear_velocity,
-            rear_topouts_mask,
+            rear_topouts_mask & rear_stroke_mask,
             hst,
             "Speed histogram (rear)")
         p_rear_vel_stats = velocity_band_stats_figure(
-            rear_velocity[rear_topouts_mask], hst)
+            rear_velocity[rear_topouts_mask & rear_stroke_mask], hst)
         p_rear_fft = fft_figure(
             rear_travel[rear_topouts_mask],
             tick,
@@ -201,9 +216,11 @@ def on_selectiongeometry(event):
                 telemetry.Front.DigitizedTravel,
                 telemetry.Front.DigitizedVelocity,
                 front_velocity,
-                f_mask)
+                f_mask & front_stroke_mask)
             update_velocity_band_stats(
-                p_front_vel_stats, front_velocity[f_mask], hst)
+                p_front_vel_stats,
+                front_velocity[f_mask & front_stroke_mask],
+                hst)
 
     if telemetry.Rear.Present:
         r_mask = rear_topouts_mask & mask
@@ -219,9 +236,11 @@ def on_selectiongeometry(event):
                 telemetry.Rear.DigitizedTravel,
                 telemetry.Rear.DigitizedVelocity,
                 rear_velocity,
-                r_mask)
+                r_mask & rear_stroke_mask)
             update_velocity_band_stats(
-                p_rear_vel_stats, rear_velocity[r_mask], hst)
+                p_rear_vel_stats,
+                rear_velocity[r_mask & rear_stroke_mask],
+                hst)
 
     if telemetry.Front.Present and telemetry.Rear.Present:
         update_balance(
@@ -264,9 +283,11 @@ def on_doubletap():
             telemetry.Rear.DigitizedTravel,
             telemetry.Rear.DigitizedVelocity,
             rear_velocity,
-            rear_topouts_mask)
+            rear_topouts_mask & rear_stroke_mask)
         update_velocity_band_stats(
-            p_rear_vel_stats, rear_velocity[rear_topouts_mask], hst)
+            p_rear_vel_stats,
+            rear_velocity[rear_topouts_mask & rear_stroke_mask],
+            hst)
 
     if telemetry.Front.Present and telemetry.Rear.Present:
         update_balance(
