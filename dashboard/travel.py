@@ -13,6 +13,9 @@ from bokeh.plotting import figure
 from extremes import bottomouts
 
 
+HISTOGRAM_RANGE_MULTIPLIER = 1.3
+
+
 def travel_figure(telemetry, lod, front_color, rear_color):
     l = len(
         telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
@@ -144,10 +147,11 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
         active_drag='ypan',
         output_backend='webgl')
     p.x_range.start = 0
+    p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])
     p.y_range.flipped = True
     p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0,
            right='right', source=source, color=color, line_color='black')
-    add_travel_stat_labels(travel[mask], max_travel, np.max(data['right']), p)
+    add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
     return p
 
 
@@ -189,13 +193,14 @@ def update_travel_histogram(p, travel, digitized, mask):
     ds.data = travel_histogram_data(digitized, mask)
 
     avg, mx, avg_text, mx_text = travel_stats(travel[mask], ds.data['y'][-1])
+    p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(ds.data['right'])
     l_avg = p.select_one('l_avg')
     l_avg.text = avg_text
-    l_avg.x = np.max(ds.data['right'])
+    l_avg.x = p.x_range.end
     l_avg.y = avg
     l_max = p.select_one('l_max')
     l_max.text = mx_text
-    l_max.x = np.max(ds.data['right'])
+    l_max.x = p.x_range.end
     l_max.y = mx
     s_avg = p.select_one('s_avg')
     s_avg.location = avg

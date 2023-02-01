@@ -6,11 +6,13 @@ from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.models.mappers import LinearColorMapper
-from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
+
+
+HISTOGRAM_RANGE_MULTIPLIER = 1.5
 
 
 def strokes(velocity, travel=None, threshold=5):
@@ -67,7 +69,7 @@ def velocity_histogram_data(dt, dv, mask, step):
     sd = {str(k): v for k, v in enumerate(hist)}
     sd['y'] = np.array(dv.Bins[:-1]) + step / 2
     hi, lo = dv.Bins[cutoff[-1]], dv.Bins[cutoff[0]]
-    return sd, hi, lo, largest_bin
+    return sd, hi, lo, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
 
 
 def update_velocity_histogram(p, dt, dv, velocity, mask):
@@ -75,7 +77,10 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
     step = dv.Bins[1] - dv.Bins[0]
     sd, hi, lo, mx = velocity_histogram_data(dt, dv, mask, step)
     ds.data = sd
-    p.y_range = Range1d(hi, lo)
+    p.x_range.start = 0
+    p.x_range.end = mx
+    p.y_range.start = hi
+    p.y_range.end = lo
 
     ds_normal = p.select_one('ds_normal')
     ds_normal.data = normal_distribution_data(velocity[mask], step)
@@ -102,6 +107,7 @@ def velocity_histogram_figure(
         output_backend='webgl')
     p.yaxis[0].formatter = PrintfTickFormatter(format="%5d")
     p.x_range.start = 0
+    p.x_range.end = mx
     palette = Spectral11[1:]
     k = list(sd.keys())
     k.remove('y')
@@ -217,6 +223,8 @@ def velocity_stats(velocity):
 
 def update_velocity_stats(p, velocity, mx):
     avgr, maxr, avgc, maxc = velocity_stats(velocity)
+    top = p.y_range.end
+    bottom = p.y_range.start
 
     p.select_one('s_avgr').location = avgr
     p.select_one('s_avgc').location = avgc
@@ -229,7 +237,7 @@ def update_velocity_stats(p, velocity, mx):
     l_avgr.text = f"avg. rebound vel.: {avgr:.1f} mm/s"
     l_maxr = p.select_one('l_maxr')
     l_maxr.x = mx
-    l_maxr.y = maxr
+    l_maxr.y = np.fmax(top, maxr)
     l_maxr.text = f"max. rebound vel.: {maxr:.1f} mm/s"
     l_avgc = p.select_one('l_avgc')
     l_avgc.x = mx
@@ -237,7 +245,7 @@ def update_velocity_stats(p, velocity, mx):
     l_avgc.text = f"avg. comp. vel.: {avgc:.1f} mm/s"
     l_maxc = p.select_one('l_maxc')
     l_maxc.x = mx
-    l_maxc.y = maxc
+    l_maxc.y = np.fmin(bottom, maxc)
     l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
 
 
@@ -295,8 +303,10 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
-    p.y_range = Range1d(0, hsr + lsr + lsc + hsc)
-    p.x_range = Range1d(0, 1)
+    p.y_range.start = 0
+    p.y_range.end = hsr + lsr + lsc + hsc
+    p.x_range.start = 0
+    p.x_range.end = 1
     return p
 
 
@@ -306,16 +316,17 @@ def update_velocity_band_stats(p, velocity, high_speed_threshold):
     ds.data = dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
 
     l_hsr = p.select_one('l_hsr')
-    l_hsr.text = f"HSR: {hsr:.2f}%"
+    l_hsr.text = f"HSR:\n{hsr:.2f}%"
     l_hsr.y = hsc + lsc + lsr + hsr / 2
     l_lsr = p.select_one('l_lsr')
-    l_lsr.text = f"LSR: {lsr:.2f}%"
+    l_lsr.text = f"LSR:\n{lsr:.2f}%"
     l_lsr.y = hsc + lsc + lsr / 2
     l_lsc = p.select_one('l_lsc')
-    l_lsc.text = f"LSC: {lsc:.2f}%"
+    l_lsc.text = f"LSC:\n{lsc:.2f}%"
     l_lsc.y = hsc + lsc / 2
     l_hsc = p.select_one('l_hsc')
-    l_hsc.text = f"HSC: {hsc:.2f}%"
+    l_hsc.text = f"HSC:\n{hsc:.2f}%"
     l_hsc.y = hsc / 2
 
-    p.y_range = Range1d(0, hsr + lsr + lsc + hsc)
+    p.y_range.start = 0
+    p.y_range.end = hsr + lsr + lsc + hsc
