@@ -45,12 +45,13 @@ def filter_airtimes(topouts, front_velocity, rear_velocity, sample_rate):
     if len(topouts) == 0:
         return airtimes
     v_check_interval = int(0.02 * sample_rate)
-    if topouts[0][0] < v_check_interval:  # beginning is not airtime
-        # !!! This might empty out topouts, so we need to check in the next line.
+
+    # beginning is not airtime
+    if topouts[0][0] < v_check_interval:
+        # !!! This might empty out topouts, so we need to check.
         topouts = topouts[1:]
     # end is not airtime
-    if len(
-            topouts) and topouts[-1][1] > len(front_velocity) - v_check_interval:
+    if len(topouts) and topouts[-1][1] > len(front_velocity) - v_check_interval:
         topouts = topouts[:-1]
 
     for to in topouts:

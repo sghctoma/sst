@@ -70,7 +70,8 @@ def update_balance(pc, pr, front_travel, front_max,
     ds_fr = pr.select_one('ds_fr')
     ds_rr = pr.select_one('ds_rr')
     ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = balance_data(
-        front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity)
+        front_travel, front_max, front_velocity,
+        rear_travel, rear_max, rear_velocity)
     pc.x_range = Range1d(0, np.fmax(
         ds_fc.data['travel'][-1], ds_rc.data['travel'][-1]))
     pr.x_range = Range1d(0, np.fmax(
@@ -80,7 +81,8 @@ def update_balance(pc, pr, front_travel, front_max,
 def balance_figures(front_travel, front_max, front_velocity, front_color,
                     rear_travel, rear_max, rear_velocity, rear_color):
     fc, rc, fr, rr = balance_data(
-        front_travel, front_max, front_velocity, rear_travel, rear_max, rear_velocity)
+        front_travel, front_max, front_velocity,
+        rear_travel, rear_max, rear_velocity)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)
     rear_compression_source = ColumnDataSource(name='ds_rc', data=rc)
     front_rebound_source = ColumnDataSource(name='ds_fr', data=fr)

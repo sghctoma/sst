@@ -233,14 +233,13 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
         # XXX OK, this is fucking ugly, but setting title.standoff
-        title="Speed\nzones\n\n\n",
         #    above a certain value somehow affects neighbouring figures...
+        title="Speed\nzones\n\n\n",
         width=70,
         height=606,
         sizing_mode='fixed',
         tools='',
         toolbar_location=None)
-    #p.title.standoff = 100
     p.grid.grid_line_color = None
     p.xaxis.visible = False
     p.yaxis.visible = False
