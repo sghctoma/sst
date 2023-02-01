@@ -188,12 +188,13 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
     p.add_layout(l_max)
 
 
-def update_travel_histogram(p, travel, digitized, mask):
+def update_travel_histogram(p, travel, max_travel, digitized, mask):
     ds = p.select_one('ds_hist')
     ds.data = travel_histogram_data(digitized, mask)
 
-    avg, mx, avg_text, mx_text = travel_stats(travel[mask], ds.data['y'][-1])
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(ds.data['right'])
+
+    avg, mx, avg_text, mx_text = travel_stats(travel[mask], max_travel)
     l_avg = p.select_one('l_avg')
     l_avg.text = avg_text
     l_avg.x = p.x_range.end

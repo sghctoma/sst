@@ -208,6 +208,7 @@ def on_selectiongeometry(event):
             update_travel_histogram(
                 p_front_travel_hist,
                 front_travel,
+                telemetry.Front.Calibration.MaxStroke,
                 telemetry.Front.DigitizedTravel,
                 f_mask)
             update_fft(p_front_fft, front_travel[f_mask], tick)
@@ -228,6 +229,7 @@ def on_selectiongeometry(event):
             update_travel_histogram(
                 p_rear_travel_hist,
                 rear_travel,
+                telemetry.Linkage.MaxRearTravel,
                 telemetry.Rear.DigitizedTravel,
                 r_mask)
             update_fft(p_rear_fft, rear_travel[r_mask], tick)
@@ -259,6 +261,7 @@ def on_doubletap():
         update_travel_histogram(
             p_front_travel_hist,
             front_travel,
+            telemetry.Front.Calibration.MaxStroke,
             telemetry.Front.DigitizedTravel,
             front_topouts_mask)
         update_fft(p_front_fft, front_travel[front_topouts_mask], tick)
@@ -267,14 +270,17 @@ def on_doubletap():
             telemetry.Front.DigitizedTravel,
             telemetry.Front.DigitizedVelocity,
             front_velocity,
-            front_topouts_mask)
+            front_topouts_mask & front_stroke_mask)
         update_velocity_band_stats(
-            p_front_vel_stats, front_velocity[front_topouts_mask], hst)
+            p_front_vel_stats,
+            front_velocity[front_topouts_mask & front_stroke_mask],
+            hst)
 
     if telemetry.Rear.Present:
         update_travel_histogram(
             p_rear_travel_hist,
             rear_travel,
+            telemetry.Linkage.MaxRearTravel,
             telemetry.Rear.DigitizedTravel,
             rear_topouts_mask)
         update_fft(p_rear_fft, rear_travel[rear_topouts_mask], tick)
