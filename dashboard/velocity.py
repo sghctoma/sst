@@ -17,31 +17,6 @@ HISTOGRAM_RANGE_HIGH = 2000
 HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
 
 
-def strokes(velocity, travel=None, threshold=5):
-    zero_crossings = np.where(np.diff(np.sign(velocity)))[0] + 1
-    if len(zero_crossings) == 0:
-        return [], []
-    zero_crossings = np.insert(zero_crossings, 0, 0)
-    zero_crossings = np.append(zero_crossings, len(velocity) - 1)
-    compressions, rebounds = [], []
-    for i in range(len(zero_crossings) - 1):
-        start = zero_crossings[i]
-        end = zero_crossings[i + 1]
-        if start == end:
-            continue
-        if velocity[start] > 0:
-            compressions.append((start, end))
-        if velocity[start] < 0:
-            rebounds.append((start, end))
-
-    if travel is not None:
-        compressions = [c for c in compressions if
-                        travel[c[1]] - travel[c[0]] >= threshold]
-        rebounds = [r for r in rebounds if
-                    travel[r[0]] - travel[r[1]] >= threshold]
-    return compressions, rebounds
-
-
 def normal_distribution_data(velocity, step):
     mu, std = norm.fit(velocity)
     ny = np.linspace(velocity.min(), velocity.max(), 100)

@@ -21,7 +21,7 @@ from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
-from balance import balance_figures, update_balance
+from balance import balance_figures, update_balance, strokes
 from extremes import topouts, combined_topouts
 from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
@@ -31,7 +31,6 @@ from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
 from travel import update_travel_histogram
-from velocity import strokes
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
@@ -115,7 +114,8 @@ if telemetry.Front.Present:
     front_topouts_mask = intervals_mask(front_topouts, front_record_num)
 
     front_compressions, front_rebounds = strokes(
-        front_velocity, travel=front_travel)
+        front_velocity, front_travel,
+        telemetry.Front.Calibration.MaxStroke * 0.025)
     front_stroke_mask = intervals_mask(
         np.array(front_compressions+front_rebounds),
         front_record_num, False)
@@ -153,7 +153,8 @@ if telemetry.Rear.Present:
     rear_topouts_mask = intervals_mask(rear_topouts, rear_record_num)
 
     rear_compressions, rear_rebounds = strokes(
-        rear_velocity, travel=rear_travel)
+        rear_velocity, rear_travel,
+        telemetry.Linkage.MaxRearTravel * 0.025)
     rear_stroke_mask = intervals_mask(
         np.array(rear_compressions+rear_rebounds),
         rear_record_num, False)
