@@ -134,18 +134,21 @@ def velocity_histogram_figure(
     p.add_layout(lowspeed_box)
     add_velocity_stat_labels(velocity[mask], mx, p)
 
-    p.js_on_event(events.Pan, CustomJS(args=dict(p=p), code='''
-        let top = p.y_range.end;
-        let bottom = p.y_range.start;
-        let maxr = p.select_one('s_maxr').location
-        let maxc = p.select_one('s_maxc').location
-        if (top > maxr && top < - 500) {
-            p.select_one('l_maxr').y = top;
-        }
-        if (bottom < maxc && bottom > 500) {
-            p.select_one('l_maxc').y = bottom;
-        }
-        '''))
+
+    js_update_label_positions = CustomJS(args=dict(p=p), code='''
+            let top = p.y_range.end;
+            let bottom = p.y_range.start;
+            let maxr = p.select_one('s_maxr').location
+            let maxc = p.select_one('s_maxc').location
+            if (top > maxr && top < - 500) {
+                p.select_one('l_maxr').y = top;
+            }
+            if (bottom < maxc && bottom > 500) {
+                p.select_one('l_maxc').y = bottom;
+            }
+            ''')
+    p.js_on_event(events.Pan, js_update_label_positions)
+    p.js_on_event(events.MouseWheel, js_update_label_positions)
 
     return p
 
