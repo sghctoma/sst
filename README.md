@@ -14,9 +14,10 @@ Right now the system is not user friendly, both the software and hardware
 need some tinkering, but my goal is to eventually offer a step-by-step guide and
 exact parts list so that anyone who can "follow a recipe" is able to make it.
 Another big drawback compared to commercial solutions is that I do not have the
-years of experience and know-how on translating data to actual settings. I think
-this lack of knowledge on my part can be offset if more experienced riders use
-telemetry and share their data though.
+years of experience and know-how on translating data to actual pressures /spring
+rates and clicks for different forks and shocks. I think this lack of knowledge
+on my part can be offset if more experienced riders use telemetry and share their
+data though.
 
 I would also like to add that although the system described here works as a
 whole, the components are not tightly glued together, and I am planning to make
@@ -47,7 +48,7 @@ will display every datapoint).
 
 
 **Travel histograms** show what percentage of the total time was spent in a given
-10 mm travel range. This graph can be used to evaluate and adjust suspension
+5% long travel range. This graph can be used to evaluate and adjust suspension
 spring rate and progression. Knowing the **average and maximum travel** helps
 this assessment, so they are shown on the graph too, along with the **number of
 bottom-outs**.
