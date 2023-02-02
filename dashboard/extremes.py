@@ -31,13 +31,13 @@ def combined_topouts(front_travel, front_max,
     return _get_intervals(travel_nz, 0.2 * sample_rate)
 
 
-def intervals_mask(intervals, length, negate=True):
+def intervals_mask(intervals, length, invert=True):
     if intervals.size == 0:
-        return np.full(length, negate)
+        return np.full(length, invert)
     l0 = intervals[:, [0]] <= np.arange(length)
-    l1 = intervals[:, [1]] >= np.arange(length)
-    return np.logical_not(np.any(l0 & l1, axis=0)
-                          ) if negate else np.any(l0 & l1, axis=0)
+    l1 = intervals[:, [1]] > np.arange(length)
+    return np.logical_not(
+        np.any(l0 & l1, axis=0)) if invert else np.any(l0 & l1, axis=0)
 
 
 def filter_airtimes(topouts, front_velocity, rear_velocity, sample_rate):
