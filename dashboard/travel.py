@@ -17,18 +17,18 @@ HISTOGRAM_RANGE_MULTIPLIER = 1.3
 
 
 def travel_figure(telemetry, lod, front_color, rear_color):
-    l = len(
-        telemetry.Front.Travel if telemetry.Front.Present else telemetry.Rear.Travel)
-    time = np.around(np.arange(0, l) / telemetry.SampleRate, 4)
+    length = len(telemetry.Front.Travel if telemetry.Front.Present else
+                 telemetry.Rear.Travel)
+    time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Linkage.MaxRearTravel
 
+    tf_lod = np.around(telemetry.Front.Travel[::lod], 4)
+    tr_lod = np.around(telemetry.Rear.Travel[::lod], 4)
     source = ColumnDataSource(data=dict(
         t=time[::lod],
-        f=np.around(telemetry.Front.Travel[::lod], 4) if telemetry.Front.Present else np.full(
-            l, 0)[::lod],
-        r=np.around(telemetry.Rear.Travel[::lod], 4,) if telemetry.Rear.Present else np.full(
-            l, 0)[::lod],
+        f=tf_lod if telemetry.Front.Present else np.full(length, 0)[::lod],
+        r=tr_lod if telemetry.Rear.Present else np.full(length, 0)[::lod],
     ))
     p = figure(
         name='travel',
@@ -39,8 +39,9 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         tools='xpan,reset,hover',
         active_inspect=None,
         active_drag='xpan',
-        tooltips=[("elapsed time", "@t s"), ("front wheel",
-                                             "@f mm"), ("rear wheel", "@r mm")],
+        tooltips=[("elapsed time", "@t s"),
+                  ("front wheel", "@f mm"),
+                  ("rear wheel", "@r mm")],
         x_axis_label="Elapsed time (s)",
         y_axis_label="Travel (mm)",
         y_range=(front_max, 0),
@@ -54,7 +55,7 @@ def travel_figure(telemetry, lod, front_color, rear_color):
 
     p.x_range = Range1d(0, time[-1], bounds='auto')
 
-    l = p.line(
+    line = p.line(
         't', 'f',
         legend_label="Front",
         line_width=2,
@@ -116,7 +117,7 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     p.toolbar.active_scroll = wz
 
     p.hover.mode = 'vline'
-    p.hover.renderers = [l]
+    p.hover.renderers = [line]
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
     return p
@@ -160,7 +161,8 @@ def travel_stats(travel, max_travel):
     mx = np.max(travel)
     bo = bottomouts(travel, max_travel)
     avg_text = f"avg.: {avg:.2f} mm ({avg/max_travel*100:.1f}%)"
-    mx_text = f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / {len(bo)} bottom outs"
+    mx_text = (f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / "
+               f"{len(bo)} bottom outs")
     return avg, mx, avg_text, mx_text
 
 
