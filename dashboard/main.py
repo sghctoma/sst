@@ -388,16 +388,29 @@ savebutton = Button(
     label="save",
     disabled=True,
     sizing_mode='fixed',
-    height=20,
-    width=20,
+    height=25,
+    width=45,
     button_type='success',
-    css_classes=['savebutton'])
+    styles={
+        "position": "unset",
+        "margin-left": "auto",
+        "margin-right": "5px"})
 
 name_input = TextInput(
     value=session_name,
     sizing_mode='stretch_width',
     margin=(0, 0, 0, 0),
-    css_classes=['inner-desc'],
+    styles={
+        "padding": "5px",
+        "width": "100%",
+        "background-color": "#15191C",
+        "color": "#d0d0d0"},
+    stylesheets=["""
+        :host input {
+            color: #d0d0d0;
+            background-color: #20262B;
+            font-size: 110%;
+        }"""],
     tags=[session_name])
 
 desc_input = TextAreaInput(
@@ -405,7 +418,21 @@ desc_input = TextAreaInput(
     rows=5,
     sizing_mode='stretch_both',
     margin=(0, 0, 0, 0),
-    css_classes=['inner-desc', 'big-bottom-padding'],
+    stylesheets=["""
+        :host textarea {
+            color: #d0d0d0;
+            background-color: #20262B;
+            font-size: 110%;
+            padding: 12px;
+        }"""],
+    styles={
+        "padding": "5px",
+        "padding-top": "0px",
+        "padding-bottom": "53px",
+        "width": "100%",
+        "height": "100%",
+        "background-color": "#15191C",
+        "color": "#d0d0d0"},
     tags=[description])
 
 
@@ -451,7 +478,10 @@ name_input.js_on_change('tags', CustomJS(args=dict(), code='''
     '''))
 savebutton.on_click(on_savebuttonclick)
 
-children = [Div(text="<h3>Notes</h3>", sizing_mode='stretch_width', height=25)]
+children = [Div(text="<h3>Notes</h3>",
+                sizing_mode='stretch_width',
+                height=25,
+                stylesheets=[":host h3 {margin-block-start: 0px;}"])]
 if full_access:
     children.append(savebutton)
 text = column(name='description_x',
@@ -460,7 +490,10 @@ text = column(name='description_x',
               children=[row(sizing_mode='stretch_width',
                             height=30,
                             margin=(0, 0, 0, 0),
-                            css_classes=['inner-desc'],
+                            styles={
+                                "width": "100%",
+                                "background-color": "#15191C",
+                                "color": "#d0d0d0"},
                             children=children),
                         name_input,
                         desc_input])
@@ -468,9 +501,7 @@ description_box = row(
     name='description',
     sizing_mode='stretch_width',
     height=300,
-    children=[
-        p_lr,
-         text])
+    children=[p_lr, text])
 
 '''
 Disable tools for mobile browsers to allow scrolling

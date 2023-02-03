@@ -54,13 +54,13 @@ gosst/gosst-http
 gosst/gosst-tcp
 gosst/gosst-file
 
-# test utilities
-dashboard/test.py
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Python virtualenv
+dashboard/venv
 
 # Small utilities for debuging, etc.
 tools/
