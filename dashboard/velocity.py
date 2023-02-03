@@ -85,7 +85,8 @@ def velocity_histogram_figure(
     k = list(sd.keys())
     k.remove('y')
     p.hbar_stack(stackers=k, name='hb', y='y', height=step,
-                 color=palette, line_color='black', source=source)
+                 color=palette, line_color='black', fill_alpha=0.8,
+                 source=source)
 
     source_normal = ColumnDataSource(
         name='ds_normal', data=normal_distribution_data(velocity[mask], step))

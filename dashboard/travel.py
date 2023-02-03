@@ -150,8 +150,9 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     p.x_range.start = 0
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])
     p.y_range.flipped = True
-    p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0,
-           right='right', source=source, color=color, line_color='black')
+    p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0, right='right',
+           source=source, line_width=2, color=color, fill_alpha=0.4)
+
     add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
     return p
 
