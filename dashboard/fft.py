@@ -17,7 +17,7 @@ def fft_data(travel, tick):
     freqs = freqs[freqs <= 10]  # cut off FFT graph at 10 Hz
 
     # TODO put a label that shows the most prominent frequencies
-    #max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
+    # max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
     # print(f[max_freq_idx])
 
     return dict(freqs=freqs, spectrum=balanced_spectrum[:len(freqs)])
@@ -40,7 +40,7 @@ def fft_figure(travel, tick, color, title):
                    mode='vline', attachment='above')
     p.add_tools(ht)
     p.yaxis.visible = False
-    p.x_range = Range1d(0.05, 5.05, bounds=(0.05, 10.05))
+    p.x_range = Range1d(0.05, 3.05, bounds=(0.05, 10.05))
     p.vbar(name='b_fft', x='freqs', bottom=0, top='spectrum',
            source=source, width=4.9 / len(source.data['freqs']), color=color)
     return p
