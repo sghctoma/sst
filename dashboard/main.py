@@ -85,9 +85,7 @@ except BaseException:
 try:
     hst = int(args.get('hst')[0])
 except BaseException:
-    hst = 100
-
-tick = 1.0 / telemetry.SampleRate  # time step length in seconds
+    hst = 350
 
 front_travel, rear_travel = [], []
 front_velocity, rear_velocity = [], []
