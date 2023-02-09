@@ -488,24 +488,21 @@ children = [Div(text="<h3>Notes</h3>",
                 stylesheets=[":host h3 {margin-block-start: 0px;}"])]
 if full_access:
     children.append(savebutton)
-text = column(name='description_x',
-              sizing_mode='stretch_width',
-              height=300,
-              children=[row(sizing_mode='stretch_width',
-                            height=30,
-                            margin=(0, 0, 0, 0),
-                            styles={
-                                "width": "100%",
-                                "background-color": "#15191C",
-                                "color": "#d0d0d0"},
-                            children=children),
-                        name_input,
-                        desc_input])
-description_box = row(
+description_box = column(
     name='description',
     sizing_mode='stretch_width',
-    height=300,
-    children=[p_lr, text])
+    height=640,
+    children=[row(sizing_mode='stretch_width',
+                  height=30,
+                  margin=(0, 0, 0, 0),
+                  styles={
+                      "width": "100%",
+                      "background-color": "#15191C",
+                      "color": "#d0d0d0"},
+                  children=children),
+              name_input,
+              desc_input])
+
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -589,3 +586,5 @@ if suspension_count == 2:
 curdoc().add_root(sessions_list)
 curdoc().add_root(session_dialog)
 curdoc().add_root(description_box)
+curdoc().add_root(p_lr)
+curdoc().add_root(p_sw)
