@@ -142,7 +142,7 @@ def velocity_histogram_figure(
 
     p = figure(
         title=title,
-        height=606,
+        height=600,
         sizing_mode='stretch_width',
         y_range=[HISTOGRAM_RANGE_HIGH, HISTOGRAM_RANGE_LOW],
         x_axis_label="Time (%)",
@@ -318,7 +318,7 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
         #    above a certain value somehow affects neighbouring figures...
         title="Speed\nzones\n\n\n",
         width=70,
-        height=606,
+        height=600,
         sizing_mode='fixed',
         tools='',
         toolbar_location=None)
