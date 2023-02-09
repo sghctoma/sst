@@ -77,6 +77,7 @@ def session_list(sessions, full_access):
                 stylesheets=["p { font-size: 14px; color: #d0d0d0; }"]))
             last_day = d.date()
         children = [Div(
+            name=str(s[0]),
             stylesheets=[tooltip_css],
             css_classes=['tooltip'],
             text=f"""

@@ -455,7 +455,7 @@ def on_savebuttonclick():
         curdoc().title = f"Sufni Suspension Telemetry Dashboard ({n})"
         session_rows = curdoc().select({'name': 'session', 'type': Row})
         for r in session_rows:
-            if r.children[0].id == s:
+            if r.children[0].name == str(s):
                 r.children[0].text = f"""
                     &nbsp;&nbsp;
                     <a href='dashboard?session={s}'>{n}</a>
