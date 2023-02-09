@@ -6,7 +6,9 @@ from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.models.mappers import LinearColorMapper
+from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
+from bokeh.models.tools import WheelZoomTool
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
@@ -15,6 +17,77 @@ from scipy.stats import norm
 HISTOGRAM_RANGE_MULTIPLIER = 1.5
 HISTOGRAM_RANGE_HIGH = 2000
 HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
+
+
+def velocity_figure(telemetry, lod, front_color, rear_color):
+    length = len(telemetry.Front.Velocity if telemetry.Front.Present else
+                 telemetry.Rear.Velocity)
+    time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
+
+    vf_lod = np.around(telemetry.Front.Velocity[::lod], 4) / 1000
+    vr_lod = np.around(telemetry.Rear.Velocity[::lod], 4) / 1000
+    source = ColumnDataSource(data=dict(
+        t=time[::lod],
+        f=vf_lod if telemetry.Front.Present else np.full(length, 0)[::lod],
+        r=vr_lod if telemetry.Rear.Present else np.full(length, 0)[::lod],
+    ))
+    p = figure(
+        name='velocity',
+        title="Suspension velocity",
+        height=275,
+        min_border_left=50,
+        min_border_right=50,
+        sizing_mode="stretch_width",
+        toolbar_location='above',
+        tools='xpan,reset,hover',
+        active_inspect=None,
+        active_drag='xpan',
+        tooltips=[("elapsed time", "@t s"),
+                  ("front wheel", "@f m/s"),
+                  ("rear wheel", "@r m/s")],
+        x_axis_label="Elapsed time (s)",
+        y_axis_label="Velocity (m/s)",
+        output_backend='webgl')
+
+    p.x_range = Range1d(0, time[-1], bounds='auto')
+
+    line = p.line(
+        't', 'f',
+        legend_label="Front",
+        line_width=2,
+        color=front_color,
+        source=source)
+    p.line(
+        't', 'r',
+        legend_label="Rear",
+        line_width=2,
+        color=rear_color,
+        source=source)
+    p.legend.level = 'overlay'
+
+    '''
+    left_unselected = BoxAnnotation(
+        left=p.x_range.start,
+        right=p.x_range.start,
+        fill_alpha=0.8,
+        fill_color='#000000')
+    right_unselected = BoxAnnotation(
+        left=p.x_range.end,
+        right=p.x_range.end,
+        fill_alpha=0.8,
+        fill_color='#000000')
+    p.add_layout(left_unselected)
+    p.add_layout(right_unselected)
+    '''
+    wz = WheelZoomTool(maintain_focus=False, dimensions='width')
+    p.add_tools(wz)
+    p.toolbar.active_scroll = wz
+
+    p.hover.mode = 'vline'
+    p.hover.renderers = [line]
+    p.legend.location = 'bottom_right'
+    p.legend.click_policy = 'hide'
+    return p
 
 
 def normal_distribution_data(velocity, step):
@@ -109,7 +182,6 @@ def velocity_histogram_figure(
         fill_alpha=0.1)
     p.add_layout(lowspeed_box)
     add_velocity_stat_labels(velocity[mask], mx, p)
-
 
     js_update_label_positions = CustomJS(args=dict(p=p), code='''
             let top = p.y_range.end;

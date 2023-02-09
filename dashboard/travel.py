@@ -34,6 +34,8 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         name='travel',
         title="Wheel travel",
         height=400,
+        min_border_left=50,
+        min_border_right=50,
         sizing_mode="stretch_width",
         toolbar_location='above',
         tools='xpan,reset,hover',
@@ -48,8 +50,6 @@ def travel_figure(telemetry, lod, front_color, rear_color):
         output_backend='webgl')
 
     p.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
-    extra_y_axis = LinearAxis(y_range_name='rear')
-    extra_y_axis.ticker = FixedTicker(ticks=np.linspace(0, rear_max, 10))
     p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p.add_layout(LinearAxis(y_range_name='rear'), 'right')
 

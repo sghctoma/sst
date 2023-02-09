@@ -31,6 +31,7 @@ from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
 from travel import update_travel_histogram
+from velocity import velocity_figure
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
@@ -311,6 +312,11 @@ def on_doubletap():
 p_travel = travel_figure(telemetry, lod, front_color, rear_color)
 p_travel.on_event(SelectionGeometry, on_selectiongeometry)
 p_travel.on_event(DoubleTap, on_doubletap)
+p_velocity = velocity_figure(telemetry, lod, front_color, rear_color)
+p_travel.x_range.js_link('start', p_velocity.x_range, 'start')
+p_travel.x_range.js_link('end', p_velocity.x_range, 'end')
+p_velocity.x_range.js_link('start', p_travel.x_range, 'start')
+p_velocity.x_range.js_link('end', p_travel.x_range, 'end')
 
 '''
 We use both suspensions to find airtimes. Basically, everything is considered
@@ -552,6 +558,7 @@ curdoc().template_variables["suspension_count"] = suspension_count
 curdoc().template_variables["name"] = session_name
 curdoc().template_variables["date"] = utc_str
 curdoc().add_root(p_travel)
+curdoc().add_root(p_velocity)
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''
     p_front_travel_hist.name = f'{prefix}travel_hist'
