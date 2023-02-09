@@ -75,6 +75,74 @@ description = session_data[1]
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
+res = cur.execute('''
+    SELECT setups.name,linkages.name,fcal.*,rcal.*
+    FROM setups
+    INNER JOIN linkages
+    ON linkages.linkage_id=setups.linkage_id
+    iNNER JOIN calibrations fcal
+    ON fcal.calibration_id=setups.front_calibration_id
+    INNER JOIN calibrations rcal
+    ON rcal.calibration_id=setups.rear_calibration_id
+    INNER JOIN sessions
+    ON sessions.setup_id=setups.setup_id
+    WHERE session_id=?''', (s,))
+setup_data = res.fetchone()
+if not setup_data:
+    curdoc().add_root(Div(text=f"Missing setup data for session '{s}'"))
+    raise Exception("Missing setup data")
+
+calibration_table = '''
+<table style="width: 100%;">
+<tbody>
+<tr>
+<th>Max. stroke</th>
+<td>{} mm</td>
+</tr>
+<tr>
+<th>Max. distance</th>
+<td>{} mm</td>
+</tr>
+<tr>
+<th>Arm length</th>
+<td>{} mm</td>
+</tr>
+</tbody>
+</table>
+'''
+
+setup_figure = Div(
+    name='setup',
+    sizing_mode='stretch_width',
+    height=300,
+    stylesheets=['''
+        div {
+          width: 100%;
+          height: 100%;
+          padding: 15px;
+          background: #15191c;
+          font-size: 14px;
+          color: #d0d0d0;
+        }
+        hr {
+          border-top:1px dashed #d0d0d0;
+          background-color: transparent;
+          border-style: none none dashed;
+        }
+        table, th, td {
+          border: 1px dashed #d0d0d0;
+          border-collapse: collapse;
+          text-align: center;
+        }'''],
+    text=f'''
+        <b>Setup:</b>{setup_data[0]}<br />
+        <b>Linkage:</b> {setup_data[1]}<hr />
+        <b>Front calibration:</b>{setup_data[3]}<br />
+        {calibration_table.format(setup_data[6], setup_data[5], setup_data[4])}
+        <br /><b>Rear calibration:</b>{setup_data[9]}<br />
+        {calibration_table.format(setup_data[12], setup_data[11], setup_data[10])}
+        ''')
+
 # lod - Level of Detail for travel graph (downsample ratio)
 try:
     lod = int(args.get('lod')[0])
@@ -588,3 +656,4 @@ curdoc().add_root(session_dialog)
 curdoc().add_root(description_box)
 curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
+curdoc().add_root(setup_figure)
