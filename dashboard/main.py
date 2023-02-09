@@ -9,7 +9,7 @@ import msgpack
 import numpy as np
 import requests
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bokeh.events import DoubleTap, SelectionGeometry
 from bokeh.io import curdoc
@@ -27,6 +27,7 @@ from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure, update_fft
 from leverage import leverage_ratio_figure, shock_wheel_figure
+from map import map_figure
 from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
@@ -163,6 +164,8 @@ front_rebounds, rear_rebounds = [], []
 front_color, rear_color = Spectral11[1], Spectral11[2]
 front_record_num, rear_record_num, record_num = 0, 0, 0
 
+tick = 1.0 / telemetry.SampleRate  # time step length in seconds
+
 '''
 Topouts are intervals where suspension is at zero extension for an extended
 period of time. It allows us to filter out e.g. the beginning and the end of
@@ -250,12 +253,15 @@ if telemetry.Rear.Present:
     else:
         telemetry.Rear.Present = False
 
-if not (front_record_num == 0 or rear_record_num ==
-        0) and front_record_num != rear_record_num:
+if (not (front_record_num == 0 or rear_record_num == 0) and
+   front_record_num != rear_record_num):
     curdoc().add_root(Div(text="SST file is corrupt"))
     raise Exception("Corrupt dataset")
 
 record_num = front_record_num if front_record_num else rear_record_num
+elapsed_time = timedelta(seconds=record_num*tick)
+start_time = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
+end_time = start_time + elapsed_time
 
 '''
 Event handlers for travel graph. We update histograms, statistics and FFTs when
@@ -571,6 +577,11 @@ description_box = column(
               name_input,
               desc_input])
 
+'''
+Map
+'''
+map = map_figure('/home/sghctoma/activity/activity_10404260237.gpx',
+                 start_time, end_time)
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -613,8 +624,7 @@ if telemetry.Front.Present:
 if telemetry.Rear.Present:
     suspension_count += 1
 
-utc = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
-utc_str = utc.strftime('%Y.%m.%d %H:%M')
+utc_str = start_time.strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({session_name})"
 curdoc().template_variables["suspension_count"] = suspension_count
@@ -656,4 +666,5 @@ curdoc().add_root(session_dialog)
 curdoc().add_root(description_box)
 curdoc().add_root(p_lr)
 curdoc().add_root(p_sw)
+curdoc().add_root(map)
 curdoc().add_root(setup_figure)
