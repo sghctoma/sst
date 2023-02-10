@@ -23,13 +23,15 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Linkage.MaxRearTravel
 
-    tf_lod = np.around(telemetry.Front.Travel[::lod], 4)
-    tr_lod = np.around(telemetry.Rear.Travel[::lod], 4)
-    source = ColumnDataSource(data=dict(
-        t=time[::lod],
-        f=tf_lod if telemetry.Front.Present else np.full(length, 0)[::lod],
-        r=tr_lod if telemetry.Rear.Present else np.full(length, 0)[::lod],
-    ))
+    if telemetry.Front.Present:
+        tf_lod = np.around(telemetry.Front.Travel[::lod], 4)
+    else:
+        tf_lod = np.full(length, 0)[::lod]
+    if telemetry.Rear.Present:
+        tr_lod = np.around(telemetry.Rear.Travel[::lod], 4)
+    else:
+        tr_lod = np.full(length, 0)[::lod]
+    source = ColumnDataSource(data=dict(t=time[::lod], f=tf_lod, r=tr_lod,))
     p = figure(
         name='travel',
         title="Wheel travel",

@@ -24,12 +24,18 @@ def velocity_figure(telemetry, lod, front_color, rear_color):
                  telemetry.Rear.Velocity)
     time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
 
-    vf_lod = np.around(telemetry.Front.Velocity[::lod], 4) / 1000
-    vr_lod = np.around(telemetry.Rear.Velocity[::lod], 4) / 1000
+    if telemetry.Front.Present:
+        vf_lod = np.around(telemetry.Front.Velocity[::lod], 4) / 1000
+    else:
+        vf_lod = np.full(length, 0)[::lod]
+    if telemetry.Rear.Present:
+        vr_lod = np.around(telemetry.Rear.Velocity[::lod], 4) / 1000
+    else:
+        vr_lod = np.full(length, 0)[::lod]
     source = ColumnDataSource(data=dict(
         t=time[::lod],
-        f=vf_lod if telemetry.Front.Present else np.full(length, 0)[::lod],
-        r=vr_lod if telemetry.Rear.Present else np.full(length, 0)[::lod],
+        f=vf_lod,
+        r=vr_lod,
     ))
     p = figure(
         name='velocity',
