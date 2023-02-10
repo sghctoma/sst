@@ -38,7 +38,7 @@
 
   <div class="tabs">
     <input class="radiotab" name="tabs" tabindex="1" type="radio" id="tabone" checked="checked">
-    <label class="label" for="tabone">Spring rate</label>
+    <label class="label" style="grid-column: 1" for="tabone">Spring rate</label>
     <div class="panel springrate" tabindex="1">
       {% if suspension_count == 1 -%}
       <div class="travel-hist">{{ embed(roots.travel_hist) }}</div>
@@ -52,7 +52,7 @@
     </div>
 
     <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabtwo">
-    <label class="label" for="tabtwo">Damping</label>
+    <label class="label" style="grid-column: 2" for="tabtwo">Damping</label>
     <div class="panel damping" tabindex="1">
       {% if suspension_count == 1 -%}
       <div class="velocity-hist">{{ embed(roots.velocity_hist) }}</div>
@@ -65,7 +65,7 @@
     
     {% if suspension_count == 2 -%}
     <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabthree">
-    <label class="label" for="tabthree" >Balance</label>
+    <label class="label" style="grid-column: 3" for="tabthree" >Balance</label>
     <div class="panel balance" tabindex="1">
       <div class="balance-compression">{{ embed(roots.balance_compression) }}</div>
       <div class="balance-rebound">{{ embed(roots.balance_rebound) }}</div>

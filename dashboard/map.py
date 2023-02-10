@@ -38,19 +38,12 @@ def map_figure(filename, start_time, end_time):
     session_data = {'lon': session_lon, 'lat': session_lat}
     ds_session = ColumnDataSource(data=session_data)
 
-    min_lon = min(session_data['lon'])
-    max_lon = max(session_data['lon'])
-    min_lat = min(session_data['lat'])
-    max_lat = max(session_data['lat'])
-
     p = figure(
         name="map",
-        x_range=(min_lon - 250, max_lon + 250),
-        y_range=(min_lat - 250, max_lat + 250),
         x_axis_type=None,
         y_axis_type=None,
-        sizing_mode='stretch_both',
-        height=400,
+        sizing_mode='stretch_width',
+        height=677,
         tools='pan,wheel_zoom,reset',
         active_drag='pan',
         active_scroll='wheel_zoom',
