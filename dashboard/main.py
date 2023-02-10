@@ -565,7 +565,7 @@ if full_access:
 description_box = column(
     name='description',
     sizing_mode='stretch_width',
-    height=640,
+    height=642,
     children=[row(sizing_mode='stretch_width',
                   height=30,
                   margin=(0, 0, 0, 0),

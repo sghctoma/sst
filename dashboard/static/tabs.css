@@ -3,7 +3,6 @@
   top: 0px;
   left: 0px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   grid-template-rows: 40px 1fr;
   width: 100%;
 }
