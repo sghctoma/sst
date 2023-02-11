@@ -53,13 +53,15 @@ def map_figure(ds_track, ds_session):
             sizing_mode='stretch_width',
             height=677,
             text="no track data for session")
+    start_lon = ds_session.data['lon'][0]
+    start_lat = ds_session.data['lat'][0]
 
     p = figure(
         name='map',
         x_axis_type=None,
         y_axis_type=None,
-        x_range=[ds_session.data['lon'][0] - 600, ds_session.data['lon'][0] + 600],
-        y_range=[ds_session.data['lat'][0] - 600, ds_session.data['lat'][0] + 600],
+        x_range=[start_lon - 600, start_lon + 600],
+        y_range=[start_lat - 600, start_lat + 600],
         sizing_mode='stretch_width',
         height=677,
         match_aspect=True,

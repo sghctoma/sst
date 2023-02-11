@@ -606,20 +606,24 @@ on_mousemove = CustomJS(
         let lon = dss.data['lon'][closest[0]];
         let lat = dss.data['lat'][closest[0]];
         if (lon - map.x_range.start < 10) {
-            map.x_range.start -= 10;
-            map.x_range.end -= 10;
+            let temp = map.x_range.start;
+            map.x_range.start = lon - 10;
+            map.x_range.end -= (temp - map.x_range.start);
         }
         if (map.x_range.end - lon < 10) {
-            map.x_range.start += 10;
-            map.x_range.end += 10;
+            let temp = map.x_range.end;
+            map.x_range.end = lon + 10;
+            map.x_range.start += (map.x_range.end - temp);
         }
         if (lat - map.y_range.start < 10) {
-            map.y_range.start -= 10;
-            map.y_range.end -= 10;
+            let temp = map.y_range.start;
+            map.y_range.start = lat - 10;
+            map.y_range.end -= (temp - map.y_range.start);
         }
         if (map.y_range.end - lat < 10) {
-            map.y_range.start += 10;
-            map.y_range.end += 10;
+            let temp = map.y_range.end;
+            map.y_range.end = lat + 10;
+            map.y_range.start += (map.y_range.end - temp);
         }
         pos.x = lon;
         pos.y = lat;
