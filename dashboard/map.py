@@ -4,6 +4,7 @@ import xyzservices.providers as xyz
 
 from gpx_converter import Converter
 from bokeh.models import ColumnDataSource
+from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
@@ -19,31 +20,49 @@ def geographic_to_mercator(x_lon, y_lat):
     return x_m, y_m
 
 
-def map_figure(filename, start_time, end_time):
+def track_data(filename, start_time, end_time):
     track = Converter(input_file=filename).gpx_to_dictionary(
         latitude_key='lat',
         longitude_key='lon')
     for i in range(len(track['time'])):
         track['lon'][i], track['lat'][i] = geographic_to_mercator(
             track['lon'][i], track['lat'][i])
+    t = np.array(track.pop('time', None))  # we don't need time in the ds
     ds_track = ColumnDataSource(data=track)
 
-    t = np.array(track['time'])
     session_indices = np.where(np.logical_and(t >= start_time, t <= end_time))
     if len(session_indices[0]) == 0:
-        return figure(name='map')
+        return None, None
 
     session_lon = np.array(track['lon'])[session_indices]
     session_lat = np.array(track['lat'])[session_indices]
-    session_data = {'lon': session_lon, 'lat': session_lat}
+    session_time = np.array(t)[session_indices]
+    session_data = dict(
+        time=list(zip(range(len(session_time)), session_time)),
+        lon=session_lon,
+        lat=session_lat)
     ds_session = ColumnDataSource(data=session_data)
 
+    return ds_track, ds_session
+
+
+def map_figure(ds_track, ds_session):
+    if ds_track is None:
+        return Div(
+            name='map',
+            sizing_mode='stretch_width',
+            height=677,
+            text="no track data for session")
+
     p = figure(
-        name="map",
+        name='map',
         x_axis_type=None,
         y_axis_type=None,
+        x_range=[ds_session.data['lon'][0] - 600, ds_session.data['lon'][0] + 600],
+        y_range=[ds_session.data['lat'][0] - 600, ds_session.data['lat'][0] + 600],
         sizing_mode='stretch_width',
         height=677,
+        match_aspect=True,
         tools='pan,wheel_zoom,reset',
         active_drag='pan',
         active_scroll='wheel_zoom',
@@ -55,11 +74,10 @@ def map_figure(filename, start_time, end_time):
     p.add_tile(tile_provider)
     p.line(x='lon', y='lat', source=ds_track,
            color=Spectral11[3], alpha=0.5, width=2)
-    p.circle(x=track['lon'][0], y=track['lat'][0],
+    p.circle(x=ds_track.data['lon'][0], y=ds_track.data['lat'][0],
              color='#229954', alpha=0.8, size=10)
-    p.circle(x=track['lon'][-1], y=track['lat'][-1],
+    p.circle(x=ds_track.data['lon'][-1], y=ds_track.data['lat'][-1],
              color='#E74C3C', alpha=0.8, size=10)
-
     p.line(x='lon', y='lat', source=ds_session,
            color=Spectral11[10], alpha=0.8, width=5)
     return p

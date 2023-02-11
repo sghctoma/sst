@@ -11,9 +11,10 @@ import requests
 
 from datetime import datetime, timedelta
 
-from bokeh.events import DoubleTap, SelectionGeometry
+from bokeh.events import DoubleTap, MouseMove, SelectionGeometry
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
+from bokeh.models import Circle
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.layouts import Row
 from bokeh.models.widgets.buttons import Button
@@ -27,7 +28,7 @@ from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure, update_fft
 from leverage import leverage_ratio_figure, shock_wheel_figure
-from map import map_figure
+from map import track_data, map_figure
 from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
@@ -580,8 +581,51 @@ description_box = column(
 '''
 Map
 '''
-map = map_figure('/home/sghctoma/activity/activity_10404260237.gpx',
-                 start_time, end_time)
+ds_track, ds_session = track_data(
+    '/home/sghctoma/activity/activity_10404260237.gpx',
+    start_time,
+    end_time)
+map = map_figure(ds_track, ds_session)
+map.tags.append(start_time)
+
+pos_marker = Circle(
+    x=ds_session.data['lon'][0],
+    y=ds_session.data['lat'][0],
+    size=13,
+    line_color='black',
+    fill_color='gray')
+map.add_glyph(pos_marker)
+
+on_mousemove = CustomJS(
+    args=dict(map=map, dss=ds_session, pos=pos_marker),
+    code='''
+        let start_time = map.tags[0];
+        let cursor_time = start_time + cb_obj.x * 1000;
+        let closest = dss.data['time'].reduce((p,c) =>
+            Math.abs(c[1] - cursor_time)<Math.abs(p[1] - cursor_time) ? c : p);
+        let lon = dss.data['lon'][closest[0]];
+        let lat = dss.data['lat'][closest[0]];
+        if (lon - map.x_range.start < 10) {
+            map.x_range.start -= 10;
+            map.x_range.end -= 10;
+        }
+        if (map.x_range.end - lon < 10) {
+            map.x_range.start += 10;
+            map.x_range.end += 10;
+        }
+        if (lat - map.y_range.start < 10) {
+            map.y_range.start -= 10;
+            map.y_range.end -= 10;
+        }
+        if (map.y_range.end - lat < 10) {
+            map.y_range.start += 10;
+            map.y_range.end += 10;
+        }
+        pos.x = lon;
+        pos.y = lat;
+    ''')
+p_travel.js_on_event(MouseMove, on_mousemove)
+
 
 '''
 Disable tools for mobile browsers to allow scrolling
