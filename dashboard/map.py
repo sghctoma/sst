@@ -4,7 +4,8 @@ import xyzservices.providers as xyz
 
 from gpx_converter import Converter
 from bokeh.models import ColumnDataSource
-from bokeh.models.widgets.markups import Div
+from bokeh.layouts import layout
+from bokeh.models.widgets.inputs import FileInput
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
@@ -63,11 +64,43 @@ def track_data(filename, start_time, end_time):
 
 def map_figure(ds_track, ds_session):
     if ds_track is None:
-        return Div(
+        file_input = FileInput(
+            name='input_gpx',
+            accept='.gpx',
+            title="Upload GPX track",
+            stylesheets=['''
+                input[type="file"] {
+                  opacity: 0;
+                  cursor: pointer;
+                  position: absolute;
+                  top: 0;
+                  left: 0;
+                }
+                label {
+                  border: 1px dashed #ccc;
+                  display: inline-block;
+                  padding: 6px 12px;
+                  font-size: 14px;
+                  color: #d0d0d0;
+                  cursor: pointer;
+                }
+                :host(.gpxbutton) {
+                  margin: auto;
+                }'''],
+            css_classes=['gpxbutton'])
+
+        def upload_gpx_data(attr, old, new):
+            print(file_input.value)
+
+        file_input.on_change('value', upload_gpx_data)
+
+        return layout(
             name='map',
             sizing_mode='stretch_width',
             height=677,
-            text="no track data for session")
+            styles={'background-color': '#15191c'},
+            children=[file_input])
+
     start_lon = ds_session.data['lon'][0]
     start_lat = ds_session.data['lat'][0]
 
