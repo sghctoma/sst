@@ -3,7 +3,8 @@ import numpy as np
 import xyzservices.providers as xyz
 
 from gpx_converter import Converter
-from bokeh.models import ColumnDataSource
+from bokeh.models import Circle, ColumnDataSource
+from bokeh.models.callbacks import CustomJS
 from bokeh.layouts import layout
 from bokeh.models.widgets.inputs import FileInput
 from bokeh.palettes import Spectral11
@@ -62,44 +63,51 @@ def track_data(filename, start_time, end_time):
     return ds_track, ds_session
 
 
-def map_figure(ds_track, ds_session):
-    if ds_track is None:
-        file_input = FileInput(
-            name='input_gpx',
-            accept='.gpx',
-            title="Upload GPX track",
-            stylesheets=['''
-                input[type="file"] {
-                  opacity: 0;
-                  cursor: pointer;
-                  position: absolute;
-                  top: 0;
-                  left: 0;
-                }
-                label {
-                  border: 1px dashed #ccc;
-                  display: inline-block;
-                  padding: 6px 12px;
-                  font-size: 14px;
-                  color: #d0d0d0;
-                  cursor: pointer;
-                }
-                :host(.gpxbutton) {
-                  margin: auto;
-                }'''],
-            css_classes=['gpxbutton'])
+def no_gpx_figure(full_access):
+    file_input = FileInput(
+        name='input_gpx',
+        accept='.gpx',
+        title="Upload GPX track" if full_access else "No GPX track for session",
+        disabled=not full_access,
+        stylesheets=['''
+            input[type="file"] {
+              opacity: 0 !important;
+              cursor: pointer;
+              position: absolute;
+              top: 0;
+              left: 0;
+            }
+            label {
+              border: 1px dashed #ccc;
+              display: inline-block;
+              padding: 6px 12px;
+              font-size: 14px;
+              color: #d0d0d0;
+              cursor: pointer;
+            }
+            :host(.gpxbutton) {
+              margin: auto;
+            }'''],
+        css_classes=['gpxbutton'])
 
-        def upload_gpx_data(attr, old, new):
-            print(file_input.value)
+    def upload_gpx_data(attr, old, new):
+        print(file_input.value)
 
+    if full_access:
         file_input.on_change('value', upload_gpx_data)
 
-        return layout(
-            name='map',
-            sizing_mode='stretch_width',
-            height=677,
-            styles={'background-color': '#15191c'},
-            children=[file_input])
+    return layout(
+        name='map',
+        sizing_mode='stretch_width',
+        height=677,
+        styles={'background-color': '#15191c'},
+        children=[file_input])
+
+
+def map_figure(gpx_file, start_time, end_time, full_access):
+    ds_track, ds_session = track_data(gpx_file, start_time, end_time)
+    if ds_track is None:
+        return no_gpx_figure(full_access), None
 
     start_lon = ds_session.data['lon'][0]
     start_lat = ds_session.data['lat'][0]
@@ -130,4 +138,48 @@ def map_figure(ds_track, ds_session):
              color='#E74C3C', alpha=0.8, size=10)
     p.line(x='lon', y='lat', source=ds_session,
            color=Spectral11[10], alpha=0.8, width=5)
-    return p
+
+    pos_marker = Circle(
+        x=ds_session.data['lon'][0],
+        y=ds_session.data['lat'][0],
+        size=13,
+        line_color='black',
+        fill_color='gray')
+    p.add_glyph(pos_marker)
+
+    on_mousemove = CustomJS(
+        args=dict(map=p, dss=ds_session, pos=pos_marker),
+        code='''
+            let idx = Math.floor(cb_obj.x * 10);
+            if (idx < 0) {
+                idx = 0;
+            } else if (idx >= dss.data['lon'].length) {
+                idx = dss.data['lon'].length - 1;
+            }
+            let lon = dss.data['lon'][idx];
+            let lat = dss.data['lat'][idx];
+            pos.x = lon;
+            pos.y = lat;
+
+            if (lon - map.x_range.start < 10) {
+                let temp = map.x_range.start;
+                map.x_range.start = lon - 10;
+                map.x_range.end -= (temp - map.x_range.start);
+            }
+            if (map.x_range.end - lon < 10) {
+                let temp = map.x_range.end;
+                map.x_range.end = lon + 10;
+                map.x_range.start += (map.x_range.end - temp);
+            }
+            if (lat - map.y_range.start < 10) {
+                let temp = map.y_range.start;
+                map.y_range.start = lat - 10;
+                map.y_range.end -= (temp - map.y_range.start);
+            }
+            if (map.y_range.end - lat < 10) {
+                let temp = map.y_range.end;
+                map.y_range.end = lat + 10;
+                map.y_range.start += (map.y_range.end - temp);
+            }''')
+
+    return p, on_mousemove
