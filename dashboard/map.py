@@ -73,9 +73,11 @@ def no_gpx_figure(full_access):
             input[type="file"] {
               opacity: 0 !important;
               cursor: pointer;
-              position: absolute;
-              top: 0;
-              left: 0;
+              width: 140px;
+              height: 34px;
+              justify-self: center;
+              align-self: center;
+              grid-area: 1/1;
             }
             label {
               border: 1px dashed #ccc;
@@ -84,9 +86,14 @@ def no_gpx_figure(full_access):
               font-size: 14px;
               color: #d0d0d0;
               cursor: pointer;
+              width: 140px;
+              height: 34px;
+              justify-self: center;
+              align-self: center;
+              grid-area: 1/1;
             }
-            :host(.gpxbutton) {
-              margin: auto;
+            :host(.gpxbutton)>.bk-input-group {
+              display: grid;
             }'''],
         css_classes=['gpxbutton'])
 
@@ -98,8 +105,8 @@ def no_gpx_figure(full_access):
 
     return layout(
         name='map',
-        sizing_mode='stretch_width',
-        height=677,
+        sizing_mode='stretch_both',
+        min_height=340,
         styles={'background-color': '#15191c'},
         children=[file_input])
 
@@ -118,8 +125,8 @@ def map_figure(gpx_file, start_time, end_time, full_access):
         y_axis_type=None,
         x_range=[start_lon - 600, start_lon + 600],
         y_range=[start_lat - 600, start_lat + 600],
-        sizing_mode='stretch_width',
-        height=677,
+        sizing_mode='stretch_both',
+        min_height=340,
         match_aspect=True,
         tools='pan,wheel_zoom,reset',
         active_drag='pan',

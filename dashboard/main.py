@@ -564,8 +564,8 @@ if full_access:
     children.append(savebutton)
 description_box = column(
     name='description',
-    sizing_mode='stretch_width',
-    height=642,
+    sizing_mode='stretch_both',
+    min_height=275,
     children=[row(sizing_mode='stretch_width',
                   height=30,
                   margin=(0, 0, 0, 0),
