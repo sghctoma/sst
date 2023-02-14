@@ -586,7 +586,6 @@ ds_track, ds_session = track_data(
     start_time,
     end_time)
 map = map_figure(ds_track, ds_session)
-map.tags.append(start_time)
 
 pos_marker = Circle(
     x=ds_session.data['lon'][0],
@@ -599,12 +598,17 @@ map.add_glyph(pos_marker)
 on_mousemove = CustomJS(
     args=dict(map=map, dss=ds_session, pos=pos_marker),
     code='''
-        let start_time = map.tags[0];
-        let cursor_time = start_time + cb_obj.x * 1000;
-        let closest = dss.data['time'].reduce((p,c) =>
-            Math.abs(c[1] - cursor_time)<Math.abs(p[1] - cursor_time) ? c : p);
-        let lon = dss.data['lon'][closest[0]];
-        let lat = dss.data['lat'][closest[0]];
+        let idx = Math.floor(cb_obj.x * 10);
+        if (idx < 0) {
+            idx = 0;
+        } else if (idx >= dss.data['lon'].length) {
+            idx = dss.data['lon'].length - 1;
+        }
+        let lon = dss.data['lon'][idx];
+        let lat = dss.data['lat'][idx];
+        pos.x = lon;
+        pos.y = lat;
+
         if (lon - map.x_range.start < 10) {
             let temp = map.x_range.start;
             map.x_range.start = lon - 10;
@@ -624,10 +628,7 @@ on_mousemove = CustomJS(
             let temp = map.y_range.end;
             map.y_range.end = lat + 10;
             map.y_range.start += (map.y_range.end - temp);
-        }
-        pos.x = lon;
-        pos.y = lat;
-    ''')
+        }''')
 p_travel.js_on_event(MouseMove, on_mousemove)
 
 

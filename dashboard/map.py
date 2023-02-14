@@ -7,6 +7,7 @@ from bokeh.models import ColumnDataSource
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
+from scipy.interpolate import pchip_interpolate
 
 
 def geographic_to_mercator(x_lon, y_lat):
@@ -34,13 +35,27 @@ def track_data(filename, start_time, end_time):
     if len(session_indices[0]) == 0:
         return None, None
 
-    session_lon = np.array(track['lon'])[session_indices]
-    session_lat = np.array(track['lat'])[session_indices]
-    session_time = np.array(t)[session_indices]
-    session_data = dict(
-        time=list(zip(range(len(session_time)), session_time)),
-        lon=session_lon,
-        lat=session_lat)
+    start_idx = session_indices[0][0]
+    end_idx = session_indices[0][-1] + 1  # +1, so that the last is included
+    # Use previous location if first GPS data point is after start_time. This
+    # makes location estimates more realistic in case GPS tracking turns on
+    # after we started data acquisition (e.g. Garmin auto-start needs 10 km/h)
+    # to start tracking.
+    if t[start_idx] > start_time:
+        start_idx -= 1
+
+    session_lon = np.array(track['lon'][start_idx:end_idx])
+    session_lat = np.array(track['lat'][start_idx:end_idx])
+    session_time = np.array(t[start_idx:end_idx]) - start_time
+    session_time = [t.total_seconds() * 1000 for t in session_time]
+    session_time[0] = 0
+
+    tms = (end_time - start_time).total_seconds() * 1000
+    x = np.arange(0, tms + 100, 100)
+    yi = np.array([session_lon, session_lat])
+    y = pchip_interpolate(session_time, yi, x, axis=1)
+
+    session_data = dict(lon=y[0, :], lat=y[1, :])
     ds_session = ColumnDataSource(data=session_data)
 
     return ds_track, ds_session
