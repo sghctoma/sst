@@ -7,7 +7,7 @@ from bokeh.models.axes import LinearAxis
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
-from bokeh.models.tools import BoxSelectTool, WheelZoomTool
+from bokeh.models.tools import BoxSelectTool, CrosshairTool, WheelZoomTool
 from bokeh.plotting import figure
 
 from extremes import bottomouts
@@ -117,6 +117,10 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
+
+    ch = CrosshairTool(dimensions='height', line_color='#d0d0d0')
+    p.add_tools(ch)
+    p.toolbar.active_inspect = ch
 
     p.hover.mode = 'vline'
     p.hover.renderers = [line]
