@@ -148,7 +148,7 @@ def map_figure(gpx_file, start_time, end_time, full_access):
     p.add_glyph(pos_marker)
 
     on_mousemove = CustomJS(
-        args=dict(map=p, dss=ds_session, pos=pos_marker),
+        args=dict(dss=ds_session, pos=pos_marker),
         code='''
             let idx = Math.floor(cb_obj.x * 10);
             if (idx < 0) {
@@ -159,27 +159,6 @@ def map_figure(gpx_file, start_time, end_time, full_access):
             let lon = dss.data['lon'][idx];
             let lat = dss.data['lat'][idx];
             pos.x = lon;
-            pos.y = lat;
-
-            if (lon - map.x_range.start < 10) {
-                let temp = map.x_range.start;
-                map.x_range.start = lon - 10;
-                map.x_range.end -= (temp - map.x_range.start);
-            }
-            if (map.x_range.end - lon < 10) {
-                let temp = map.x_range.end;
-                map.x_range.end = lon + 10;
-                map.x_range.start += (map.x_range.end - temp);
-            }
-            if (lat - map.y_range.start < 10) {
-                let temp = map.y_range.start;
-                map.y_range.start = lat - 10;
-                map.y_range.end -= (temp - map.y_range.start);
-            }
-            if (map.y_range.end - lat < 10) {
-                let temp = map.y_range.end;
-                map.y_range.end = lat + 10;
-                map.y_range.start += (map.y_range.end - temp);
-            }''')
+            pos.y = lat;''')
 
     return p, on_mousemove
