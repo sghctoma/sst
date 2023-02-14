@@ -123,6 +123,8 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     p.toolbar.active_inspect = ch
 
     p.hover.mode = 'vline'
+    p.hover.line_policy = 'none'
+    p.hover.show_arrow = False
     p.hover.renderers = [line]
     p.legend.location = 'bottom_right'
     p.legend.click_policy = 'hide'
