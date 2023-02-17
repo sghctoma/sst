@@ -96,14 +96,14 @@ def velocity_figure(telemetry, lod, front_color, rear_color):
     return p
 
 
-def normal_distribution_data(velocity, step):
+def _normal_distribution_data(velocity, step):
     mu, std = norm.fit(velocity)
     ny = np.linspace(velocity.min(), velocity.max(), 100)
     pdf = norm.pdf(ny, mu, std) * step * 100
     return dict(pdf=pdf, ny=ny)
 
 
-def velocity_histogram_data(dt, dv, mask, step):
+def _velocity_histogram_data(dt, dv, mask, step):
     hist = np.zeros(((len(dt.Bins) - 1) // 2, len(dv.Bins) - 1))
     for i in range(len(dv.Data)):
         if mask[i]:
@@ -127,7 +127,7 @@ def velocity_histogram_data(dt, dv, mask, step):
 def update_velocity_histogram(p, dt, dv, velocity, mask):
     ds = p.select_one('ds_hist')
     step = dv.Bins[1] - dv.Bins[0]
-    sd, mx = velocity_histogram_data(dt, dv, mask, step)
+    sd, mx = _velocity_histogram_data(dt, dv, mask, step)
     ds.data = sd
     p.x_range.start = 0
     p.x_range.end = mx
@@ -135,7 +135,7 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
     p.y_range.end = HISTOGRAM_RANGE_LOW
 
     ds_normal = p.select_one('ds_normal')
-    ds_normal.data = normal_distribution_data(velocity[mask], step)
+    ds_normal.data = _normal_distribution_data(velocity[mask], step)
 
     update_velocity_stats(p, velocity[mask], mx)
 
@@ -143,7 +143,7 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
 def velocity_histogram_figure(
         dt, dv, velocity, mask, high_speed_threshold, title):
     step = dv.Bins[1] - dv.Bins[0]
-    sd, mx = velocity_histogram_data(dt, dv, mask, step)
+    sd, mx = _velocity_histogram_data(dt, dv, mask, step)
     source = ColumnDataSource(name='ds_hist', data=sd)
 
     p = figure(
@@ -168,7 +168,7 @@ def velocity_histogram_figure(
                  source=source)
 
     source_normal = ColumnDataSource(
-        name='ds_normal', data=normal_distribution_data(velocity[mask], step))
+        name='ds_normal', data=_normal_distribution_data(velocity[mask], step))
     p.line(x='pdf', y='ny', line_width=2, source=source_normal,
            line_dash='dashed', color=Spectral11[-2])
 
@@ -187,7 +187,7 @@ def velocity_histogram_figure(
         fill_color='#FFFFFF',
         fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    add_velocity_stat_labels(velocity[mask], mx, p)
+    _add_velocity_stat_labels(velocity[mask], mx, p)
 
     js_update_label_positions = CustomJS(args=dict(p=p), code='''
             let top = p.y_range.end;
@@ -207,8 +207,8 @@ def velocity_histogram_figure(
     return p
 
 
-def add_velocity_stat_labels(velocity, mx, p):
-    avgr, maxr, avgc, maxc = velocity_stats(velocity)
+def _add_velocity_stat_labels(velocity, mx, p):
+    avgr, maxr, avgc, maxc = _velocity_stats(velocity)
 
     s_avgr = Span(name='s_avgr', location=avgr, dimension='width',
                   line_color='gray', line_dash='dashed', line_width=2)
@@ -268,7 +268,7 @@ def add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_maxc)
 
 
-def velocity_stats(velocity):
+def _velocity_stats(velocity):
     avgr = np.average(velocity[velocity < 0])
     maxr = np.min(velocity[velocity < 0])
     avgc = np.average(velocity[velocity > 0])
@@ -277,7 +277,7 @@ def velocity_stats(velocity):
 
 
 def update_velocity_stats(p, velocity, mx):
-    avgr, maxr, avgc, maxc = velocity_stats(velocity)
+    avgr, maxr, avgc, maxc = _velocity_stats(velocity)
     top = p.y_range.end
     bottom = p.y_range.start
 
@@ -304,7 +304,7 @@ def update_velocity_stats(p, velocity, mx):
     l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
 
 
-def velocity_band_stats(velocity, high_speed_threshold):
+def _velocity_band_stats(velocity, high_speed_threshold):
     count = len(velocity)
     hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
     lsr = np.count_nonzero((velocity > -high_speed_threshold)
@@ -316,7 +316,7 @@ def velocity_band_stats(velocity, high_speed_threshold):
 
 
 def velocity_band_stats_figure(velocity, high_speed_threshold):
-    hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
+    hsr, lsr, lsc, hsc = _velocity_band_stats(velocity, high_speed_threshold)
     source = ColumnDataSource(name='ds_stats', data=dict(
         x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
@@ -367,7 +367,7 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
 
 def update_velocity_band_stats(p, velocity, high_speed_threshold):
     ds = p.select_one('ds_stats')
-    hsr, lsr, lsc, hsc = velocity_band_stats(velocity, high_speed_threshold)
+    hsr, lsr, lsc, hsc = _velocity_band_stats(velocity, high_speed_threshold)
     ds.data = dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
 
     l_hsr = p.select_one('l_hsr')

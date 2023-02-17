@@ -131,7 +131,7 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     return p
 
 
-def travel_histogram_data(digitized, mask):
+def _travel_histogram_data(digitized, mask):
     hist = np.zeros(len(digitized.Bins) - 1)
     for i in range(len(digitized.Data)):
         if mask[i]:
@@ -143,7 +143,7 @@ def travel_histogram_data(digitized, mask):
 def travel_histogram_figure(digitized, travel, mask, color, title):
     bins = digitized.Bins
     max_travel = bins[-1]
-    data = travel_histogram_data(digitized, mask)
+    data = _travel_histogram_data(digitized, mask)
     source = ColumnDataSource(name='ds_hist', data=data)
     p = figure(
         title=title,
@@ -161,11 +161,11 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0, right='right',
            source=source, line_width=2, color=color, fill_alpha=0.4)
 
-    add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
+    _add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
     return p
 
 
-def travel_stats(travel, max_travel):
+def _travel_stats(travel, max_travel):
     avg = np.average(travel)
     mx = np.max(travel)
     bo = bottomouts(travel, max_travel)
@@ -175,8 +175,8 @@ def travel_stats(travel, max_travel):
     return avg, mx, avg_text, mx_text
 
 
-def add_travel_stat_labels(travel, max_travel, hist_max, p):
-    avg, mx, avg_text, mx_text = travel_stats(travel, max_travel)
+def _add_travel_stat_labels(travel, max_travel, hist_max, p):
+    avg, mx, avg_text, mx_text = _travel_stats(travel, max_travel)
     s_avg = Span(name='s_avg', location=avg, dimension='width',
                  line_color='gray', line_dash='dashed', line_width=2)
     s_max = Span(name='s_max', location=mx, dimension='width',
@@ -201,11 +201,11 @@ def add_travel_stat_labels(travel, max_travel, hist_max, p):
 
 def update_travel_histogram(p, travel, max_travel, digitized, mask):
     ds = p.select_one('ds_hist')
-    ds.data = travel_histogram_data(digitized, mask)
+    ds.data = _travel_histogram_data(digitized, mask)
 
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(ds.data['right'])
 
-    avg, mx, avg_text, mx_text = travel_stats(travel[mask], max_travel)
+    avg, mx, avg_text, mx_text = _travel_stats(travel[mask], max_travel)
     l_avg = p.select_one('l_avg')
     l_avg.text = avg_text
     l_avg.x = p.x_range.end

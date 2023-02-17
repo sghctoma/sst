@@ -31,7 +31,7 @@ def strokes(velocity, travel=None, threshold=5):
     return compressions, rebounds
 
 
-def travel_velocity(travel, travel_max, velocity):
+def _travel_velocity(travel, travel_max, velocity):
     compressions, rebounds = strokes(velocity, travel, travel_max * 0.025)
     ct, cv, rt, rv = [], [], [], []
     for c in compressions:
@@ -51,11 +51,11 @@ def travel_velocity(travel, travel_max, velocity):
     return ct[cp], cv[cp], rt[rp], rv[rp]
 
 
-def balance_data(front_travel, front_max, front_velocity,
-                 rear_travel, rear_max, rear_velocity):
-    fct, fcv, frt, frv = travel_velocity(
+def _balance_data(front_travel, front_max, front_velocity,
+                  rear_travel, rear_max, rear_velocity):
+    fct, fcv, frt, frv = _travel_velocity(
         front_travel, front_max, front_velocity)
-    rct, rcv, rrt, rrv = travel_velocity(rear_travel, rear_max, rear_velocity)
+    rct, rcv, rrt, rrv = _travel_velocity(rear_travel, rear_max, rear_velocity)
     fcp = np.poly1d(np.polyfit(fct, fcv, 1))
     frp = np.poly1d(np.polyfit(frt, frv, 1))
     rcp = np.poly1d(np.polyfit(rct, rcv, 1))
@@ -75,7 +75,7 @@ def update_balance(pc, pr, front_travel, front_max,
     ds_rc = pc.select_one('ds_rc')
     ds_fr = pr.select_one('ds_fr')
     ds_rr = pr.select_one('ds_rr')
-    ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = balance_data(
+    ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = _balance_data(
         front_travel, front_max, front_velocity,
         rear_travel, rear_max, rear_velocity)
     pc.x_range = Range1d(0, np.fmax(
@@ -86,7 +86,7 @@ def update_balance(pc, pr, front_travel, front_max,
 
 def balance_figures(front_travel, front_max, front_velocity, front_color,
                     rear_travel, rear_max, rear_velocity, rear_color):
-    fc, rc, fr, rr = balance_data(
+    fc, rc, fr, rr = _balance_data(
         front_travel, front_max, front_velocity,
         rear_travel, rear_max, rear_velocity)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)

@@ -20,7 +20,7 @@ from scipy.interpolate import pchip_interpolate
 GPX_STORE = '../database/gpx'
 
 
-def geographic_to_mercator(x_lon, y_lat):
+def _geographic_to_mercator(x_lon, y_lat):
     if abs(x_lon) > 180 or abs(y_lat) >= 90:
         return None
 
@@ -31,7 +31,7 @@ def geographic_to_mercator(x_lon, y_lat):
     return x_m, y_m
 
 
-def track_timeframe(gpx_file):
+def _track_timeframe(gpx_file):
     track = None
     try:
         track = Converter(input_file=gpx_file).gpx_to_dictionary(
@@ -60,7 +60,7 @@ def track_data(gpx_file, start_time, end_time):
         return None, None
 
     for i in range(len(full_track['time'])):
-        full_track['lon'][i], full_track['lat'][i] = geographic_to_mercator(
+        full_track['lon'][i], full_track['lat'][i] = _geographic_to_mercator(
             full_track['lon'][i], full_track['lat'][i])
     t = np.array(full_track.pop('time', None))  # we don't need time in the ds
 
@@ -152,7 +152,7 @@ def _upload_button(con, id):
         gpx_path = os.path.join(GPX_STORE, gpx_file)
         with open(gpx_path, 'wb') as f:
             f.write(gpx_data)
-        ts, tf = track_timeframe(gpx_path)
+        ts, tf = _track_timeframe(gpx_path)
         cur = con.cursor()
         cur.execute('''
             UPDATE sessions

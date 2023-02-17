@@ -101,7 +101,7 @@ def session_list(sessions, full_access):
     return column(name='sessions', width=245, children=session_rows)
 
 
-def file_widgets():
+def _file_widgets():
     file_input = FileInput(name='input_sst', accept='.sst', multiple=True)
     ds = ColumnDataSource(name='ds_sst', data=dict(
         files=[], names=[], notes=[]))
@@ -132,7 +132,7 @@ def file_widgets():
     return file_input, file_table, ds
 
 
-def settings_widgets():
+def _settings_widgets():
     return row(sizing_mode='stretch_width', children=[
         column(
             Div(text="<b>&nbsp;</b>", width=130, height=31),
@@ -157,7 +157,7 @@ def settings_widgets():
             Spinner(placeholder="n/a", width=130))])
 
 
-def setups_widgets(cur):
+def _setups_widgets(cur):
     res = cur.execute('SELECT setup_id, name FROM setups')
     options = [(str(r[0]), r[1]) for r in res.fetchall()]
     return Select(
@@ -171,9 +171,9 @@ def session_dialog(cur, full_access):
         return column(name='dialog_session', children=[
                       Div(text="Ah-ah-ah, your didn't say the magic word!")])
 
-    files_input, files_table, files_ds = file_widgets()
-    settings_display = settings_widgets()
-    setup_select = setups_widgets(cur)
+    files_input, files_table, files_ds = _file_widgets()
+    settings_display = _settings_widgets()
+    setup_select = _setups_widgets(cur)
 
     add_button = Button(name='button_add', label="Add", button_type='success')
     add_button.js_on_change('label', CustomJS(args=dict(), code='''

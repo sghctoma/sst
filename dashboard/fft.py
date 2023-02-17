@@ -7,7 +7,7 @@ from bokeh.plotting import figure
 from scipy.fft import rfft, rfftfreq
 
 
-def fft_data(travel, tick):
+def _fft_data(travel, tick):
     balanced_travel = travel - np.mean(travel)
     n = np.max([20000, len(balanced_travel)])
     balanced_travel_f = rfft(balanced_travel, n=n)
@@ -24,7 +24,7 @@ def fft_data(travel, tick):
 
 
 def fft_figure(travel, tick, color, title):
-    source = ColumnDataSource(name='ds_fft', data=fft_data(travel, tick))
+    source = ColumnDataSource(name='ds_fft', data=_fft_data(travel, tick))
     p = figure(
         title=title,
         height=300,
@@ -48,6 +48,6 @@ def fft_figure(travel, tick, color, title):
 
 def update_fft(p, travel, tick):
     ds = p.select_one('ds_fft')
-    ds.data = fft_data(travel, tick)
+    ds.data = _fft_data(travel, tick)
     b = p.select_one('b_fft')
     b.glyph.width = 4.9 / len(ds.data['freqs'])
