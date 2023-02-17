@@ -27,7 +27,7 @@ from extremes import intervals_mask, filter_airtimes, filter_idlings
 from extremes import add_airtime_labels, add_idling_marks
 from fft import fft_figure, update_fft
 from leverage import leverage_ratio_figure, shock_wheel_figure
-from map import map_figure
+from map import track_data, map_figure_notrack, map_figure
 from psst import Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
@@ -52,8 +52,10 @@ try:
 except BaseException:
     pass
 
-res = cur.execute(
-    'SELECT session_id, name, description, timestamp FROM sessions ORDER BY timestamp DESC')
+res = cur.execute('''
+    SELECT session_id, name, description, timestamp
+    FROM sessions
+    ORDER BY timestamp DESC''')
 sessions = res.fetchall()
 
 if not sessions:
@@ -65,7 +67,10 @@ try:
 except BaseException:
     s = sessions[0][0]
 
-res = cur.execute('SELECT name,description,data FROM sessions WHERE session_id=?', (s,))
+res = cur.execute('''
+    SELECT name,description,data,gpx_file
+    FROM sessions
+    WHERE session_id=?''', (s,))
 session_data = res.fetchone()
 if not session_data:
     curdoc().add_root(Div(text=f"No session with ID '{s}'"))
@@ -73,6 +78,7 @@ if not session_data:
 
 session_name = session_data[0]
 description = session_data[1]
+gpx_file = session_data[3]
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
@@ -580,9 +586,11 @@ description_box = column(
 '''
 Map
 '''
-gpx_file = '/home/sghctoma/activity/activity_10404260237.gpx'
-map, on_mousemove = map_figure(gpx_file, start_time, end_time, full_access)
-if on_mousemove:
+full_track, session_track = track_data(gpx_file, start_time, end_time)
+if session_track is None:
+    map = map_figure_notrack(s, con, full_access)
+else:
+    map, on_mousemove = map_figure(full_track, session_track)
     p_travel.js_on_event(MouseMove, on_mousemove)
 
 '''

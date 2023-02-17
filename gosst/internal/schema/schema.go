@@ -39,4 +39,5 @@ var Sql = `
 		description TEXT,
 		timestamp INTEGER,
 		data BLOB,
+		gpx_file VARCHAR(64),
 		FOREIGN KEY (setup_id) REFERENCES setups (setup_id));`

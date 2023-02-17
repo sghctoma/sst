@@ -1,15 +1,23 @@
+import base64
 import math
 import numpy as np
+import os
 import xyzservices.providers as xyz
+
+from uuid import uuid4
 
 from gpx_converter import Converter
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
 from bokeh.layouts import layout
 from bokeh.models.widgets.inputs import FileInput
+from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
+
+
+GPX_STORE = '../database/gpx'
 
 
 def geographic_to_mercator(x_lon, y_lat):
@@ -23,15 +31,38 @@ def geographic_to_mercator(x_lon, y_lat):
     return x_m, y_m
 
 
-def track_data(filename, start_time, end_time):
-    track = Converter(input_file=filename).gpx_to_dictionary(
-        latitude_key='lat',
-        longitude_key='lon')
-    for i in range(len(track['time'])):
-        track['lon'][i], track['lat'][i] = geographic_to_mercator(
-            track['lon'][i], track['lat'][i])
-    t = np.array(track.pop('time', None))  # we don't need time in the ds
-    ds_track = ColumnDataSource(data=track)
+def track_timeframe(gpx_file):
+    track = None
+    try:
+        track = Converter(input_file=gpx_file).gpx_to_dictionary(
+            altitude_key=None,
+            latitude_key=None,
+            longitude_key=None)
+    except Exception as e:
+        print(e)
+        return None, None
+
+    return track['time'][0], track['time'][-1]
+
+
+def track_data(gpx_file, start_time, end_time):
+    if not gpx_file:
+        return None, None
+
+    gpx_path = os.path.join(GPX_STORE, gpx_file)
+    full_track = None
+    try:
+        full_track = Converter(input_file=gpx_path).gpx_to_dictionary(
+            latitude_key='lat',
+            longitude_key='lon')
+        full_track.pop('altitude')
+    except Exception:
+        return None, None
+
+    for i in range(len(full_track['time'])):
+        full_track['lon'][i], full_track['lat'][i] = geographic_to_mercator(
+            full_track['lon'][i], full_track['lat'][i])
+    t = np.array(full_track.pop('time', None))  # we don't need time in the ds
 
     session_indices = np.where(np.logical_and(t >= start_time, t <= end_time))
     if len(session_indices[0]) == 0:
@@ -46,8 +77,8 @@ def track_data(filename, start_time, end_time):
     if t[start_idx] > start_time:
         start_idx -= 1
 
-    session_lon = np.array(track['lon'][start_idx:end_idx])
-    session_lat = np.array(track['lat'][start_idx:end_idx])
+    session_lon = np.array(full_track['lon'][start_idx:end_idx])
+    session_lat = np.array(full_track['lat'][start_idx:end_idx])
     session_time = np.array(t[start_idx:end_idx]) - start_time
     session_time = [t.total_seconds() * 1000 for t in session_time]
     session_time[0] = 0
@@ -57,18 +88,37 @@ def track_data(filename, start_time, end_time):
     yi = np.array([session_lon, session_lat])
     y = pchip_interpolate(session_time, yi, x, axis=1)
 
-    session_data = dict(lon=y[0, :], lat=y[1, :])
-    ds_session = ColumnDataSource(data=session_data)
+    session_track = dict(lon=y[0, :], lat=y[1, :])
 
-    return ds_track, ds_session
+    return full_track, session_track
 
 
-def no_gpx_figure(full_access):
+def _notrack_label():
+    label = Div(
+        text="No GPX track for session",
+        stylesheets=['''
+            :host(.notracklabel)>.bk-clearfix {
+              border: 1px dashed #ccc;
+              padding: 6px 12px;
+              font-size: 14px;
+              color: #a0a0a0;
+              height: 34px;
+              justify-self: center;
+              align-self: center;
+              grid-area: 1/1;
+            }
+            :host(.notracklabel) {
+              display: grid;
+            }'''],
+        css_classes=['notracklabel'])
+    return label
+
+
+def _upload_button(con, id):
     file_input = FileInput(
         name='input_gpx',
         accept='.gpx',
-        title="Upload GPX track" if full_access else "No GPX track for session",
-        disabled=not full_access,
+        title="Upload GPX track",
         stylesheets=['''
             input[type="file"] {
               opacity: 0 !important;
@@ -81,7 +131,6 @@ def no_gpx_figure(full_access):
             }
             label {
               border: 1px dashed #ccc;
-              display: inline-block;
               padding: 6px 12px;
               font-size: 14px;
               color: #d0d0d0;
@@ -98,23 +147,50 @@ def no_gpx_figure(full_access):
         css_classes=['gpxbutton'])
 
     def upload_gpx_data(attr, old, new):
-        print(file_input.value)
+        gpx_data = base64.b64decode(file_input.value)
+        gpx_file = f'{uuid4()}.gpx'
+        gpx_path = os.path.join(GPX_STORE, gpx_file)
+        with open(gpx_path, 'wb') as f:
+            f.write(gpx_data)
+        ts, tf = track_timeframe(gpx_path)
+        cur = con.cursor()
+        cur.execute('''
+            UPDATE sessions
+            SET gpx_file=?
+            WHERE session_id
+            IN (
+                SELECT s2.session_id
+                FROM sessions s1
+                INNER JOIN sessions s2
+                ON s1.setup_id=s2.setup_id
+                WHERE s1.session_id=?
+                AND s2.timestamp>=?
+                AND s2.timestamp<=?
+            )''', (gpx_file, id, ts.timestamp(), tf.timestamp()))
+        con.commit()
+        cur.close()
 
+    file_input.on_change('value', upload_gpx_data)
+    return file_input
+
+
+def map_figure_notrack(session_id, con, full_access):
     if full_access:
-        file_input.on_change('value', upload_gpx_data)
+        content = _upload_button(con, session_id)
+    else:
+        content = _notrack_label()
 
     return layout(
         name='map',
         sizing_mode='stretch_both',
         min_height=340,
         styles={'background-color': '#15191c'},
-        children=[file_input])
+        children=[content])
 
 
-def map_figure(gpx_file, start_time, end_time, full_access):
-    ds_track, ds_session = track_data(gpx_file, start_time, end_time)
-    if ds_track is None:
-        return no_gpx_figure(full_access), None
+def map_figure(full_track, session_track):
+    ds_track = ColumnDataSource(data=full_track)
+    ds_session = ColumnDataSource(data=session_track)
 
     start_lon = ds_session.data['lon'][0]
     start_lat = ds_session.data['lat'][0]
