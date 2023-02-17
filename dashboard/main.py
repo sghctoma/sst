@@ -493,7 +493,6 @@ name_input = TextInput(
 
 desc_input = TextAreaInput(
     value=description,
-    rows=5,
     sizing_mode='stretch_both',
     margin=(0, 0, 0, 0),
     stylesheets=["""
@@ -502,11 +501,12 @@ desc_input = TextAreaInput(
             background-color: #20262B;
             font-size: 110%;
             padding: 12px;
+            min-height: 180px;
         }"""],
     styles={
         "padding": "5px",
         "padding-top": "0px",
-        "padding-bottom": "53px",
+        "padding-bottom": "28px",
         "width": "100%",
         "height": "100%",
         "background-color": "#15191C",

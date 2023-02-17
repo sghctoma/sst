@@ -4,6 +4,7 @@
   left: 0px;
   display: grid;
   grid-template-rows: 40px 1fr;
+  gap: 2px;
   width: 100%;
 }
 
