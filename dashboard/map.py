@@ -205,6 +205,7 @@ def map_figure(full_track, session_track):
         min_height=340,
         match_aspect=True,
         tools='pan,wheel_zoom,reset',
+        toolbar_location='above',
         active_drag='pan',
         active_scroll='wheel_zoom',
         output_backend='webgl')
