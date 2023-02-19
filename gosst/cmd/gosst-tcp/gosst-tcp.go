@@ -8,10 +8,10 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"regexp"
 
 	"github.com/blockloop/scan"
+	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
@@ -136,9 +136,19 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 }
 
 func main() {
+	var opts struct {
+		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
+		Host         string `short:"h" long:"host" description:"Host to bind on" default:"0.0.0.0"`
+		Port         string `short:"p" long:"port" description:"Port to bind on" default:"557"`
+	}
+	_, err := flags.Parse(&opts)
+	if err != nil {
+		return
+	}
+
 	var h codec.MsgpackHandle
 
-	db, err := sql.Open("sqlite", os.Args[1])
+	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
 		log.Fatal("[ERR] could not open database")
 	}
@@ -146,7 +156,7 @@ func main() {
 		log.Fatal("[ERR] could not create data tables")
 	}
 
-	l, err := net.Listen("tcp", ":557")
+	l, err := net.Listen("tcp", opts.Host+":"+opts.Port)
 	if err != nil {
 		log.Fatal("[ERR]", err.Error())
 	}

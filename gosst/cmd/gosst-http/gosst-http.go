@@ -6,12 +6,12 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/blockloop/scan"
 	"github.com/gin-gonic/gin"
+	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
 	_ "modernc.org/sqlite"
@@ -557,7 +557,17 @@ func (this *RequestHandler) PatchSession(c *gin.Context) {
 }
 
 func main() {
-	db, err := sql.Open("sqlite", os.Args[1])
+	var opts struct {
+		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
+		Host         string `short:"h" long:"host" description:"Host to bind on" default:"127.0.0.1"`
+		Port         string `short:"p" long:"port" description:"Port to bind on" default:"8080"`
+	}
+	_, err := flags.Parse(&opts)
+	if err != nil {
+		return
+	}
+
+	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
 		log.Fatal("could not open database")
 	}
@@ -594,5 +604,5 @@ func main() {
 	router.DELETE("/session/:id", (&RequestHandler{Db: db}).DeleteSession)
 	router.PATCH("/session/:id", (&RequestHandler{Db: db}).PatchSession)
 
-	router.Run("127.0.0.1:8080")
+	router.Run(opts.Host + ":" + opts.Port)
 }
