@@ -5,7 +5,6 @@ import os
 import xyzservices.providers as xyz
 
 from uuid import uuid4
-
 from gpx_converter import Converter
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
@@ -15,9 +14,6 @@ from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
-
-
-GPX_STORE = '../database/gpx'
 
 
 def _geographic_to_mercator(x_lon, y_lat):
@@ -49,10 +45,9 @@ def track_data(gpx_file, start_time, end_time):
     if not gpx_file:
         return None, None
 
-    gpx_path = os.path.join(GPX_STORE, gpx_file)
     full_track = None
     try:
-        full_track = Converter(input_file=gpx_path).gpx_to_dictionary(
+        full_track = Converter(input_file=gpx_file).gpx_to_dictionary(
             latitude_key='lat',
             longitude_key='lon')
         full_track.pop('altitude')
@@ -114,7 +109,7 @@ def _notrack_label():
     return label
 
 
-def _upload_button(con, id):
+def _upload_button(con, id, gpx_store):
     file_input = FileInput(
         name='input_gpx',
         accept='.gpx',
@@ -149,7 +144,7 @@ def _upload_button(con, id):
     def upload_gpx_data(attr, old, new):
         gpx_data = base64.b64decode(file_input.value)
         gpx_file = f'{uuid4()}.gpx'
-        gpx_path = os.path.join(GPX_STORE, gpx_file)
+        gpx_path = os.path.join(gpx_store, gpx_file)
         with open(gpx_path, 'wb') as f:
             f.write(gpx_data)
         ts, tf = _track_timeframe(gpx_path)
@@ -174,9 +169,9 @@ def _upload_button(con, id):
     return file_input
 
 
-def map_figure_notrack(session_id, con, full_access):
+def map_figure_notrack(session_id, con, full_access, gpx_store):
     if full_access:
-        content = _upload_button(con, session_id)
+        content = _upload_button(con, session_id, gpx_store)
     else:
         content = _notrack_label()
 

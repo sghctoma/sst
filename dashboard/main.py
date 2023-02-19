@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-import re
+import argparse
+import os
 import pytz
+import re
 import sqlite3
-import sys
 
 import msgpack
 import numpy as np
@@ -37,11 +38,25 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-DB_FILE = sys.argv[1]
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-d", "--datastore",
+    required=True,
+    help="Data directory path")
+parser.add_argument(
+    "-g", "--gosst_api",
+    required=False,
+    default="http://127.0.0.1:8080",
+    help="GoSST HTTP API address:port")
+cmd_args = parser.parse_args()
 
-args = curdoc().session_context.request.arguments
+gpx_dir = os.path.join(cmd_args.datastore, 'gpx')
+if not os.path.isdir(gpx_dir):
+    os.mkdir(gpx_dir)
 
-con = sqlite3.connect(DB_FILE)
+query_args = curdoc().session_context.request.arguments
+
+con = sqlite3.connect(os.path.join(cmd_args.datastore, 'gosst.db'))
 cur = con.cursor()
 
 full_access = False
@@ -63,7 +78,7 @@ if not sessions:
     raise Exception("Empty data directory")
 
 try:
-    s = int(args.get('session')[0].decode('utf-8'))
+    s = int(query_args.get('session')[0].decode('utf-8'))
 except BaseException:
     s = sessions[0][0]
 
@@ -78,7 +93,7 @@ if not session_data:
 
 session_name = session_data[0]
 description = session_data[1]
-gpx_file = session_data[3]
+gpx_file = os.path.join(gpx_dir, session_data[3])
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
@@ -152,13 +167,13 @@ setup_figure = Div(
 
 # lod - Level of Detail for travel graph (downsample ratio)
 try:
-    lod = int(args.get('lod')[0])
+    lod = int(query_args.get('lod')[0])
 except BaseException:
     lod = 5
 
 # hst - High Speed Threshold for velocity graphs/statistics in mm/s
 try:
-    hst = int(args.get('hst')[0])
+    hst = int(query_args.get('hst')[0])
 except BaseException:
     hst = 350
 
@@ -462,8 +477,8 @@ if telemetry.Front.Present and telemetry.Rear.Present:
 '''
 Sessions
 '''
-sessions_list = session_list(sessions, full_access)
-session_dialog = session_dialog(cur, full_access)
+sessions_list = session_list(sessions, full_access, cmd_args.gosst_api)
+session_dialog = session_dialog(cur, full_access, cmd_args.gosst_api)
 
 '''
 Description
@@ -524,7 +539,7 @@ def on_savebuttonclick():
     n = name_input.value_input if name_input.value_input else name_input.value
     d = desc_input.value_input if desc_input.value_input else desc_input.value
     r = requests.patch(
-        f'http://127.0.0.1:8080/session/{s}',
+        f'{cmd_args.gosst_api}/session/{s}',
         json={"name": n, "desc": d})
     if r.status_code == 204:
         savebutton.disabled = True
@@ -588,7 +603,7 @@ Map
 '''
 full_track, session_track = track_data(gpx_file, start_time, end_time)
 if session_track is None:
-    map = map_figure_notrack(s, con, full_access)
+    map = map_figure_notrack(s, con, full_access, gpx_dir)
 else:
     map, on_mousemove = map_figure(full_track, session_track)
     p_travel.js_on_event(MouseMove, on_mousemove)

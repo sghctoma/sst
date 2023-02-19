@@ -16,10 +16,10 @@ from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
-def session_list(sessions, full_access):
+def session_list(sessions, full_access, api):
 
     def deletesession(event, id):
-        r = requests.delete(f'http://127.0.0.1:8080/session/{id}')
+        r = requests.delete(f'{api}/session/{id}')
         to_remove = None
         if r.status_code == 204:
             rows = curdoc().select({'name': 'session', 'type': Row})
@@ -166,7 +166,7 @@ def _setups_widgets(cur):
         value=options[0][0])
 
 
-def session_dialog(cur, full_access):
+def session_dialog(cur, full_access, api):
     if not full_access:
         return column(name='dialog_session', children=[
                       Div(text="Ah-ah-ah, your didn't say the magic word!")])
@@ -208,7 +208,7 @@ def session_dialog(cur, full_access):
                 description=description,
                 setup=int(setup_select.value),
                 data=files_input.value[i])
-            r = requests.put('http://127.0.0.1:8080/session', json=session)
+            r = requests.put(f'{api}/session', json=session)
             if r.status_code == 201:
                 add_button.tags.append(r.json()['id'])
                 success += 1
