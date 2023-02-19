@@ -1,0 +1,11 @@
+:80 {
+	reverse_proxy {
+		to dashboard:5100
+		header_up Origin "http://localhost:5100"
+	}
+
+	log {
+		output file /data/caddy-access.log
+		format json
+	}
+}

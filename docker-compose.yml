@@ -1,0 +1,33 @@
+version: "3.7"
+services:
+  gosst-http:
+    build:
+      target: gosst-http
+      context: ./gosst
+    volumes:
+      - data:/data/
+  gosst-tcp:
+    build:
+      target: gosst-tcp
+      context: ./gosst
+    ports:
+      - "557:557"
+    volumes:
+      - data:/data/
+  dashboard:
+    build:
+      target: dashboard
+      context: ./dashboard
+    volumes:
+      - data:/data/
+  caddy:
+    image: caddy:2.6.4
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - data:/data/
+volumes:
+  data:
