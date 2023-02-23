@@ -8,9 +8,9 @@
 
 struct config config = {
     .ssid = "sst",
-    .psk = "changemeplease"
+    .psk = "changemeplease",
     .ntp_server = "pool.ntp.org",
-    .sst_server = "40.68.254.87",
+    .sst_server = "52.136.213.121",
     .sst_server_port = 557
 };
 
