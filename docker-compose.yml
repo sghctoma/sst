@@ -6,6 +6,7 @@ services:
       context: ./gosst
     volumes:
       - data:/data/
+    restart: unless-stopped
   gosst-tcp:
     build:
       target: gosst-tcp
@@ -14,15 +15,21 @@ services:
       - "557:557"
     volumes:
       - data:/data/
+    restart: unless-stopped
   dashboard:
     build:
       target: dashboard
       context: ./dashboard
     volumes:
       - data:/data/
+    restart: unless-stopped
+    depends_on:
+      - gosst-http
   caddy:
     image: caddy:2.6.4
     restart: unless-stopped
+    depends_on:
+      - dashboard
     ports:
       - "80:80"
       - "443:443"
