@@ -193,6 +193,29 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	var hasRear = records[0].ShockAngle != 0xffff
 	pd.Rear.Present = hasRear
 
+	// Rudimentary attempt to fix datasets where the sensor jumps to an unreasonably
+	// large number after a few tenth of seconds, but measures everything correctly
+	// from that baseline.
+	var frontError, rearError uint16
+	frontError = 0
+	rearError = 0
+	for _, r := range records {
+		if r.ForkAngle != 0 {
+			if r.ForkAngle > 0x0050 {
+				frontError = r.ForkAngle
+			}
+			break
+		}
+	}
+	for _, r := range records {
+		if r.ShockAngle != 0 {
+			if r.ShockAngle > 0x0050 {
+				rearError = r.ShockAngle
+			}
+			break
+		}
+	}
+
 	if hasFront {
 		pd.Front.Travel = make([]float64, len(records))
 	}
@@ -206,7 +229,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			// connection due to vibration), so we don't error out, just cap
 			// travel. Errors like these will be obvious on the graphs, and
 			// the affected regions can be filtered by hand.
-			x := angleToStroke(value.ForkAngle, pd.Front.Calibration)
+			x := angleToStroke(value.ForkAngle-frontError, pd.Front.Calibration)
 			x = math.Max(0, x)
 			x = math.Min(x, pd.Front.Calibration.MaxStroke)
 			pd.Front.Travel[index] = x
@@ -216,7 +239,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			//  a) inaccurately measured leverage ratio
 			//  b) inaccuracies introduced by polynomial fitting
 			// So we just cap it at calculated maximum.
-			x := p.At(angleToStroke(value.ShockAngle, pd.Rear.Calibration))
+			x := p.At(angleToStroke(value.ShockAngle-rearError, pd.Rear.Calibration))
 			x = math.Max(0, x)
 			x = math.Min(x, lnk.MaxRearTravel)
 			pd.Rear.Travel[index] = x
