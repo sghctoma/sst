@@ -4,7 +4,7 @@
 #include "pico/stdio.h"
 #include "lwip/ip_addr.h"
 
-#define READ_BUF_LEN 1024
+#define READ_BUF_LEN 1024*2
 #define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
                            // so length is always 10.
 #define SERVER_PORT 557
