@@ -24,7 +24,7 @@ def session_list(sessions, full_access, api):
         if r.status_code == 204:
             rows = curdoc().select({'name': 'session', 'type': Row})
             for r in rows:
-                if r.children[1].id == event._model_id:
+                if r.children[1].id == event.model.id:
                     to_remove = r
             sessions = curdoc().select_one({'name': 'sessions'})
             sessions.children.remove(to_remove)
