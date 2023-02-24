@@ -21,6 +21,7 @@
 #include "hardware/timer.h"
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
+#include "hardware/watchdog.h"
 #include "bsp/board.h"
 
 // For scb_hw so we can enable deep sleep
@@ -50,9 +51,21 @@ static void display_message(ssd1306_t *disp, char *message) {
     ssd1306_show(disp);
 }
 
+static void soft_reset() {
+      watchdog_enable(1, 1);
+      while(1);
+}
+
+static bool vbus_present() {
+    cyw43_arch_init();
+    bool ret = cyw43_arch_gpio_get(2);
+    cyw43_arch_deinit();
+    return ret;
+}
+
 static bool msc_present() {
     // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
-    if (cyw43_arch_gpio_get(2)) {
+    if (vbus_present) {
         // Wait for a maximum of 1 second for USB MSC to initialize
         uint32_t t = time_us_32();
         while (!tud_ready()) {
@@ -408,6 +421,9 @@ static void on_sync_data() {
 }
 
 static void on_idle() {
+    if (msc_present()) {
+        soft_reset();
+    }
     static char time_str[] = "00:00:00";
     static datetime_t t;
     static absolute_time_t timeout = 0;
@@ -468,6 +484,9 @@ static void on_waking() {
 }
 
 static void on_msc() {
+    if (!msc_present()) {
+        soft_reset();
+    }
     tud_task();
 }
 
@@ -554,10 +573,7 @@ int main() {
 
     setup_display(&disp);
 
-    gpio_init(5);
-    gpio_pull_up(5);
-    sleep_ms(10);
-    if (!gpio_get(5) && msc_present()) {
+    if (msc_present()) {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
