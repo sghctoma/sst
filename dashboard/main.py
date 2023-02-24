@@ -93,7 +93,10 @@ if not session_data:
 
 session_name = session_data[0]
 description = session_data[1]
-gpx_file = os.path.join(gpx_dir, session_data[3])
+if session_data[3]:
+    gpx_file = os.path.join(gpx_dir, session_data[3])
+else:
+    gpx_file = None
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
