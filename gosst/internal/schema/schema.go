@@ -32,6 +32,10 @@ var Sql = `
 		name TEXT NOT NULL,
 		raw_lr_data TEXT NOT NULL
 	);
+	CREATE TABLE IF NOT EXISTS tracks(
+		track_ID INTEGER PRIMARY KEY,
+		track TEXT NOT NULL
+	);
     CREATE TABLE IF NOT EXISTS sessions(
 		session_id INTEGER PRIMARY KEY,
 		name TEXT,
@@ -39,5 +43,7 @@ var Sql = `
 		description TEXT,
 		timestamp INTEGER,
 		data BLOB,
-		gpx_file VARCHAR(64),
-		FOREIGN KEY (setup_id) REFERENCES setups (setup_id));`
+		track_id INTEGER NOT NULL,
+		FOREIGN KEY (setup_id) REFERENCES setups (setup_id),
+		FOREIGN KEY (track_id) REFERENCES tracks (track_id)
+	);`

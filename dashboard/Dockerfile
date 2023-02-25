@@ -16,5 +16,5 @@ COPY ./templates ./templates/
 COPY ./static ./static/
 
 CMD ["bokeh", "serve", "--port", "5100", ".", "--args", \
-     "--datastore", "/data/", \
+     "--database", "/data/gosst.db", \
      "--gosst_api", "http://gosst-http:8080"]

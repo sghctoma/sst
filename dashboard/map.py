@@ -1,11 +1,12 @@
 import base64
+import io
+import json
 import math
 import numpy as np
-import os
+import gpxpy
+import gpxpy.gpx
 import xyzservices.providers as xyz
 
-from uuid import uuid4
-from gpx_converter import Converter
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
 from bokeh.layouts import layout
@@ -16,7 +17,7 @@ from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
 
 
-def _geographic_to_mercator(x_lon, y_lat):
+def _geographic_to_mercator(y_lat, x_lon):
     if abs(x_lon) > 180 or abs(y_lat) >= 90:
         return None
 
@@ -24,44 +25,29 @@ def _geographic_to_mercator(x_lon, y_lat):
     x_m = 6378137.0 * num
     a = y_lat * 0.017453292519943295
     y_m = 3189068.5 * math.log((1.0 + math.sin(a)) / (1.0 - math.sin(a)))
-    return x_m, y_m
+    return y_m, x_m
 
 
-def _track_timeframe(gpx_file):
-    track = None
-    try:
-        track = Converter(input_file=gpx_file).gpx_to_dictionary(
-            altitude_key=None,
-            latitude_key=None,
-            longitude_key=None)
-    except Exception as e:
-        print(e)
-        return None, None
+def _gpx_to_json(gpx_data):
+    gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
+    gpx_file = io.BytesIO(gpx_data)
+    gpx = gpxpy.parse(gpx_file)
+    for track in gpx.tracks:
+        for segment in track.segments:
+            for point in segment.points:
+                lat, lon = _geographic_to_mercator(point.latitude,
+                                                   point.longitude)
+                gpx_dict['lat'].append(lat)
+                gpx_dict['lon'].append(lon)
+                gpx_dict['ele'].append(point.elevation)
+                gpx_dict['time'].append(point.time.timestamp())
+    return gpx_dict
 
-    return track['time'][0], track['time'][-1]
 
-
-def track_data(gpx_file, start_time, end_time):
-    if not gpx_file:
-        return None, None
-
-    full_track = None
-    try:
-        full_track = Converter(input_file=gpx_file).gpx_to_dictionary(
-            latitude_key='lat',
-            longitude_key='lon')
-        full_track.pop('altitude')
-    except Exception:
-        return None, None
-
-    for i in range(len(full_track['time'])):
-        full_track['lon'][i], full_track['lat'][i] = _geographic_to_mercator(
-            full_track['lon'][i], full_track['lat'][i])
-    t = np.array(full_track.pop('time', None))  # we don't need time in the ds
-
-    session_indices = np.where(np.logical_and(t >= start_time, t <= end_time))
+def _session_track(start, end, t, track):
+    session_indices = np.where(np.logical_and(t >= start, t <= end))
     if len(session_indices[0]) == 0:
-        return None, None
+        return None
 
     start_idx = session_indices[0][0]
     end_idx = session_indices[0][-1] + 1  # +1, so that the last is included
@@ -69,21 +55,39 @@ def track_data(gpx_file, start_time, end_time):
     # makes location estimates more realistic in case GPS tracking turns on
     # after we started data acquisition (e.g. Garmin auto-start needs 10 km/h)
     # to start tracking.
-    if t[start_idx] > start_time:
+    if t[start_idx] > start:
         start_idx -= 1
 
-    session_lon = np.array(full_track['lon'][start_idx:end_idx])
-    session_lat = np.array(full_track['lat'][start_idx:end_idx])
-    session_time = np.array(t[start_idx:end_idx]) - start_time
-    session_time = [t.total_seconds() * 1000 for t in session_time]
+    session_lon = np.array(track['lon'][start_idx:end_idx])
+    session_lat = np.array(track['lat'][start_idx:end_idx])
+    session_time = np.array(t[start_idx:end_idx]) - start
+    session_time = [t * 10 for t in session_time]
     session_time[0] = 0
 
-    tms = (end_time - start_time).total_seconds() * 1000
-    x = np.arange(0, tms + 100, 100)
+    tms = (end - start) * 10
+    x = np.arange(0, tms + 1, 1)
     yi = np.array([session_lon, session_lat])
     y = pchip_interpolate(session_time, yi, x, axis=1)
 
-    session_track = dict(lon=y[0, :], lat=y[1, :])
+    return dict(lon=list(y[0, :]), lat=list(y[1, :]))
+
+
+def track_data(track_json, start_timestamp, end_timestamp):
+    if not track_json:
+        return None, None
+
+    full_track = json.loads(track_json)
+    # We don't yet use elevation data, so currently there is no need to include
+    # it in the datasource. It is just saved to the database for future use.
+    full_track.pop('ele', None)
+    # We also do not need to include time data in the datasource, but we need
+    # it for later calculations.
+    time = np.array(full_track.pop('time', None))
+
+    session_track = _session_track(start_timestamp,
+                                   end_timestamp,
+                                   time,
+                                   full_track)
 
     return full_track, session_track
 
@@ -109,7 +113,7 @@ def _notrack_label():
     return label
 
 
-def _upload_button(con, id, gpx_store):
+def _upload_button(con, id, map):
     file_input = FileInput(
         name='input_gpx',
         accept='.gpx',
@@ -143,15 +147,19 @@ def _upload_button(con, id, gpx_store):
 
     def upload_gpx_data(attr, old, new):
         gpx_data = base64.b64decode(file_input.value)
-        gpx_file = f'{uuid4()}.gpx'
-        gpx_path = os.path.join(gpx_store, gpx_file)
-        with open(gpx_path, 'wb') as f:
-            f.write(gpx_data)
-        ts, tf = _track_timeframe(gpx_path)
+        track_json = _gpx_to_json(gpx_data)
+        ts, tf = track_json['time'][0], track_json['time'][-1]
+
         cur = con.cursor()
+        cur.execute('INSERT INTO tracks (track) VALUES (?)',
+                    (json.dumps(track_json),))
+        res = cur.execute('SELECT last_insert_rowid()')
+        con.commit()
+        track_id = res.fetchone()[0]
+
         cur.execute('''
             UPDATE sessions
-            SET gpx_file=?
+            SET track_id=?
             WHERE session_id
             IN (
                 SELECT s2.session_id
@@ -161,17 +169,19 @@ def _upload_button(con, id, gpx_store):
                 WHERE s1.session_id=?
                 AND s2.timestamp>=?
                 AND s2.timestamp<=?
-            )''', (gpx_file, id, ts.timestamp(), tf.timestamp()))
+            )''', (track_id, id, ts, tf))
         con.commit()
         cur.close()
+
+        map.children = []  # TODO load the map
 
     file_input.on_change('value', upload_gpx_data)
     return file_input
 
 
-def map_figure_notrack(session_id, con, full_access, gpx_store):
-    if full_access:
-        content = _upload_button(con, session_id, gpx_store)
+def map_figure_notrack(session_id, con, map):
+    if con:
+        content = _upload_button(con, session_id, map)
     else:
         content = _notrack_label()
 

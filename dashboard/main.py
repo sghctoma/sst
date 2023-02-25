@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-import os
 import pytz
 import re
 import sqlite3
@@ -10,7 +9,7 @@ import msgpack
 import numpy as np
 import requests
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from bokeh.events import DoubleTap, MouseMove, SelectionGeometry
 from bokeh.io import curdoc
@@ -40,9 +39,9 @@ from velocity import update_velocity_band_stats, update_velocity_histogram
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-d", "--datastore",
+    "-d", "--database",
     required=True,
-    help="Data directory path")
+    help="SQLite database path")
 parser.add_argument(
     "-g", "--gosst_api",
     required=False,
@@ -50,13 +49,9 @@ parser.add_argument(
     help="GoSST HTTP API address:port")
 cmd_args = parser.parse_args()
 
-gpx_dir = os.path.join(cmd_args.datastore, 'gpx')
-if not os.path.isdir(gpx_dir):
-    os.mkdir(gpx_dir)
-
 query_args = curdoc().session_context.request.arguments
 
-con = sqlite3.connect(os.path.join(cmd_args.datastore, 'gosst.db'))
+con = sqlite3.connect(cmd_args.database)
 cur = con.cursor()
 
 full_access = False
@@ -83,8 +78,10 @@ except BaseException:
     s = sessions[0][0]
 
 res = cur.execute('''
-    SELECT name,description,data,gpx_file
+    SELECT name,description,data,track
     FROM sessions
+    LEFT JOIN tracks
+    ON sessions.track_id = tracks.track_id
     WHERE session_id=?''', (s,))
 session_data = res.fetchone()
 if not session_data:
@@ -93,10 +90,7 @@ if not session_data:
 
 session_name = session_data[0]
 description = session_data[1]
-if session_data[3]:
-    gpx_file = os.path.join(gpx_dir, session_data[3])
-else:
-    gpx_file = None
+track_json = session_data[3]
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
@@ -283,8 +277,8 @@ if (not (front_record_num == 0 or rear_record_num == 0) and
     raise Exception("Corrupt dataset")
 
 record_num = front_record_num if front_record_num else rear_record_num
-elapsed_time = timedelta(seconds=record_num*tick)
-start_time = datetime.fromtimestamp(telemetry.Timestamp, pytz.timezone('UTC'))
+elapsed_time = record_num * tick
+start_time = telemetry.Timestamp
 end_time = start_time + elapsed_time
 
 '''
@@ -604,12 +598,20 @@ description_box = column(
 '''
 Map
 '''
-full_track, session_track = track_data(gpx_file, start_time, end_time)
+full_track, session_track = track_data(track_json, start_time, end_time)
+map = column(
+    name='map',
+    sizing_mode='stretch_both',
+    min_height=340,
+    styles={'background-color': '#15191c'})
+
 if session_track is None:
-    map = map_figure_notrack(s, con, full_access, gpx_dir)
+    m = map_figure_notrack(s, con if full_access else None, map)
 else:
-    map, on_mousemove = map_figure(full_track, session_track)
+    m, on_mousemove = map_figure(full_track, session_track)
     p_travel.js_on_event(MouseMove, on_mousemove)
+
+map.children = [m]
 
 '''
 Disable tools for mobile browsers to allow scrolling
@@ -652,7 +654,8 @@ if telemetry.Front.Present:
 if telemetry.Rear.Present:
     suspension_count += 1
 
-utc_str = start_time.strftime('%Y.%m.%d %H:%M')
+utc_str = datetime.fromtimestamp(
+    start_time, pytz.UTC).strftime('%Y.%m.%d %H:%M')
 curdoc().theme = 'dark_minimal'
 curdoc().title = f"Sufni Suspension Telemetry Dashboard ({session_name})"
 curdoc().template_variables["suspension_count"] = suspension_count
