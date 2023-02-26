@@ -197,18 +197,21 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	// large number after a few tenth of seconds, but measures everything correctly
 	// from that baseline.
 	var frontError, rearError uint16
+	var frontBaseline, rearBaseline uint16
 	frontError = 0
-	rearError = 0
-	for _, r := range records {
-		if r.ForkAngle != 0 {
+	frontBaseline = records[0].ForkAngle
+	for _, r := range records[1:] {
+		if r.ForkAngle > frontBaseline {
 			if r.ForkAngle > 0x0050 {
 				frontError = r.ForkAngle
 			}
 			break
 		}
 	}
-	for _, r := range records {
-		if r.ShockAngle != 0 {
+	rearError = 0
+	rearBaseline = records[0].ShockAngle
+	for _, r := range records[1:] {
+		if r.ShockAngle > rearBaseline {
 			if r.ShockAngle > 0x0050 {
 				rearError = r.ShockAngle
 			}
