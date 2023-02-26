@@ -27,8 +27,10 @@ def fft_figure(travel, tick, color, title):
     source = ColumnDataSource(name='ds_fft', data=_fft_data(travel, tick))
     p = figure(
         title=title,
-        height=300,
-        sizing_mode='stretch_width',
+        min_height=150,
+        min_border_left=70,
+        min_border_right=50,
+        sizing_mode='stretch_both',
         toolbar_location='above',
         tools='xpan,reset',
         active_drag='xpan',
@@ -41,8 +43,10 @@ def fft_figure(travel, tick, color, title):
     p.add_tools(ht)
     p.yaxis.visible = False
     p.x_range = Range1d(0.05, 3.05, bounds=(0.05, 10.05))
+    bar_width = 4.9 / len(source.data['freqs'])
     p.vbar(name='b_fft', x='freqs', bottom=0, top='spectrum',
-           source=source, width=4.9 / len(source.data['freqs']), color=color)
+           source=source, width=bar_width, line_width=2,
+           color=color, fill_alpha=0.4)
     return p
 
 

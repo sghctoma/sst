@@ -147,8 +147,10 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     source = ColumnDataSource(name='ds_hist', data=data)
     p = figure(
         title=title,
-        height=300,
-        sizing_mode="stretch_width",
+        min_height=300,
+        min_border_left=70,
+        min_border_right=50,
+        sizing_mode="stretch_both",
         x_axis_label="Time (%)",
         y_axis_label='Travel (mm)',
         toolbar_location='above',
@@ -158,7 +160,7 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     p.x_range.start = 0
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])
     p.y_range.flipped = True
-    p.hbar(y='y', height=max_travel / (len(bins) - 1), left=0, right='right',
+    p.hbar(y='y', height=max_travel / (len(bins) - 1) - 2, left=0, right='right',
            source=source, line_width=2, color=color, fill_alpha=0.4)
 
     _add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
