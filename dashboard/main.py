@@ -606,7 +606,11 @@ map = column(
     styles={'background-color': '#15191c'})
 
 if session_track is None:
-    m = map_figure_notrack(s, con if full_access else None, map)
+    m = map_figure_notrack(
+        s,
+        con if full_access else None,
+        start_time, end_time,
+        map, p_travel)
 else:
     m, on_mousemove = map_figure(full_track, session_track)
     p_travel.js_on_event(MouseMove, on_mousemove)

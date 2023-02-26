@@ -7,6 +7,7 @@ import gpxpy
 import gpxpy.gpx
 import xyzservices.providers as xyz
 
+from bokeh.events import MouseMove
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
 from bokeh.layouts import layout
@@ -28,7 +29,7 @@ def _geographic_to_mercator(y_lat, x_lon):
     return y_m, x_m
 
 
-def _gpx_to_json(gpx_data):
+def _gpx_to_dict(gpx_data):
     gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
     gpx_file = io.BytesIO(gpx_data)
     gpx = gpxpy.parse(gpx_file)
@@ -72,21 +73,24 @@ def _session_track(start, end, t, track):
     return dict(lon=list(y[0, :]), lat=list(y[1, :]))
 
 
-def track_data(track_json, start_timestamp, end_timestamp):
-    if not track_json:
+def track_data(track, start_timestamp, end_timestamp):
+    if not track:
         return None, None
 
-    full_track = json.loads(track_json)
+    if type(track) is str:
+        full_track = json.loads(track)
+    else:
+        full_track = dict(track)  # Copy, so that we leage the original intact.
     # We don't yet use elevation data, so currently there is no need to include
     # it in the datasource. It is just saved to the database for future use.
     full_track.pop('ele', None)
     # We also do not need to include time data in the datasource, but we need
     # it for later calculations.
-    time = np.array(full_track.pop('time', None))
+    timestamps = np.array(full_track.pop('time', None))
 
     session_track = _session_track(start_timestamp,
                                    end_timestamp,
-                                   time,
+                                   timestamps,
                                    full_track)
 
     return full_track, session_track
@@ -113,7 +117,7 @@ def _notrack_label():
     return label
 
 
-def _upload_button(con, id, map):
+def _upload_button(con, id, start_time, end_time, map, travel):
     file_input = FileInput(
         name='input_gpx',
         accept='.gpx',
@@ -145,14 +149,31 @@ def _upload_button(con, id, map):
             }'''],
         css_classes=['gpxbutton'])
 
+    map.js_on_change('tags', CustomJS(args={}, code='''
+        if (cb_obj.tags[0] == 'track_not_applicable') {
+            cb_obj.tags = [];
+            alert("GPX does not contain data for session!");
+        }
+        '''))
+
     def upload_gpx_data(attr, old, new):
         gpx_data = base64.b64decode(file_input.value)
-        track_json = _gpx_to_json(gpx_data)
-        ts, tf = track_json['time'][0], track_json['time'][-1]
+        track_dict = _gpx_to_dict(gpx_data)
+        ts, tf = track_dict['time'][0], track_dict['time'][-1]
+
+        full_track, session_track = track_data(
+            track_dict, start_time, end_time)
+        if session_track is None:
+            map.tags = ['track_not_applicable']
+            return
+
+        m, on_mousemove = map_figure(full_track, session_track)
+        travel.js_on_event(MouseMove, on_mousemove)
+        map.children = [m]
 
         cur = con.cursor()
         cur.execute('INSERT INTO tracks (track) VALUES (?)',
-                    (json.dumps(track_json),))
+                    (json.dumps(track_dict),))
         res = cur.execute('SELECT last_insert_rowid()')
         con.commit()
         track_id = res.fetchone()[0]
@@ -173,15 +194,14 @@ def _upload_button(con, id, map):
         con.commit()
         cur.close()
 
-        map.children = []  # TODO load the map
-
     file_input.on_change('value', upload_gpx_data)
     return file_input
 
 
-def map_figure_notrack(session_id, con, map):
+def map_figure_notrack(session_id, con, start_time, end_time, map, travel):
     if con:
-        content = _upload_button(con, session_id, map)
+        content = _upload_button(
+            con, session_id, start_time, end_time, map, travel)
     else:
         content = _notrack_label()
 
