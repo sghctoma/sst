@@ -458,6 +458,12 @@ static void on_idle() {
         ssd1306_clear(&disp);
         ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
         ssd1306_draw_string(&disp,   0, 0, 2, time_str);
+        if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+        }
+        if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+            ssd1306_draw_string(&disp, 40, 24, 1, "shock");
+        }
         ssd1306_show(&disp);
     }
 }
