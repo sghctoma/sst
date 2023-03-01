@@ -16,6 +16,7 @@
 #include "pico/types.h"
 #include "pico/util/datetime.h"
 #include "hardware/clocks.h"
+#include "hardware/adc.h"
 #include "hardware/rtc.h"
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
@@ -56,28 +57,39 @@ static void soft_reset() {
       while(1);
 }
 
-static bool vbus_present() {
+static bool on_battery() {
     cyw43_arch_init();
-    bool ret = cyw43_arch_gpio_get(2);
+    bool ret = !cyw43_arch_gpio_get(2);
+    cyw43_arch_deinit();
+    return ret;
+}
+
+static float read_voltage() {
+    cyw43_arch_init();
+    sleep_ms(1); // NOTE ADC3 readings are way too high without this sleep.
+    adc_gpio_init(29);   // GPIO29 measures VSYS/3
+    adc_select_input(3); // GPIO29 is ADC #3
+    uint32_t vsys = 0;
+    for(int i = 0; i < 3; i++) {
+        vsys += adc_read();
+    }
+    cyw43_thread_exit();
+    const float conversion_factor = 3.3f / (1 << 12);
+    float ret = vsys * conversion_factor;
     cyw43_arch_deinit();
     return ret;
 }
 
 static bool msc_present() {
-    // WL_GPIO2 is VBUS sense. WL_GPIO2 low -> no USB cable -> no MSC.
-    if (vbus_present) {
-        // Wait for a maximum of 1 second for USB MSC to initialize
-        uint32_t t = time_us_32();
-        while (!tud_ready()) {
-            if (time_us_32() - t > 1000000) {
-                return false;
-            }
-            tud_task();
+    // Wait for a maximum of 1 second for USB MSC to initialize
+    uint32_t t = time_us_32();
+    while (!tud_ready()) {
+        if (time_us_32() - t > 1000000) {
+            return false;
         }
-        return true;
+        tud_task();
     }
-
-    return false;
+    return true;
 }
 
 static bool wifi_connect() {
@@ -421,17 +433,32 @@ static void on_sync_data() {
 }
 
 static void on_idle() {
-    if (msc_present()) {
+    // No MSC if there is no USB cable connected, so checking
+    // tud is not necessary.
+    bool battery = on_battery();
+    if (!battery && msc_present()) {
         soft_reset();
     }
-    static char time_str[] = "00:00:00";
-    static datetime_t t;
-    static absolute_time_t timeout = 0;
+
+    static absolute_time_t timeout = {0};
     if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
         timeout = make_timeout_time_ms(1000);
+
+        uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
+        static char battery_str[] = " PWR";
+        if (battery) {
+            snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
+        }
+
+        static char time_str[] = "00:00";
+        static datetime_t t;
         rtc_get_datetime(&t);
-        sprintf(time_str, "%02d:%02d:%02d", t.hour, t.min, t.sec);
-        display_message(&disp, time_str);
+        snprintf(time_str, sizeof(time_str), "%02d:%02d", t.hour, t.min);
+
+        ssd1306_clear(&disp);
+        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
+        ssd1306_draw_string(&disp,   0, 0, 2, time_str);
+        ssd1306_show(&disp);
     }
 }
 
@@ -559,6 +586,7 @@ int main() {
     board_init();
     tusb_init();
     rtc_init();
+    adc_init();
 
     datetime_t t = {
         .year  = 2022,

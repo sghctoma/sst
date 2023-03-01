@@ -25,4 +25,8 @@
 #define BUTTON_LEFT      5
 #define BUTTON_RIGHT     1
 
+#define BATTERY_MIN_V    3.3f
+#define BATTERY_MAX_V    4.2f
+#define BATTERY_RANGE    (BATTERY_MAX_V - BATTERY_MIN_V)
+
 #endif // _PIN_CONFIG_H

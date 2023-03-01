@@ -39,6 +39,7 @@ target_link_libraries(sufni-suspension-telemetry
     # XXX Using polling for now due to locking issues with
     #     pico_cyw43_arch_lwip_threadsafe_background 
     pico_cyw43_arch_lwip_poll
+    hardware_adc
     hardware_sleep
     tinyusb_board
     tinyusb_device
