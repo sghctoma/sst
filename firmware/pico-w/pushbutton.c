@@ -55,7 +55,7 @@ void create_button(uint gpio, void *user_data, void (*onpress)(void *), void (*o
                                                         // buttons are assumed to live forever.
     btn->gpio = gpio;
     btn->state = gpio_get(gpio); // should be true, since we pulled the GPIO up
-	btn->enabled = true;
+    btn->enabled = true;
     btn->alarm = -1;
     btn->user_data = user_data;
     btn->onpress = onpress;

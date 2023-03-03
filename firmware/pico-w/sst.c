@@ -274,16 +274,16 @@ static void data_storage_core1() {
 
 static void setup_i2c() {
     i2c_init(FORK_I2C, 1000000);
-    gpio_set_function(20, GPIO_FUNC_I2C);
-    gpio_set_function(21, GPIO_FUNC_I2C);
-    gpio_pull_up(20);
-    gpio_pull_up(21);
+    gpio_set_function(FORK_PIN_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(FORK_PIN_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(FORK_PIN_SDA);
+    gpio_pull_up(FORK_PIN_SCL);
 
     i2c_init(SHOCK_I2C, 1000000);
-    gpio_set_function(26, GPIO_FUNC_I2C);
-    gpio_set_function(27, GPIO_FUNC_I2C);
-    gpio_pull_up(26);
-    gpio_pull_up(27);
+    gpio_set_function(SHOCK_PIN_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(SHOCK_PIN_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(SHOCK_PIN_SDA);
+    gpio_pull_up(SHOCK_PIN_SCL);
 }
 
 static bool setup_baseline(i2c_inst_t *i2c) {

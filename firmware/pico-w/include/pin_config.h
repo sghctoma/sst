@@ -15,8 +15,8 @@
 #define DISPLAY_PIN_RST  11
 
 #define FORK_I2C         i2c0
-#define FORK_PIN_SDA     20
-#define FORK_PIN_SCL     21
+#define FORK_PIN_SDA     8
+#define FORK_PIN_SCL     9
 
 #define SHOCK_I2C        i2c1
 #define SHOCK_PIN_SDA    26
