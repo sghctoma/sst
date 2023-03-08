@@ -23,6 +23,7 @@
 #else
 #define DISPLAY_ADDRESS  0x3c
 #endif // SPI_DISPLAY
+#define DISPLAY_FLIPPED  1
 
 #define FORK_I2C         i2c0
 #define FORK_PIN_SDA     8

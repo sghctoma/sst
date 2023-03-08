@@ -337,6 +337,7 @@ static void setup_display(ssd1306_t *disp) {
         PIO_PIN_SCL);
 #endif // SPI_DISPLAY
             
+    ssd1306_flip(disp, DISPLAY_FLIPPED);
     ssd1306_clear(disp);
     ssd1306_show(disp);
 }
