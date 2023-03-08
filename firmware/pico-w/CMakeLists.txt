@@ -12,10 +12,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 pico_sdk_init()
 
-add_subdirectory(../lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
-add_subdirectory(../lib/pico-as5600 lib/pico-as5600)
-add_subdirectory(../lib/pico-ssd1306-spi lib/pico-ssd1306-spi)
-
 add_executable(sufni-suspension-telemetry
     sst.c
     pushbutton.c
@@ -28,9 +24,17 @@ add_executable(sufni-suspension-telemetry
     sst_usb_descriptors.c
 )
 
-target_include_directories(sufni-suspension-telemetry
-    PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/include/
+add_subdirectory(../lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(../lib/pico-as5600 lib/pico-as5600)
+add_subdirectory(../lib/pico-ssd1306 lib/pico-ssd1306)
+if(${DISP_PROTO} STREQUAL SPI)
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DSPI_DISPLAY
+    )
+endif()
+
+target_include_directories(sufni-suspension-telemetry PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include/
 )
 
 target_link_libraries(sufni-suspension-telemetry
@@ -47,7 +51,7 @@ target_link_libraries(sufni-suspension-telemetry
     hardware_rtc
     FatFs_SPI
     as5600
-    ssd1306_spi
+    ssd1306
 )
 
 pico_add_extra_outputs(sufni-suspension-telemetry)

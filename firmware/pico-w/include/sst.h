@@ -3,11 +3,11 @@
 
 #include "hw_config.h"
 #include "tusb.h"
-#include "ssd1306_spi.h"
 #include "as5600.h"
 #include "ntp.h"
 #include "tcpclient.h"
 #include "pushbutton.h"
+#include "ssd1306.h"
 
 enum state {
     IDLE,

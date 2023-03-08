@@ -7,12 +7,22 @@
 #define MICROSD_PIN_SCK  18
 #define MICROSD_PIN_CS   17
 
+#define DISPLAY_WIDTH    128
+#define DISPLAY_HEIGHT    64
+
+#define PIO_PIN_SDA  12
+#define PIO_PIN_SCL  (PIO_PIN_SDA + 1)
+
+#ifdef SPI_DISPLAY
 #define DISPLAY_SPI      spi1
 #define DISPLAY_PIN_MISO 12
 #define DISPLAY_PIN_MOSI 15
 #define DISPLAY_PIN_SCK  14
 #define DISPLAY_PIN_CS   13
 #define DISPLAY_PIN_RST  11
+#else
+#define DISPLAY_ADDRESS  0x3c
+#endif // SPI_DISPLAY
 
 #define FORK_I2C         i2c0
 #define FORK_PIN_SDA     8

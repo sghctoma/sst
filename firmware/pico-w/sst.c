@@ -321,15 +321,21 @@ static bool setup_sensors() {
 }
 
 static void setup_display(ssd1306_t *disp) {
+#ifdef SPI_DISPLAY
     spi_init(DISPLAY_SPI, 1000000);
     gpio_set_function(DISPLAY_PIN_SCK, GPIO_FUNC_SPI);  // SCK
     gpio_set_function(DISPLAY_PIN_MOSI, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 32, DISPLAY_SPI,
+    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_SPI,
         DISPLAY_PIN_CS,   // CS
         DISPLAY_PIN_MISO, // DC
         DISPLAY_PIN_RST); // RST
+#else
+    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, pio0, DISPLAY_ADDRESS,
+        PIO_PIN_SDA,
+        PIO_PIN_SCL);
+#endif // SPI_DISPLAY
             
     ssd1306_clear(disp);
     ssd1306_show(disp);
