@@ -37,8 +37,6 @@ socket, which SPI it is driven by, and how it is wired.
 
 #include "pin_config.h"
 
-void spi0_dma_isr();
-
 // Hardware Configuration of SPI "objects"
 // Note: multiple SD cards can be driven by one SPI if they use different slave
 // selects.
@@ -49,8 +47,6 @@ static spi_t spis[] = {  // One for each SPI.
         .mosi_gpio = MICROSD_PIN_MOSI,
         .sck_gpio  = MICROSD_PIN_SCK,
         .baud_rate = 25 * 1000 * 1000,
-
-        .dma_isr = spi0_dma_isr
     }
 };
 
@@ -64,11 +60,8 @@ static sd_card_t sd_cards[] = {  // One for each SD card
         //.card_detect_gpio = 22,   // Card detect
         //.card_detected_true = 1,  // What the GPIO read returns when a card is
                                   // present. Use -1 if there is no card detect.
-        .m_Status = STA_NOINIT
     }
 };
-
-void spi0_dma_isr() { spi_irq_handler(&spis[0]); }
 
 /* ********************************************************************** */
 size_t sd_get_num() { return count_of(sd_cards); }

@@ -73,8 +73,9 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
     (void) lun;
 
     if (sd == NULL) {
+        sd_init_driver();
         sd = sd_get_by_num(0);
-        sd_init_card(sd);
+        sd->init(sd);
     }
     *block_count = sd_sectors(sd);
     *block_size  = BLOCK_SIZE; 
@@ -91,8 +92,9 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, boo
     if ( load_eject ) {
         if (start) {
             if (sd == NULL) {
+                sd_init_driver();
                 sd = sd_get_by_num(0);
-                return sd_init_card(sd);
+                return sd->init(sd);
             } else {
                 return true;
             }
@@ -124,7 +126,7 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buff
     (void) offset; // ignored because CFG_TUD_MSC_EP_BUFSIZE == BLOCK_SIZE
 
     uint32_t block_count = bufsize / BLOCK_SIZE;
-    int status = sd_read_blocks(sd, buffer, lba, block_count);
+    int status = sd->read_blocks(sd, buffer, lba, block_count);
     if (status != SD_BLOCK_DEVICE_ERROR_NONE) {
         return status;
     }
@@ -133,7 +135,7 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buff
     uint32_t remainder = bufsize % BLOCK_SIZE;
     if (remainder != 0) {
         uint8_t block[BLOCK_SIZE];
-        status = sd_read_blocks(sd, block, lba + block_count, 1);
+        status = sd->read_blocks(sd, block, lba + block_count, 1);
         if (status != SD_BLOCK_DEVICE_ERROR_NONE) {
             return status;
         } else {
@@ -168,7 +170,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* 
     (void) offset; // ignored because CFG_TUD_MSC_EP_BUFSIZE == BLOCK_SIZE
 
     uint32_t block_count = bufsize / BLOCK_SIZE;
-    int status = sd_write_blocks(sd, buffer, lba, block_count);
+    int status = sd->write_blocks(sd, buffer, lba, block_count);
     if (status != SD_BLOCK_DEVICE_ERROR_NONE) {
         return status;
     }
