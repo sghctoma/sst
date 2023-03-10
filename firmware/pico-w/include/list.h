@@ -1,3 +1,6 @@
+#ifndef _LIST_H
+#define _LIST_H
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -16,3 +19,5 @@ struct list {
 struct list * list_create();
 void list_push(struct list *list, const char data[FILENAME_LENGTH]);
 void list_delete(struct list *list);
+
+#endif // _LIST_H
