@@ -454,7 +454,11 @@ static void on_idle() {
         uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
         static char battery_str[] = " PWR";
         if (battery) {
-            snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
+            if (voltage_percentage > 99) {
+                snprintf(battery_str, sizeof(battery_str), "FULL");
+            } else {
+                snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
+            }
         }
 
         static char time_str[] = "00:00";
