@@ -5,6 +5,7 @@
 #include "cyw43_country.h"
 #include "cyw43_ll.h"
 #include "device/usbd.h"
+#include "include/ds3231.h"
 #include "include/ntp.h"
 #include "lwip/dhcp.h"
 #include "pico/platform.h"
@@ -39,7 +40,8 @@ static uint32_t scb_orig;
 static uint32_t clock0_orig;
 static uint32_t clock1_orig;
 
-/*static*/ ssd1306_t disp;
+static ssd1306_t disp;
+static struct ds3231 rtc;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
 
@@ -327,14 +329,16 @@ static void setup_display(ssd1306_t *disp) {
     gpio_set_function(DISPLAY_PIN_MOSI, GPIO_FUNC_SPI); // MOSI
 
     disp->external_vcc = false;
-    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_SPI,
+    ssd1306_proto_t p = {
+        DISPLAY_SPI,
         DISPLAY_PIN_CS,   // CS
         DISPLAY_PIN_MISO, // DC
-        DISPLAY_PIN_RST); // RST
+        DISPLAY_PIN_RST   // RST
+    };
+    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, p);
 #else
-    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, pio0, DISPLAY_ADDRESS,
-        PIO_PIN_SDA,
-        PIO_PIN_SCL);
+    ssd1306_proto_t p = {DISPLAY_ADDRESS, I2C_PIO, I2C_SM, pio_i2c_write_blocking};
+    ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, p);
 #endif // SPI_DISPLAY
             
     ssd1306_flip(disp, DISPLAY_FLIPPED);
@@ -489,6 +493,10 @@ static void on_sync_time() {
         if (!sync_rtc_to_ntp()) {
             display_message(&disp, "NTP ERR");
             sleep_ms(1000);
+        } else {
+            datetime_t dt;
+            rtc_get_datetime(&dt);
+            ds3231_set_datetime(&rtc, &dt);
         }
     }
     wifi_disconnect();
@@ -605,16 +613,15 @@ int main() {
     rtc_init();
     adc_init();
 
-    datetime_t t = {
-        .year  = 2022,
-        .month = 11,
-        .day   = 03,
-        .dotw  = 4,
-        .hour  = 13,
-        .min   = 37,
-        .sec   = 00
-    };
-    rtc_set_datetime(&t);
+    uint offset = pio_add_program(I2C_PIO, &i2c_program);
+    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SCL);
+
+    datetime_t dt;
+    ds3231_init(&rtc, I2C_PIO, I2C_SM,
+                pio_i2c_write_blocking,
+                pio_i2c_read_blocking);
+    ds3231_get_datetime(&rtc, &dt);
+    rtc_set_datetime(&dt);
 
     setup_display(&disp);
 
