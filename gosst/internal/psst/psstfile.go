@@ -13,17 +13,21 @@ import (
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
 	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/stat"
 )
 
 const (
-	VELOCITY_ZERO_THRESHOLD    = 0.02  // (mm/s) maximum velocity to be considered as zero
-	IDLING_DURATION_THRESHOLD  = 0.10  // (s) minimum duration to consider stroke an idle period
-	AIRTIME_DURATION_THRESHOLD = 0.20  // (s) minimum duration to consider stroke an airtime
-	AIRTIME_VELOCITY_THRESHOLD = 500   // (mm/s) minimum velocity after stroke to consider it an airtime
-	STROKE_TRAVEL_THRESHOLD    = 5     // (mm) minimum travel to consider stroke a compression/rebound
-	TRAVEL_HIST_BINS           = 20    // number of travel histogram bins
-	VELOCITY_HIST_TRAVEL_BINS  = 10    // number of travel histogram bins for velocity histogram
-	VELOCITY_HIST_STEP         = 100.0 // (mm/s) step between velocity histogram bins
+	VELOCITY_ZERO_THRESHOLD             = 0.02  // (mm/s) maximum velocity to be considered as zero
+	IDLING_DURATION_THRESHOLD           = 0.10  // (s) minimum duration to consider stroke an idle period
+	AIRTIME_TRAVEL_THRESHOLD            = 3     // (mm) maximum travel to consider stroke an airtime
+	AIRTIME_DURATION_THRESHOLD          = 0.20  // (s) minimum duration to consider stroke an airtime
+	AIRTIME_VELOCITY_THRESHOLD          = 500   // (mm/s) minimum velocity after stroke to consider it an airtime
+	AIRTIME_OVERLAP_THRESHOLD           = 0.5   // f&r airtime candidates must overlap at least this amount to be an airtime
+	AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO = 0.04  // stroke f&r mean travel must be below max*this to be an airtime
+	STROKE_LENGTH_THRESHOLD             = 5     // (mm) minimum length to consider stroke a compression/rebound
+	TRAVEL_HIST_BINS                    = 20    // number of travel histogram bins
+	VELOCITY_HIST_TRAVEL_BINS           = 10    // number of travel histogram bins for velocity histogram
+	VELOCITY_HIST_STEP                  = 100.0 // (mm/s) step between velocity histogram bins
 )
 
 type Calibration struct {
@@ -78,6 +82,7 @@ type stroke struct {
 	VelocityHist [][VELOCITY_HIST_TRAVEL_BINS]float32
 	length       float64
 	duration     float64
+	airCandidate bool
 	posMin       float64
 	posMax       float64
 	velMin       float64
@@ -87,9 +92,13 @@ type stroke struct {
 type strokes struct {
 	Compressions []*stroke
 	Rebounds     []*stroke
-	Airtimes     []*stroke
-	Idlings      []*stroke
+	idlings      []*stroke
 	totalCount   int
+}
+
+type airtime struct {
+	Start float64
+	End   float64
 }
 
 type processed struct {
@@ -100,6 +109,7 @@ type processed struct {
 	Front      suspension
 	Rear       suspension
 	Linkage    Linkage
+	Airtimes   []*airtime
 }
 
 func NewCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *Calibration {
@@ -203,24 +213,29 @@ func (this *stroke) calculateHistograms(dt, dv []int, vbl int, totalCount int) {
 
 func (this *strokes) categorize(strokes []*stroke, travel []float64, maxTravel float64) {
 	for i, stroke := range strokes {
-		if stroke.posMax <= STROKE_TRAVEL_THRESHOLD &&
+		if math.Abs(stroke.length) < STROKE_LENGTH_THRESHOLD &&
 			stroke.duration >= IDLING_DURATION_THRESHOLD {
+
+			// If suitable, tag this idling stroke as possible airtime.
+			// Whether or not it really is one, will be decided with
+			// further heuristics based on both front and read
+			// candidates.
 			if i > 0 && i < len(strokes)-1 &&
+				stroke.posMax <= STROKE_LENGTH_THRESHOLD &&
 				stroke.duration >= AIRTIME_DURATION_THRESHOLD &&
 				strokes[i+1].velMax >= AIRTIME_VELOCITY_THRESHOLD {
 
-				this.Airtimes = append(this.Airtimes, stroke)
-			} else {
-				this.Idlings = append(this.Idlings, stroke)
+				stroke.airCandidate = true
 			}
-		} else if stroke.length >= STROKE_TRAVEL_THRESHOLD {
+			this.idlings = append(this.idlings, stroke)
+		} else if stroke.length >= STROKE_LENGTH_THRESHOLD {
 			stroke.Balance = balance{
 				Position: stroke.posMax / maxTravel * 100.0,
 				Velocity: stroke.velMax,
 			}
 			this.totalCount += (stroke.End - stroke.Start + 1)
 			this.Compressions = append(this.Compressions, stroke)
-		} else if stroke.length <= -STROKE_TRAVEL_THRESHOLD {
+		} else if stroke.length <= -STROKE_LENGTH_THRESHOLD {
 			stroke.Balance = balance{
 				Position: stroke.posMin / maxTravel * 100.0,
 				Velocity: stroke.velMin,
@@ -270,9 +285,9 @@ func filterStrokes(velocity, travel []float64, rate uint16) (strokes []*stroke) 
 		// mean position is close to zero.
 		d := float64(i-start_index+1) / float64(rate)
 		pm := floats.Max(travel[start_index : i+1])
-		if pm < STROKE_TRAVEL_THRESHOLD &&
+		if pm < STROKE_LENGTH_THRESHOLD &&
 			len(strokes) > 0 &&
-			strokes[len(strokes)-1].posMax < STROKE_TRAVEL_THRESHOLD {
+			strokes[len(strokes)-1].posMax < STROKE_LENGTH_THRESHOLD {
 
 			strokes[len(strokes)-1].End = i
 			strokes[len(strokes)-1].duration += d
@@ -292,6 +307,96 @@ func filterStrokes(velocity, travel []float64, rate uint16) (strokes []*stroke) 
 	}
 
 	return strokes
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func (this *stroke) overlaps(other *stroke) bool {
+	l := max(this.End-this.Start, other.End-other.Start)
+	s := max(this.Start, other.Start)
+	e := min(this.End, other.End)
+	return float32(e-s) >= AIRTIME_OVERLAP_THRESHOLD*float32(l)
+}
+
+func (this *processed) airtimes() {
+	if this.Front.Present && this.Rear.Present {
+		for _, f := range this.Front.Strokes.idlings {
+			if f.airCandidate {
+				for _, r := range this.Rear.Strokes.idlings {
+					if r.airCandidate && f.overlaps(r) {
+						f.airCandidate = false
+						r.airCandidate = false
+
+						at := &airtime{
+							Start: float64(min(f.Start, r.Start)) / float64(this.SampleRate),
+							End:   float64(min(f.End, r.End)) / float64(this.SampleRate),
+						}
+						this.Airtimes = append(this.Airtimes, at)
+						break
+					}
+				}
+			}
+		}
+		maxMean := (this.Front.Calibration.MaxStroke + this.Linkage.MaxRearTravel) / 2.0
+		for _, f := range this.Front.Strokes.idlings {
+			if f.airCandidate {
+				fmean := stat.Mean(this.Front.Travel[f.Start:f.End+1], nil)
+				rmean := stat.Mean(this.Rear.Travel[f.Start:f.End+1], nil)
+				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
+					at := &airtime{
+						Start: float64(f.Start) / float64(this.SampleRate),
+						End:   float64(f.End) / float64(this.SampleRate),
+					}
+					this.Airtimes = append(this.Airtimes, at)
+				}
+			}
+		}
+		for _, r := range this.Rear.Strokes.idlings {
+			if r.airCandidate {
+				fmean := stat.Mean(this.Front.Travel[r.Start:r.End+1], nil)
+				rmean := stat.Mean(this.Rear.Travel[r.Start:r.End+1], nil)
+				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
+					at := &airtime{
+						Start: float64(r.Start) / float64(this.SampleRate),
+						End:   float64(r.End) / float64(this.SampleRate),
+					}
+					this.Airtimes = append(this.Airtimes, at)
+				}
+			}
+		}
+	} else if this.Front.Present {
+		for _, f := range this.Front.Strokes.idlings {
+			if f.airCandidate {
+				at := &airtime{
+					Start: float64(f.Start) / float64(this.SampleRate),
+					End:   float64(f.End) / float64(this.SampleRate),
+				}
+				this.Airtimes = append(this.Airtimes, at)
+			}
+		}
+	} else if this.Rear.Present {
+		for _, r := range this.Rear.Strokes.idlings {
+			if r.airCandidate {
+				at := &airtime{
+					Start: float64(r.Start) / float64(this.SampleRate),
+					End:   float64(r.End) / float64(this.SampleRate),
+				}
+				this.Airtimes = append(this.Airtimes, at)
+			}
+		}
+	}
 }
 
 func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibration) *processed {
@@ -415,6 +520,8 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
 		pd.Rear.Strokes.histograms(dt, dv, len(vbins))
 	}
+
+	pd.airtimes()
 
 	return &pd
 }

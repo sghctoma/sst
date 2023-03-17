@@ -37,14 +37,16 @@ class Stroke:
 class Strokes:
     Compressions: list
     Rebounds: list
-    Airtimes: list
-    Idlings: list
 
     def __post_init__(self):
         self.Compressions = [dataclass_from_dict(Stroke, d) for d in self.Compressions]
         self.Rebounds = [dataclass_from_dict(Stroke, d) for d in self.Rebounds]
-        self.Airtimes = [dataclass_from_dict(Stroke, d) for d in self.Airtimes]
-        self.Idlings = [dataclass_from_dict(Stroke, d) for d in self.Idlings]
+
+
+@dataclass
+class Airtime:
+    Start: float
+    End: float
 
 
 @dataclass
@@ -65,6 +67,10 @@ class Telemetry:
     Front: Suspension
     Rear: Suspension
     Linkage: Linkage
+    Airtimes: list
+
+    def __post_init__(self):
+        self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]
 
 
 def dataclass_from_dict(klass, d):
