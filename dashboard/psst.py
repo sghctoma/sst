@@ -2,9 +2,9 @@ from dataclasses import dataclass, fields as datafields
 
 
 @dataclass
-class Digitized:
-    Data: list
-    Bins: list
+class Balance:
+    Position: float
+    Velocity: float
 
 
 @dataclass
@@ -25,13 +25,35 @@ class Calibration:
 
 
 @dataclass
+class Stroke:
+    Start: int
+    End: int
+    Balance: Balance
+    TravelHist: list
+    VelocityHist: list
+
+
+@dataclass
+class Strokes:
+    Compressions: list
+    Rebounds: list
+    Airtimes: list
+    Idlings: list
+
+    def __post_init__(self):
+        self.Compressions = [dataclass_from_dict(Stroke, d) for d in self.Compressions]
+        self.Rebounds = [dataclass_from_dict(Stroke, d) for d in self.Rebounds]
+        self.Airtimes = [dataclass_from_dict(Stroke, d) for d in self.Airtimes]
+        self.Idlings = [dataclass_from_dict(Stroke, d) for d in self.Idlings]
+
+
+@dataclass
 class Suspension:
     Present: bool
     Calibration: Calibration
     Travel: list
     Velocity: list
-    DigitizedTravel: Digitized
-    DigitizedVelocity: Digitized
+    Strokes: Strokes
 
 
 @dataclass
@@ -44,10 +66,9 @@ class Telemetry:
     Rear: Suspension
     Linkage: Linkage
 
-# source: https://stackoverflow.com/a/54769644
-
 
 def dataclass_from_dict(klass, d):
+    # source: https://stackoverflow.com/a/54769644
     try:
         fieldtypes = {f.name: f.type for f in datafields(klass)}
         return klass(
