@@ -15,6 +15,17 @@ import (
 	"gonum.org/v1/gonum/floats"
 )
 
+const (
+	VELOCITY_ZERO_THRESHOLD    = 0.02  // (mm/s) maximum velocity to be considered as zero
+	IDLING_DURATION_THRESHOLD  = 0.10  // (s) minimum duration to consider stroke an idle period
+	AIRTIME_DURATION_THRESHOLD = 0.20  // (s) minimum duration to consider stroke an airtime
+	AIRTIME_VELOCITY_THRESHOLD = 500   // (mm/s) minimum velocity after stroke to consider it an airtime
+	STROKE_TRAVEL_THRESHOLD    = 5     // (mm) minimum travel to consider stroke a compression/rebound
+	TRAVEL_HIST_BINS           = 20    // number of travel histogram bins
+	VELOCITY_HIST_TRAVEL_BINS  = 10    // number of travel histogram bins for velocity histogram
+	VELOCITY_HIST_STEP         = 100.0 // (mm/s) step between velocity histogram bins
+)
+
 type Calibration struct {
 	Id          int     `codec:"-" db:"calibration_id" json:"id"`
 	Name        string  `codec:"," db:"name"           json:"name"   binding:"required"`
@@ -33,18 +44,12 @@ type Linkage struct {
 	MaxRearTravel    float64      `codec:","                  json:"max_travel"`
 }
 
-type digitized struct {
-	Data []int
-	Bins []float64
-}
-
 type suspension struct {
-	Present           bool
-	Calibration       Calibration
-	Travel            []float64
-	Velocity          []float64
-	DigitizedTravel   digitized
-	DigitizedVelocity digitized
+	Present     bool
+	Calibration Calibration
+	Travel      []float64
+	Velocity    []float64
+	Strokes     strokes
 }
 
 type header struct {
@@ -58,6 +63,33 @@ type header struct {
 type record struct {
 	ForkAngle  uint16
 	ShockAngle uint16
+}
+
+type balance struct {
+	Position float64
+	Velocity float64
+}
+
+type stroke struct {
+	Start        int
+	End          int
+	Balance      balance
+	TravelHist   [TRAVEL_HIST_BINS]float32
+	VelocityHist [][VELOCITY_HIST_TRAVEL_BINS]float32
+	length       float64
+	duration     float64
+	posMin       float64
+	posMax       float64
+	velMin       float64
+	velMax       float64
+}
+
+type strokes struct {
+	Compressions []*stroke
+	Rebounds     []*stroke
+	Airtimes     []*stroke
+	Idlings      []*stroke
+	totalCount   int
 }
 
 type processed struct {
@@ -147,14 +179,119 @@ func digitize(data, bins []float64) []int {
 	return inds
 }
 
-func digitizeVelocity(v []float64, d *digitized) {
-	step := 100.0
+func digitizeVelocity(v []float64) (bins []float64, data []int) {
+	step := VELOCITY_HIST_STEP
 	mn := (math.Floor(floats.Min(v)/step) - 0.5) * step // Subtracting half bin ensures that 0 will be at the middle of one bin
 	mx := (math.Floor(floats.Max(v)/step) + 1.5) * step // Adding 1.5 bins ensures that all values will fit in bins, and that
 	// the last bin fits the step boundary.
-	bins := linspace(mn, mx, int((mx-mn)/step)+1)
-	d.Bins = bins
-	d.Data = digitize(v, bins)
+	bins = linspace(mn, mx, int((mx-mn)/step)+1)
+	data = digitize(v, bins)
+	return bins, data
+}
+
+func (this *stroke) calculateHistograms(dt, dv []int, vbl int, totalCount int) {
+	this.VelocityHist = make([][10]float32, vbl)
+	step := 1.0 / float32(totalCount) * 100.0
+	for i := this.Start; i <= this.End; i++ {
+		tbin := dt[i]
+		vbin := dv[i]
+		tbinv := dt[i] / (TRAVEL_HIST_BINS / VELOCITY_HIST_TRAVEL_BINS)
+		this.TravelHist[tbin] += step
+		this.VelocityHist[vbin][tbinv] += step
+	}
+}
+
+func (this *strokes) categorize(strokes []*stroke, travel []float64, maxTravel float64) {
+	for i, stroke := range strokes {
+		if stroke.posMax <= STROKE_TRAVEL_THRESHOLD &&
+			stroke.duration >= IDLING_DURATION_THRESHOLD {
+			if i > 0 && i < len(strokes)-1 &&
+				stroke.duration >= AIRTIME_DURATION_THRESHOLD &&
+				strokes[i+1].velMax >= AIRTIME_VELOCITY_THRESHOLD {
+
+				this.Airtimes = append(this.Airtimes, stroke)
+			} else {
+				this.Idlings = append(this.Idlings, stroke)
+			}
+		} else if stroke.length >= STROKE_TRAVEL_THRESHOLD {
+			stroke.Balance = balance{
+				Position: stroke.posMax / maxTravel * 100.0,
+				Velocity: stroke.velMax,
+			}
+			this.totalCount += (stroke.End - stroke.Start + 1)
+			this.Compressions = append(this.Compressions, stroke)
+		} else if stroke.length <= -STROKE_TRAVEL_THRESHOLD {
+			stroke.Balance = balance{
+				Position: stroke.posMin / maxTravel * 100.0,
+				Velocity: stroke.velMin,
+			}
+			this.totalCount += (stroke.End - stroke.Start + 1)
+			this.Rebounds = append(this.Rebounds, stroke)
+		}
+	}
+}
+
+func (this *strokes) histograms(dt, dv []int, vbl int) {
+	for _, s := range this.Compressions {
+		s.calculateHistograms(dt, dv, vbl, this.totalCount)
+	}
+	for _, s := range this.Rebounds {
+		s.calculateHistograms(dt, dv, vbl, this.totalCount)
+	}
+}
+
+func sign(v float64) int8 {
+	if math.Abs(v) <= VELOCITY_ZERO_THRESHOLD {
+		return 0
+	} else if math.Signbit(v) {
+		return -1
+	} else {
+		return 1
+	}
+}
+
+func filterStrokes(velocity, travel []float64, rate uint16) (strokes []*stroke) {
+	var start_index int
+	var start_sign int8
+	for i := 0; i < len(velocity)-1; i++ {
+		// Loop until velocity changes sign
+		start_index = i
+		start_sign = sign(velocity[i])
+		for ; i < len(velocity)-1 && sign(velocity[i+1]) == start_sign; i++ {
+		}
+
+		// We are at the end of the data stream
+		if i >= len(velocity) {
+			i = len(velocity) - 1
+		}
+
+		// Topout periods often oscillate a bit, so they are split to multiple
+		// strokes. We fix this by concatenating consecutive strokes if their
+		// mean position is close to zero.
+		d := float64(i-start_index+1) / float64(rate)
+		pm := floats.Max(travel[start_index : i+1])
+		if pm < STROKE_TRAVEL_THRESHOLD &&
+			len(strokes) > 0 &&
+			strokes[len(strokes)-1].posMax < STROKE_TRAVEL_THRESHOLD {
+
+			strokes[len(strokes)-1].End = i
+			strokes[len(strokes)-1].duration += d
+		} else {
+			s := &stroke{
+				Start:    start_index,
+				End:      i,
+				length:   travel[i] - travel[start_index],
+				duration: d,
+				posMin:   floats.Min(travel[start_index : i+1]),
+				posMax:   floats.Max(travel[start_index : i+1]),
+				velMin:   floats.Min(velocity[start_index : i+1]),
+				velMax:   floats.Max(velocity[start_index : i+1]),
+			}
+			strokes = append(strokes, s)
+		}
+	}
+
+	return strokes
 }
 
 func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibration) *processed {
@@ -249,31 +386,34 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 		}
 	}
 
-	if hasFront {
-		tb := linspace(0, pd.Front.Calibration.MaxStroke, 21)
-		pd.Front.DigitizedTravel.Bins = tb
-		pd.Front.DigitizedTravel.Data = digitize(pd.Front.Travel, tb)
-	}
-	if hasRear {
-		tb := linspace(0, pd.Linkage.MaxRearTravel, 21)
-		pd.Rear.DigitizedTravel.Bins = tb
-		pd.Rear.DigitizedTravel.Data = digitize(pd.Rear.Travel, tb)
-	}
-
 	t := make([]float64, len(records))
 	for i := range t {
 		t[i] = 1.0 / float64(pd.SampleRate) * float64(i)
 	}
 	filter, _ := savitzkygolay.NewFilter(51, 1, 3)
 	if hasFront {
-		vf, _ := filter.Process(pd.Front.Travel, t)
-		pd.Front.Velocity = vf
-		digitizeVelocity(vf, &pd.Front.DigitizedVelocity)
+		tbins := linspace(0, pd.Front.Calibration.MaxStroke, TRAVEL_HIST_BINS+1)
+		dt := digitize(pd.Front.Travel, tbins)
+
+		v, _ := filter.Process(pd.Front.Travel, t)
+		pd.Front.Velocity = v
+		vbins, dv := digitizeVelocity(v)
+
+		strokes := filterStrokes(v, pd.Rear.Travel, pd.SampleRate)
+		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Front.Calibration.MaxStroke)
+		pd.Front.Strokes.histograms(dt, dv, len(vbins))
 	}
 	if hasRear {
-		vr, _ := filter.Process(pd.Rear.Travel, t)
-		pd.Rear.Velocity = vr
-		digitizeVelocity(vr, &pd.Rear.DigitizedVelocity)
+		tbins := linspace(0, pd.Linkage.MaxRearTravel, TRAVEL_HIST_BINS+1)
+		dt := digitize(pd.Rear.Travel, tbins)
+
+		v, _ := filter.Process(pd.Rear.Travel, t)
+		pd.Rear.Velocity = v
+		vbins, dv := digitizeVelocity(v)
+
+		strokes := filterStrokes(v, pd.Rear.Travel, pd.SampleRate)
+		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
+		pd.Rear.Strokes.histograms(dt, dv, len(vbins))
 	}
 
 	return &pd
