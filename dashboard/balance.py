@@ -1,61 +1,31 @@
-from bokeh.models.ranges import Range1d
-from bokeh.models.tickers import FixedTicker
 import numpy as np
 
 from bokeh.models import ColumnDataSource
+from bokeh.models.ranges import Range1d
+from bokeh.models.tickers import FixedTicker
 from bokeh.plotting import figure
 
-
-def strokes(velocity, travel=None, threshold=5):
-    zero_crossings = np.where(np.diff(np.sign(velocity)))[0] + 1
-    if len(zero_crossings) == 0:
-        return [], []
-    zero_crossings = np.insert(zero_crossings, 0, 0)
-    zero_crossings = np.append(zero_crossings, len(velocity) - 1)
-    compressions, rebounds = [], []
-    for i in range(len(zero_crossings) - 1):
-        start = zero_crossings[i]
-        end = zero_crossings[i + 1]
-        if start == end:
-            continue
-        if velocity[start] > 0:
-            compressions.append((start, end))
-        if velocity[start] < 0:
-            rebounds.append((start, end))
-
-    if travel is not None:
-        compressions = [c for c in compressions if
-                        travel[c[1]] - travel[c[0]] >= threshold]
-        rebounds = [r for r in rebounds if
-                    travel[r[0]] - travel[r[1]] >= threshold]
-    return compressions, rebounds
+from psst import Strokes
 
 
-def _travel_velocity(travel, travel_max, velocity):
-    compressions, rebounds = strokes(velocity, travel, travel_max * 0.025)
-    ct, cv, rt, rv = [], [], [], []
-    for c in compressions:
-        v_max = np.max(velocity[c[0]:c[1]])
-        ct.append(travel[c[1]] / travel_max * 100)
-        cv.append(v_max)
-    for r in rebounds:
-        v_min = np.min(velocity[r[0]:r[1]])
-        rt.append(travel[r[0]] / travel_max * 100)
-        rv.append(v_min)
-    ct = np.array(ct)
-    cv = np.array(cv)
-    rt = np.array(rt)
-    rv = np.array(rv)
-    cp = ct.argsort()
-    rp = rt.argsort()
-    return ct[cp], cv[cp], rt[rp], rv[rp]
+def _balance_data(front_strokes: Strokes, rear_strokes: Strokes):
+    fct, fcv = [], []
+    for c in front_strokes.Compressions:
+        fct.append(c.Stat.MaxTravel)
+        fcv.append(c.Stat.MaxVelocity)
+    frt, frv = [], []
+    for r in front_strokes.Rebounds:
+        frt.append(r.Stat.MaxTravel)
+        frv.append(r.Stat.MaxVelocity)
+    rct, rcv = [], []
+    for c in front_strokes.Compressions:
+        rct.append(c.Stat.MaxTravel)
+        rcv.append(c.Stat.MaxVelocity)
+    rrt, rrv = [], []
+    for r in front_strokes.Rebounds:
+        rrt.append(r.Stat.MaxTravel)
+        rrv.append(r.Stat.MaxVelocity)
 
-
-def _balance_data(front_travel, front_max, front_velocity,
-                  rear_travel, rear_max, rear_velocity):
-    fct, fcv, frt, frv = _travel_velocity(
-        front_travel, front_max, front_velocity)
-    rct, rcv, rrt, rrv = _travel_velocity(rear_travel, rear_max, rear_velocity)
     fcp = np.poly1d(np.polyfit(fct, fcv, 1))
     frp = np.poly1d(np.polyfit(frt, frv, 1))
     rcp = np.poly1d(np.polyfit(rct, rcv, 1))
@@ -69,26 +39,23 @@ def _balance_data(front_travel, front_max, front_velocity,
     return fc, rc, fr, rr
 
 
-def update_balance(pc, pr, front_travel, front_max,
-                   front_velocity, rear_travel, rear_max, rear_velocity):
+def update_balance(pc: figure, pr: figure, front_strokes: Strokes,
+                   rear_strokes: Strokes):
     ds_fc = pc.select_one('ds_fc')
     ds_rc = pc.select_one('ds_rc')
     ds_fr = pr.select_one('ds_fr')
     ds_rr = pr.select_one('ds_rr')
     ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = _balance_data(
-        front_travel, front_max, front_velocity,
-        rear_travel, rear_max, rear_velocity)
+        front_strokes, rear_strokes)
     pc.x_range = Range1d(0, np.fmax(
         ds_fc.data['travel'][-1], ds_rc.data['travel'][-1]))
     pr.x_range = Range1d(0, np.fmax(
         ds_fr.data['travel'][-1], ds_rr.data['travel'][-1]))
 
 
-def balance_figures(front_travel, front_max, front_velocity, front_color,
-                    rear_travel, rear_max, rear_velocity, rear_color):
-    fc, rc, fr, rr = _balance_data(
-        front_travel, front_max, front_velocity,
-        rear_travel, rear_max, rear_velocity)
+def balance_figures(front_strokes: Strokes, rear_strokes: Strokes,
+                    front_color: tuple[str], rear_color: tuple[str]):
+    fc, rc, fr, rr = _balance_data(front_strokes, rear_strokes)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)
     rear_compression_source = ColumnDataSource(name='ds_rc', data=rc)
     front_rebound_source = ColumnDataSource(name='ds_fr', data=fr)

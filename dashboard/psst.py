@@ -2,16 +2,10 @@ from dataclasses import dataclass, fields as datafields
 
 
 @dataclass
-class Balance:
-    Position: float
-    Velocity: float
-
-
-@dataclass
 class Linkage:
     Name: str
-    LeverageRatio: list
-    ShockWheelCoeffs: list
+    LeverageRatio: list[float]
+    ShockWheelCoeffs: list[float]
     MaxRearTravel: float
 
 
@@ -25,18 +19,28 @@ class Calibration:
 
 
 @dataclass
+class StrokeStat:
+    SumTravel: float
+    MaxTravel: float
+    SumVelocity: float
+    MaxVelocity: float
+    Bottomouts: int
+    Count: int
+
+
+@dataclass
 class Stroke:
     Start: int
     End: int
-    Balance: Balance
-    TravelHist: list
-    VelocityHist: list
+    Stat: StrokeStat
+    DigitizedTravel: list[int]
+    DigitizedVelocity: list[int]
 
 
 @dataclass
 class Strokes:
-    Compressions: list
-    Rebounds: list
+    Compressions: list[Stroke]
+    Rebounds: list[Stroke]
 
     def __post_init__(self):
         self.Compressions = [dataclass_from_dict(Stroke, d) for d in self.Compressions]
@@ -53,9 +57,11 @@ class Airtime:
 class Suspension:
     Present: bool
     Calibration: Calibration
-    Travel: list
-    Velocity: list
+    Travel: list[float]
+    Velocity: list[float]
     Strokes: Strokes
+    TravelBins: list[float]
+    VelocityBins: list[float]
 
 
 @dataclass
@@ -67,7 +73,7 @@ class Telemetry:
     Front: Suspension
     Rear: Suspension
     Linkage: Linkage
-    Airtimes: list
+    Airtimes: list[Airtime]
 
     def __post_init__(self):
         self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]

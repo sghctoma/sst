@@ -8,15 +8,17 @@ from bokeh.models.callbacks import CustomJS
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.models.tools import BoxSelectTool, CrosshairTool, WheelZoomTool
+from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
-from extremes import bottomouts
+from psst import Airtime, Strokes, Telemetry
 
 
 HISTOGRAM_RANGE_MULTIPLIER = 1.3
 
 
-def travel_figure(telemetry, lod, front_color, rear_color):
+def travel_figure(telemetry: Telemetry, lod: int,
+                  front_color: tuple[str], rear_color: tuple[str]):
     length = len(telemetry.Front.Travel if telemetry.Front.Present else
                  telemetry.Rear.Travel)
     time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
@@ -95,11 +97,11 @@ def travel_figure(telemetry, lod, front_color, rear_color):
                 ru=right_unselected,
                 end=p.x_range.end),
             code='''
-        lu.right = 0;
-        ru.left = end;
-        lu.change.emit();
-        ru.change.emit();
-        '''))
+                 lu.right = 0;
+                 ru.left = end;
+                 lu.change.emit();
+                 ru.change.emit();
+                 '''))
     p.js_on_event(
         SelectionGeometry,
         CustomJS(
@@ -107,12 +109,12 @@ def travel_figure(telemetry, lod, front_color, rear_color):
                 lu=left_unselected,
                 ru=right_unselected),
             code='''
-        const geometry = cb_obj['geometry'];
-        lu.right = geometry['x0'];
-        ru.left = geometry['x1'];
-        lu.change.emit();
-        ru.change.emit();
-        '''))
+                 const geometry = cb_obj['geometry'];
+                 lu.right = geometry['x0'];
+                 ru.left = geometry['x1'];
+                 lu.change.emit();
+                 ru.change.emit();
+                 '''))
 
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
@@ -131,19 +133,21 @@ def travel_figure(telemetry, lod, front_color, rear_color):
     return p
 
 
-def _travel_histogram_data(digitized, mask):
-    hist = np.zeros(len(digitized.Bins) - 1)
-    for i in range(len(digitized.Data)):
-        if mask[i]:
-            hist[digitized.Data[i]] += 1
-    hist = hist / np.count_nonzero(mask) * 100
-    return dict(y=digitized.Bins[:-1], right=hist)
+def _travel_histogram_data(strokes: Strokes, bins: list[float]):
+    hist = np.zeros(len(bins) - 1)
+    total_count = 0
+    for s in strokes.Compressions + strokes.Rebounds:
+        total_count += s.End - s.Start + 1
+        for d in s.DigitizedTravel:
+            hist[d] += 1
+    hist = hist / total_count * 100.0
+    return dict(y=bins[:-1], right=hist)
 
 
-def travel_histogram_figure(digitized, travel, mask, color, title):
-    bins = digitized.Bins
+def travel_histogram_figure(strokes: Strokes, bins: list[float],
+                            color: tuple[str], title: str):
     max_travel = bins[-1]
-    data = _travel_histogram_data(digitized, mask)
+    data = _travel_histogram_data(strokes, bins)
     source = ColumnDataSource(name='ds_hist', data=data)
     p = figure(
         title=title,
@@ -160,25 +164,36 @@ def travel_histogram_figure(digitized, travel, mask, color, title):
     p.x_range.start = 0
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])
     p.y_range.flipped = True
-    p.hbar(y='y', height=max_travel / (len(bins) - 1) - 3, left=0, right='right',
-           source=source, line_width=2, color=color, fill_alpha=0.4)
+    p.hbar(y='y', height=max_travel / (len(bins) - 1) - 3,
+           left=0, right='right', source=source, line_width=2,
+           color=color, fill_alpha=0.4)
 
-    _add_travel_stat_labels(travel[mask], max_travel, p.x_range.end, p)
+    _add_travel_stat_labels(strokes, max_travel, p.x_range.end, p)
     return p
 
 
-def _travel_stats(travel, max_travel):
-    avg = np.average(travel)
-    mx = np.max(travel)
-    bo = bottomouts(travel, max_travel)
+def _travel_stats(strokes: Strokes, max_travel: float):
+    sum = 0
+    count = 0
+    mx = 0
+    bo = 0
+    for s in strokes.Compressions + strokes.Rebounds:
+        sum += s.Stat.SumTravel
+        count += s.Stat.Count
+        bo += s.Stat.Bottomouts
+        if s.Stat.MaxTravel > mx:
+            mx = s.Stat.MaxTravel
+    avg = sum / count
+
     avg_text = f"avg.: {avg:.2f} mm ({avg/max_travel*100:.1f}%)"
     mx_text = (f"max.: {mx:.2f} mm ({mx/max_travel*100:.1f}%) / "
-               f"{len(bo)} bottom outs")
+               f"{bo} bottom outs")
     return avg, mx, avg_text, mx_text
 
 
-def _add_travel_stat_labels(travel, max_travel, hist_max, p):
-    avg, mx, avg_text, mx_text = _travel_stats(travel, max_travel)
+def _add_travel_stat_labels(strokes: Strokes, max_travel: float,
+                            hist_max: float, p: figure):
+    avg, mx, avg_text, mx_text = _travel_stats(strokes, max_travel)
     s_avg = Span(name='s_avg', location=avg, dimension='width',
                  line_color='gray', line_dash='dashed', line_width=2)
     s_max = Span(name='s_max', location=mx, dimension='width',
@@ -201,13 +216,13 @@ def _add_travel_stat_labels(travel, max_travel, hist_max, p):
     p.add_layout(l_max)
 
 
-def update_travel_histogram(p, travel, max_travel, digitized, mask):
+def update_travel_histogram(p: figure, strokes: Strokes, bins: list[float]):
     ds = p.select_one('ds_hist')
-    ds.data = _travel_histogram_data(digitized, mask)
+    ds.data = _travel_histogram_data(strokes, bins)
 
     p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(ds.data['right'])
 
-    avg, mx, avg_text, mx_text = _travel_stats(travel[mask], max_travel)
+    avg, mx, avg_text, mx_text = _travel_stats(strokes, bins[-1])
     l_avg = p.select_one('l_avg')
     l_avg.text = avg_text
     l_avg.x = p.x_range.end
@@ -220,3 +235,21 @@ def update_travel_histogram(p, travel, max_travel, digitized, mask):
     s_avg.location = avg
     s_max = p.select_one('s_max')
     s_max.location = mx
+
+
+def add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
+    for airtime in airtimes:
+        b = BoxAnnotation(left=airtime.Start, right=airtime.End,
+                          fill_color=Spectral11[-2], fill_alpha=0.2)
+        p_travel.add_layout(b)
+        airtime_label = Label(
+            x=airtime.Start + (airtime.End - airtime.Start) / 2,
+            y=30,
+            x_units='data',
+            y_units='screen',
+            text_font_size='14px',
+            text_color='#fefefe',
+            text_align='center',
+            text_baseline='middle',
+            text=f"{airtime.End-airtime.Start:.2f}s air")
+        p_travel.add_layout(airtime_label)

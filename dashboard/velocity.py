@@ -13,13 +13,15 @@ from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
 
+from psst import Strokes, Telemetry
 
 HISTOGRAM_RANGE_MULTIPLIER = 1.5
 HISTOGRAM_RANGE_HIGH = 2000
 HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
 
 
-def velocity_figure(telemetry, lod, front_color, rear_color):
+def velocity_figure(telemetry: Telemetry, lod: int,
+                    front_color: tuple[str], rear_color: tuple[str]):
     length = len(telemetry.Front.Velocity if telemetry.Front.Present else
                  telemetry.Rear.Velocity)
     time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
@@ -71,20 +73,6 @@ def velocity_figure(telemetry, lod, front_color, rear_color):
         source=source)
     p.legend.level = 'overlay'
 
-    '''
-    left_unselected = BoxAnnotation(
-        left=p.x_range.start,
-        right=p.x_range.start,
-        fill_alpha=0.8,
-        fill_color='#000000')
-    right_unselected = BoxAnnotation(
-        left=p.x_range.end,
-        right=p.x_range.end,
-        fill_alpha=0.8,
-        fill_color='#000000')
-    p.add_layout(left_unselected)
-    p.add_layout(right_unselected)
-    '''
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
@@ -96,21 +84,30 @@ def velocity_figure(telemetry, lod, front_color, rear_color):
     return p
 
 
-def _normal_distribution_data(velocity, step):
-    mu, std = norm.fit(velocity)
-    ny = np.linspace(velocity.min(), velocity.max(), 100)
+def _normal_distribution_data(strokes: Strokes, velocity: list[float],
+                              step: float):
+    stroke_velocity = []
+    for s in strokes.Compressions + strokes.Rebounds:
+        stroke_velocity.extend(velocity[s.Start:s.End+1])
+    stroke_velocity = np.array(stroke_velocity)
+    mu, std = norm.fit(stroke_velocity)
+    ny = np.linspace(stroke_velocity.min(), stroke_velocity.max(), 100)
     pdf = norm.pdf(ny, mu, std) * step * 100
     return dict(pdf=pdf, ny=ny)
 
 
-def _velocity_histogram_data(dt, dv, mask, step):
-    hist = np.zeros(((len(dt.Bins) - 1) // 2, len(dv.Bins) - 1))
-    for i in range(len(dv.Data)):
-        if mask[i]:
-            vbin = dv.Data[i]
-            tbin = dt.Data[i] // 2
+def _velocity_histogram_data(strokes: Strokes, step: float,
+                             tbins: list[float], vbins: list[float]):
+    vtbins_length = 10  # XXX un-hardcode
+    hist = np.zeros((vtbins_length, len(vbins) - 1))
+    total_count = 0
+    for s in strokes.Compressions + strokes.Rebounds:
+        total_count += s.End - s.Start + 1
+        for i in range(len(s.DigitizedVelocity)):
+            vbin = s.DigitizedVelocity[i]
+            tbin = s.DigitizedTravel[i] // ((len(tbins) - 1) // vtbins_length)
             hist[tbin][vbin] += 1
-    hist = hist / np.count_nonzero(mask) * 100
+    hist = hist / total_count * 100.0
 
     thist = np.transpose(hist)
     largest_bin = 0
@@ -120,14 +117,16 @@ def _velocity_histogram_data(dt, dv, mask, step):
             largest_bin = sm
 
     sd = {str(k): v for k, v in enumerate(hist)}
-    sd['y'] = np.array(dv.Bins[:-1]) + step / 2
+    sd['y'] = np.array(vbins[:-1]) + step / 2
     return sd, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
 
 
-def update_velocity_histogram(p, dt, dv, velocity, mask):
+def update_velocity_histogram(p: figure, strokes: Strokes,
+                              velocity: list[float],
+                              tbins: list[float], vbins: list[float]):
     ds = p.select_one('ds_hist')
-    step = dv.Bins[1] - dv.Bins[0]
-    sd, mx = _velocity_histogram_data(dt, dv, mask, step)
+    step = vbins[1] - vbins[0]
+    sd, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
     ds.data = sd
     p.x_range.start = 0
     p.x_range.end = mx
@@ -135,15 +134,16 @@ def update_velocity_histogram(p, dt, dv, velocity, mask):
     p.y_range.end = HISTOGRAM_RANGE_LOW
 
     ds_normal = p.select_one('ds_normal')
-    ds_normal.data = _normal_distribution_data(velocity[mask], step)
+    ds_normal.data = _normal_distribution_data(strokes, velocity, step)
 
-    update_velocity_stats(p, velocity[mask], mx)
+    update_velocity_stats(p, strokes, mx)
 
 
-def velocity_histogram_figure(
-        dt, dv, velocity, mask, high_speed_threshold, title):
-    step = dv.Bins[1] - dv.Bins[0]
-    sd, mx = _velocity_histogram_data(dt, dv, mask, step)
+def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
+                              tbins: list[float], vbins: list[float],
+                              high_speed_threshold: int, title: str):
+    step = vbins[1] - vbins[0]
+    sd, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
     source = ColumnDataSource(name='ds_hist', data=sd)
 
     p = figure(
@@ -168,7 +168,8 @@ def velocity_histogram_figure(
                  source=source)
 
     source_normal = ColumnDataSource(
-        name='ds_normal', data=_normal_distribution_data(velocity[mask], step))
+        name='ds_normal',
+        data=_normal_distribution_data(strokes, velocity, step))
     p.line(x='pdf', y='ny', line_width=2, source=source_normal,
            line_dash='dashed', color=Spectral11[-2])
 
@@ -187,7 +188,7 @@ def velocity_histogram_figure(
         fill_color='#FFFFFF',
         fill_alpha=0.1)
     p.add_layout(lowspeed_box)
-    _add_velocity_stat_labels(velocity[mask], mx, p)
+    _add_velocity_stat_labels(p, strokes, mx)
 
     js_update_label_positions = CustomJS(args=dict(p=p), code='''
             let top = p.y_range.end;
@@ -207,8 +208,8 @@ def velocity_histogram_figure(
     return p
 
 
-def _add_velocity_stat_labels(velocity, mx, p):
-    avgr, maxr, avgc, maxc = _velocity_stats(velocity)
+def _add_velocity_stat_labels(p: figure, strokes: Strokes, mx):
+    avgr, maxr, avgc, maxc = _velocity_stats(strokes)
 
     s_avgr = Span(name='s_avgr', location=avgr, dimension='width',
                   line_color='gray', line_dash='dashed', line_width=2)
@@ -268,16 +269,31 @@ def _add_velocity_stat_labels(velocity, mx, p):
     p.add_layout(l_maxc)
 
 
-def _velocity_stats(velocity):
-    avgr = np.average(velocity[velocity < 0])
-    maxr = np.min(velocity[velocity < 0])
-    avgc = np.average(velocity[velocity > 0])
-    maxc = np.max(velocity[velocity > 0])
+def _velocity_stats(strokes: Strokes):
+    csum = 0
+    ccount = 0
+    maxc = 0
+    for c in strokes.Compressions:
+        csum += c.Stat.SumVelocity
+        ccount += c.Stat.Count
+        if c.Stat.MaxVelocity > maxc:
+            maxc = c.Stat.MaxVelocity
+    avgc = csum / ccount
+
+    rsum = 0
+    rcount = 0
+    maxr = 0
+    for r in strokes.Rebounds:
+        rsum += r.Stat.SumVelocity
+        rcount += r.Stat.Count
+        if r.Stat.MaxVelocity < maxr:
+            maxr = r.Stat.MaxVelocity
+    avgr = rsum / rcount
     return avgr, maxr, avgc, maxc
 
 
-def update_velocity_stats(p, velocity, mx):
-    avgr, maxr, avgc, maxc = _velocity_stats(velocity)
+def update_velocity_stats(p: figure, strokes: Strokes, mx: float):
+    avgr, maxr, avgc, maxc = _velocity_stats(strokes)
     top = p.y_range.end
     bottom = p.y_range.start
 
@@ -304,19 +320,36 @@ def update_velocity_stats(p, velocity, mx):
     l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
 
 
-def _velocity_band_stats(velocity, high_speed_threshold):
-    count = len(velocity)
-    hsr = np.count_nonzero(velocity < -high_speed_threshold) / count * 100
-    lsr = np.count_nonzero((velocity > -high_speed_threshold)
-                           & (velocity < 0)) / count * 100
-    lsc = np.count_nonzero((velocity > 0) & (
-        velocity < high_speed_threshold)) / count * 100
-    hsc = np.count_nonzero(velocity > high_speed_threshold) / count * 100
+def _velocity_band_stats(strokes: Strokes, velocity: list[float],
+                         high_speed_threshold: float):
+    velocity_ = np.array(velocity)
+    total_count = 0
+    lsc, hsc = 0, 0
+    for c in strokes.Compressions:
+        total_count += c.Stat.Count
+        lsc += np.count_nonzero(
+            velocity_[c.Start:c.End+1] < high_speed_threshold)
+        hsc += c.Stat.Count - lsc
+
+    lsr, hsr = 0, 0
+    for r in strokes.Rebounds:
+        total_count += c.Stat.Count
+        lsr += np.count_nonzero(
+            velocity_[r.Start:r.End+1] > -high_speed_threshold)
+        hsr += r.Stat.Count - lsr
+
+    lsc = lsc / total_count * 100.0
+    hsc = hsc / total_count * 100.0
+    lsr = lsr / total_count * 100.0
+    hsr = hsr / total_count * 100.0
+
     return hsr, lsr, lsc, hsc
 
 
-def velocity_band_stats_figure(velocity, high_speed_threshold):
-    hsr, lsr, lsc, hsc = _velocity_band_stats(velocity, high_speed_threshold)
+def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
+                               high_speed_threshold: float):
+    hsr, lsr, lsc, hsc = _velocity_band_stats(strokes, velocity,
+                                              high_speed_threshold)
     source = ColumnDataSource(name='ds_stats', data=dict(
         x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]))
     p = figure(
@@ -365,9 +398,12 @@ def velocity_band_stats_figure(velocity, high_speed_threshold):
     return p
 
 
-def update_velocity_band_stats(p, velocity, high_speed_threshold):
+def update_velocity_band_stats(p: figure, strokes: Strokes,
+                               velocity: list[float],
+                               high_speed_threshold: float):
     ds = p.select_one('ds_stats')
-    hsr, lsr, lsc, hsc = _velocity_band_stats(velocity, high_speed_threshold)
+    hsr, lsr, lsc, hsc = _velocity_band_stats(strokes, velocity,
+                                              high_speed_threshold)
     ds.data = dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
 
     l_hsr = p.select_one('l_hsr')

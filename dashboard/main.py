@@ -21,10 +21,8 @@ from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 
-from balance import balance_figures, update_balance, strokes
-from extremes import topouts, combined_topouts
-from extremes import intervals_mask, filter_airtimes, filter_idlings
-from extremes import add_airtime_labels, add_idling_marks
+from balance import balance_figures, update_balance
+from travel import add_airtime_labels
 from fft import fft_figure, update_fft
 from leverage import leverage_ratio_figure, shock_wheel_figure
 from map import track_data, map_figure_notrack, map_figure
@@ -174,107 +172,62 @@ try:
 except BaseException:
     hst = 350
 
-front_travel, rear_travel = [], []
-front_velocity, rear_velocity = [], []
-front_topouts, rear_topouts = [], []
-front_compressions, rear_compressions = [], []
-front_rebounds, rear_rebounds = [], []
 front_color, rear_color = Spectral11[1], Spectral11[2]
 front_record_num, rear_record_num, record_num = 0, 0, 0
 
 tick = 1.0 / telemetry.SampleRate  # time step length in seconds
 
-'''
-Topouts are intervals where suspension is at zero extension for an extended
-period of time. It allows us to filter out e.g. the beginning and the end of
-the ride, where the bike is at rest, or intervals where we stop mid-ride.
-Filtering these out is important, because they can skew travel and velocity
-statistics. They are handled individually for front and rear suspension.
-'''
 if telemetry.Front.Present:
-    front_travel = np.array(telemetry.Front.Travel)
-    front_record_num = len(front_travel)
-    front_velocity = np.array(telemetry.Front.Velocity)
-    front_topouts = topouts(
-        front_travel,
-        telemetry.Front.Calibration.MaxStroke,
-        telemetry.SampleRate)
-    front_topouts_mask = intervals_mask(front_topouts, front_record_num)
-
-    front_compressions, front_rebounds = strokes(
-        front_velocity, front_travel,
-        telemetry.Front.Calibration.MaxStroke * 0.025)
-    front_stroke_mask = intervals_mask(
-        np.array(front_compressions+front_rebounds),
-        front_record_num, False)
-
-    if np.count_nonzero(front_topouts_mask):
-        p_front_travel_hist = travel_histogram_figure(
-            telemetry.Front.DigitizedTravel,
-            front_travel,
-            front_topouts_mask,
-            front_color,
-            "Travel histogram (front)")
-        p_front_vel_hist = velocity_histogram_figure(
-            telemetry.Front.DigitizedTravel,
-            telemetry.Front.DigitizedVelocity,
-            front_velocity,
-            front_topouts_mask & front_stroke_mask,
-            hst,
-            "Speed histogram (front)")
-        p_front_vel_stats = velocity_band_stats_figure(
-            front_velocity[front_topouts_mask & front_stroke_mask], hst)
-        p_front_fft = fft_figure(
-            front_travel[front_topouts_mask],
-            tick,
-            front_color,
-            "Frequencies (front)")
-    else:
-        telemetry.Front.Present = False
+    front_record_num = sum([s.Stat.Count for s in
+                           telemetry.Front.Strokes.Compressions +
+                           telemetry.Front.Strokes.Rebounds])
+    p_front_travel_hist = travel_histogram_figure(
+        telemetry.Front.Strokes,
+        telemetry.Front.TravelBins,
+        front_color,
+        "Speed histogram (front)")
+    p_front_vel_hist = velocity_histogram_figure(
+        telemetry.Front.Strokes,
+        telemetry.Front.Velocity,
+        telemetry.Front.TravelBins,
+        telemetry.Front.VelocityBins,
+        hst,
+        "Speed histogram (front)")
+    p_front_vel_stats = velocity_band_stats_figure(
+        telemetry.Front.Strokes,
+        telemetry.Front.Velocity,
+        hst)
+    p_front_fft = fft_figure(
+        telemetry.Front.Travel, # XXX filter to strokes
+        tick,
+        front_color,
+        "Frequencies (front)")
 
 if telemetry.Rear.Present:
-    rear_travel = np.array(telemetry.Rear.Travel)
-    rear_record_num = len(rear_travel)
-    rear_velocity = np.array(telemetry.Rear.Velocity)
-    rear_topouts = topouts(
-        rear_travel, telemetry.Linkage.MaxRearTravel, telemetry.SampleRate)
-    rear_topouts_mask = intervals_mask(rear_topouts, rear_record_num)
-
-    rear_compressions, rear_rebounds = strokes(
-        rear_velocity, rear_travel,
-        telemetry.Linkage.MaxRearTravel * 0.025)
-    rear_stroke_mask = intervals_mask(
-        np.array(rear_compressions+rear_rebounds),
-        rear_record_num, False)
-
-    if np.count_nonzero(rear_topouts_mask):
-        p_rear_travel_hist = travel_histogram_figure(
-            telemetry.Rear.DigitizedTravel,
-            rear_travel,
-            rear_topouts_mask,
-            rear_color,
-            "Travel histogram (rear)")
-        p_rear_vel_hist = velocity_histogram_figure(
-            telemetry.Rear.DigitizedTravel,
-            telemetry.Rear.DigitizedVelocity,
-            rear_velocity,
-            rear_topouts_mask & rear_stroke_mask,
-            hst,
-            "Speed histogram (rear)")
-        p_rear_vel_stats = velocity_band_stats_figure(
-            rear_velocity[rear_topouts_mask & rear_stroke_mask], hst)
-        p_rear_fft = fft_figure(
-            rear_travel[rear_topouts_mask],
-            tick,
-            rear_color,
-            "Frequencies (rear)")
-    else:
-        telemetry.Rear.Present = False
-
-if (not (front_record_num == 0 or rear_record_num == 0) and
-   front_record_num != rear_record_num):
-    curdoc().add_root(Div(text="SST file is corrupt"))
-    raise Exception("Corrupt dataset")
+    rear_record_num = sum([s.Stat.Count for s in
+                           telemetry.Rear.Strokes.Compressions +
+                           telemetry.Rear.Strokes.Rebounds])
+    p_rear_travel_hist = travel_histogram_figure(
+        telemetry.Rear.Strokes,
+        telemetry.Rear.TravelBins,
+        rear_color,
+        "Travel histogram (rear)")
+    p_rear_vel_hist = velocity_histogram_figure(
+        telemetry.Rear.Strokes,
+        telemetry.Rear.Velocity,
+        telemetry.Rear.TravelBins,
+        telemetry.Rear.VelocityBins,
+        hst,
+        "Speed histogram (rear)")
+    p_rear_vel_stats = velocity_band_stats_figure(
+        telemetry.Rear.Strokes,
+        telemetry.Rear.Velocity,
+        hst)
+    p_rear_fft = fft_figure(
+        telemetry.Rear.Travel, # XXX filter to strokes
+        tick,
+        rear_color,
+        "Frequencies (rear)")
 
 record_num = front_record_num if front_record_num else rear_record_num
 elapsed_time = record_num * tick
@@ -289,6 +242,8 @@ cancelled with a double tap.
 
 
 def on_selectiongeometry(event):
+    pass  # XXX
+    '''
     start = int(event.geometry['x0'] * telemetry.SampleRate)
     end = int(event.geometry['x1'] * telemetry.SampleRate)
     mask = np.full(record_num, False)
@@ -346,9 +301,12 @@ def on_selectiongeometry(event):
             rear_travel[mask],
             telemetry.Linkage.MaxRearTravel,
             rear_velocity[mask])
+    '''
 
 
 def on_doubletap():
+    pass  # XXX
+    '''
     if telemetry.Front.Present:
         update_travel_histogram(
             p_front_travel_hist,
@@ -397,6 +355,7 @@ def on_doubletap():
             rear_travel,
             telemetry.Linkage.MaxRearTravel,
             rear_velocity)
+    '''
 
 
 p_travel = travel_figure(telemetry, lod, front_color, rear_color)
@@ -408,46 +367,8 @@ p_travel.x_range.js_link('end', p_velocity.x_range, 'end')
 p_velocity.x_range.js_link('start', p_travel.x_range, 'start')
 p_velocity.x_range.js_link('end', p_travel.x_range, 'end')
 
-'''
-We use both suspensions to find airtimes. Basically, everything is considered
-airtime if both suspensions are close to zero travel, and suspension velocity
-at the end of the interval reaches a threshold. A few remarks:
- - Originally, I used a velocity threshold at the beginning too of a candidate
-   interval, but there were a lot of alse negatives usually with drops.
- - We use the mean of front and rear travel to determine closeness to zero.
-   This is based on the empirical observation that sometimes one of the
-   suspensions (usually my fork) oscillates outside the set threshold during
-   airtime (usually during drops). I expect this to become a problem if anybody
-   else starts using this program, but could not come up with better heuristics
-   so far.
-'''
-comb_topouts = combined_topouts(
-    front_travel if telemetry.Front.Present else np.full(
-        record_num,
-        0),
-    telemetry.Front.Calibration.MaxStroke,
-    rear_travel if telemetry.Rear.Present else np.full(
-        record_num,
-        0),
-    telemetry.Linkage.MaxRearTravel,
-    telemetry.SampleRate)
-airtimes = filter_airtimes(
-    comb_topouts, front_velocity if telemetry.Front.Present else np.full(
-        record_num, 0), rear_velocity if telemetry.Rear.Present else np.full(
-        record_num, 0), telemetry.SampleRate)
-airtimes_mask = intervals_mask(np.array(airtimes), record_num, False)
-add_airtime_labels(airtimes, tick, p_travel)
+add_airtime_labels(p_travel, telemetry.Airtimes)
 
-'''
-Mask out intervals on the travel graph that are ignored in statistics.
-'''
-if telemetry.Front.Present:
-    front_idlings = filter_idlings(front_topouts, airtimes_mask)
-    add_idling_marks(front_idlings, tick, p_travel)
-
-if telemetry.Rear.Present:
-    rear_idlings = filter_idlings(rear_topouts, airtimes_mask)
-    add_idling_marks(rear_idlings, tick, p_travel)
 
 '''
 Leverage-related graphs. These are input data, not measured by this project.
@@ -462,13 +383,9 @@ Compression and rebound velocity balance
 '''
 if telemetry.Front.Present and telemetry.Rear.Present:
     p_balance_compression, p_balance_rebound = balance_figures(
-        front_travel,
-        telemetry.Front.Calibration.MaxStroke,
-        front_velocity,
+        telemetry.Front.Strokes,
+        telemetry.Rear.Strokes,
         front_color,
-        rear_travel,
-        telemetry.Linkage.MaxRearTravel,
-        rear_velocity,
         rear_color)
 
 '''

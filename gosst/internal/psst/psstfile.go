@@ -6,14 +6,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 
 	"github.com/SeanJxie/polygo"
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
 	"gonum.org/v1/gonum/floats"
-	"gonum.org/v1/gonum/stat"
 )
 
 const (
@@ -28,6 +26,7 @@ const (
 	TRAVEL_HIST_BINS                    = 20    // number of travel histogram bins
 	VELOCITY_HIST_TRAVEL_BINS           = 10    // number of travel histogram bins for velocity histogram
 	VELOCITY_HIST_STEP                  = 100.0 // (mm/s) step between velocity histogram bins
+	BOTTOMOUT_THRESHOLD                 = 3     // (mm) bottomouts are regions where travel > max_travel - this value
 )
 
 type Calibration struct {
@@ -49,11 +48,13 @@ type Linkage struct {
 }
 
 type suspension struct {
-	Present     bool
-	Calibration Calibration
-	Travel      []float64
-	Velocity    []float64
-	Strokes     strokes
+	Present      bool
+	Calibration  Calibration
+	Travel       []float64
+	Velocity     []float64
+	Strokes      strokes
+	TravelBins   []float64
+	VelocityBins []float64
 }
 
 type header struct {
@@ -67,38 +68,6 @@ type header struct {
 type record struct {
 	ForkAngle  uint16
 	ShockAngle uint16
-}
-
-type balance struct {
-	Position float64
-	Velocity float64
-}
-
-type stroke struct {
-	Start        int
-	End          int
-	Balance      balance
-	TravelHist   [TRAVEL_HIST_BINS]float32
-	VelocityHist [][VELOCITY_HIST_TRAVEL_BINS]float32
-	length       float64
-	duration     float64
-	airCandidate bool
-	posMin       float64
-	posMax       float64
-	velMin       float64
-	velMax       float64
-}
-
-type strokes struct {
-	Compressions []*stroke
-	Rebounds     []*stroke
-	idlings      []*stroke
-	totalCount   int
-}
-
-type airtime struct {
-	Start float64
-	End   float64
 }
 
 type processed struct {
@@ -172,231 +141,6 @@ func linspace(min, max float64, num int) []float64 {
 		bins[i] = min + step*float64(i)
 	}
 	return bins
-}
-
-func digitize(data, bins []float64) []int {
-	inds := make([]int, len(data))
-	for k, v := range data {
-		i := sort.SearchFloat64s(bins, v)
-		// If current value is not exactly a bin boundary, we subtract 1 to make
-		// the digitized slice indexed from 0 instead of 1. We do the same if a
-		// value would exceed existing bins.
-		if v >= bins[len(bins)-1] || v != bins[i] {
-			i -= 1
-		}
-		inds[k] = i
-	}
-	return inds
-}
-
-func digitizeVelocity(v []float64) (bins []float64, data []int) {
-	step := VELOCITY_HIST_STEP
-	mn := (math.Floor(floats.Min(v)/step) - 0.5) * step // Subtracting half bin ensures that 0 will be at the middle of one bin
-	mx := (math.Floor(floats.Max(v)/step) + 1.5) * step // Adding 1.5 bins ensures that all values will fit in bins, and that
-	// the last bin fits the step boundary.
-	bins = linspace(mn, mx, int((mx-mn)/step)+1)
-	data = digitize(v, bins)
-	return bins, data
-}
-
-func (this *stroke) calculateHistograms(dt, dv []int, vbl int, totalCount int) {
-	this.VelocityHist = make([][10]float32, vbl)
-	step := 1.0 / float32(totalCount) * 100.0
-	for i := this.Start; i <= this.End; i++ {
-		tbin := dt[i]
-		vbin := dv[i]
-		tbinv := dt[i] / (TRAVEL_HIST_BINS / VELOCITY_HIST_TRAVEL_BINS)
-		this.TravelHist[tbin] += step
-		this.VelocityHist[vbin][tbinv] += step
-	}
-}
-
-func (this *strokes) categorize(strokes []*stroke, travel []float64, maxTravel float64) {
-	for i, stroke := range strokes {
-		if math.Abs(stroke.length) < STROKE_LENGTH_THRESHOLD &&
-			stroke.duration >= IDLING_DURATION_THRESHOLD {
-
-			// If suitable, tag this idling stroke as possible airtime.
-			// Whether or not it really is one, will be decided with
-			// further heuristics based on both front and read
-			// candidates.
-			if i > 0 && i < len(strokes)-1 &&
-				stroke.posMax <= STROKE_LENGTH_THRESHOLD &&
-				stroke.duration >= AIRTIME_DURATION_THRESHOLD &&
-				strokes[i+1].velMax >= AIRTIME_VELOCITY_THRESHOLD {
-
-				stroke.airCandidate = true
-			}
-			this.idlings = append(this.idlings, stroke)
-		} else if stroke.length >= STROKE_LENGTH_THRESHOLD {
-			stroke.Balance = balance{
-				Position: stroke.posMax / maxTravel * 100.0,
-				Velocity: stroke.velMax,
-			}
-			this.totalCount += (stroke.End - stroke.Start + 1)
-			this.Compressions = append(this.Compressions, stroke)
-		} else if stroke.length <= -STROKE_LENGTH_THRESHOLD {
-			stroke.Balance = balance{
-				Position: stroke.posMin / maxTravel * 100.0,
-				Velocity: stroke.velMin,
-			}
-			this.totalCount += (stroke.End - stroke.Start + 1)
-			this.Rebounds = append(this.Rebounds, stroke)
-		}
-	}
-}
-
-func (this *strokes) histograms(dt, dv []int, vbl int) {
-	for _, s := range this.Compressions {
-		s.calculateHistograms(dt, dv, vbl, this.totalCount)
-	}
-	for _, s := range this.Rebounds {
-		s.calculateHistograms(dt, dv, vbl, this.totalCount)
-	}
-}
-
-func sign(v float64) int8 {
-	if math.Abs(v) <= VELOCITY_ZERO_THRESHOLD {
-		return 0
-	} else if math.Signbit(v) {
-		return -1
-	} else {
-		return 1
-	}
-}
-
-func filterStrokes(velocity, travel []float64, rate uint16) (strokes []*stroke) {
-	var start_index int
-	var start_sign int8
-	for i := 0; i < len(velocity)-1; i++ {
-		// Loop until velocity changes sign
-		start_index = i
-		start_sign = sign(velocity[i])
-		for ; i < len(velocity)-1 && sign(velocity[i+1]) == start_sign; i++ {
-		}
-
-		// We are at the end of the data stream
-		if i >= len(velocity) {
-			i = len(velocity) - 1
-		}
-
-		// Topout periods often oscillate a bit, so they are split to multiple
-		// strokes. We fix this by concatenating consecutive strokes if their
-		// mean position is close to zero.
-		d := float64(i-start_index+1) / float64(rate)
-		pm := floats.Max(travel[start_index : i+1])
-		if pm < STROKE_LENGTH_THRESHOLD &&
-			len(strokes) > 0 &&
-			strokes[len(strokes)-1].posMax < STROKE_LENGTH_THRESHOLD {
-
-			strokes[len(strokes)-1].End = i
-			strokes[len(strokes)-1].duration += d
-		} else {
-			s := &stroke{
-				Start:    start_index,
-				End:      i,
-				length:   travel[i] - travel[start_index],
-				duration: d,
-				posMin:   floats.Min(travel[start_index : i+1]),
-				posMax:   floats.Max(travel[start_index : i+1]),
-				velMin:   floats.Min(velocity[start_index : i+1]),
-				velMax:   floats.Max(velocity[start_index : i+1]),
-			}
-			strokes = append(strokes, s)
-		}
-	}
-
-	return strokes
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func (this *stroke) overlaps(other *stroke) bool {
-	l := max(this.End-this.Start, other.End-other.Start)
-	s := max(this.Start, other.Start)
-	e := min(this.End, other.End)
-	return float32(e-s) >= AIRTIME_OVERLAP_THRESHOLD*float32(l)
-}
-
-func (this *processed) airtimes() {
-	if this.Front.Present && this.Rear.Present {
-		for _, f := range this.Front.Strokes.idlings {
-			if f.airCandidate {
-				for _, r := range this.Rear.Strokes.idlings {
-					if r.airCandidate && f.overlaps(r) {
-						f.airCandidate = false
-						r.airCandidate = false
-
-						at := &airtime{
-							Start: float64(min(f.Start, r.Start)) / float64(this.SampleRate),
-							End:   float64(min(f.End, r.End)) / float64(this.SampleRate),
-						}
-						this.Airtimes = append(this.Airtimes, at)
-						break
-					}
-				}
-			}
-		}
-		maxMean := (this.Front.Calibration.MaxStroke + this.Linkage.MaxRearTravel) / 2.0
-		for _, f := range this.Front.Strokes.idlings {
-			if f.airCandidate {
-				fmean := stat.Mean(this.Front.Travel[f.Start:f.End+1], nil)
-				rmean := stat.Mean(this.Rear.Travel[f.Start:f.End+1], nil)
-				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
-					at := &airtime{
-						Start: float64(f.Start) / float64(this.SampleRate),
-						End:   float64(f.End) / float64(this.SampleRate),
-					}
-					this.Airtimes = append(this.Airtimes, at)
-				}
-			}
-		}
-		for _, r := range this.Rear.Strokes.idlings {
-			if r.airCandidate {
-				fmean := stat.Mean(this.Front.Travel[r.Start:r.End+1], nil)
-				rmean := stat.Mean(this.Rear.Travel[r.Start:r.End+1], nil)
-				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
-					at := &airtime{
-						Start: float64(r.Start) / float64(this.SampleRate),
-						End:   float64(r.End) / float64(this.SampleRate),
-					}
-					this.Airtimes = append(this.Airtimes, at)
-				}
-			}
-		}
-	} else if this.Front.Present {
-		for _, f := range this.Front.Strokes.idlings {
-			if f.airCandidate {
-				at := &airtime{
-					Start: float64(f.Start) / float64(this.SampleRate),
-					End:   float64(f.End) / float64(this.SampleRate),
-				}
-				this.Airtimes = append(this.Airtimes, at)
-			}
-		}
-	} else if this.Rear.Present {
-		for _, r := range this.Rear.Strokes.idlings {
-			if r.airCandidate {
-				at := &airtime{
-					Start: float64(r.Start) / float64(this.SampleRate),
-					End:   float64(r.End) / float64(this.SampleRate),
-				}
-				this.Airtimes = append(this.Airtimes, at)
-			}
-		}
-	}
 }
 
 func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibration) *processed {
@@ -499,26 +243,30 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	if hasFront {
 		tbins := linspace(0, pd.Front.Calibration.MaxStroke, TRAVEL_HIST_BINS+1)
 		dt := digitize(pd.Front.Travel, tbins)
+		pd.Front.TravelBins = tbins
 
 		v, _ := filter.Process(pd.Front.Travel, t)
 		pd.Front.Velocity = v
 		vbins, dv := digitizeVelocity(v)
+		pd.Front.VelocityBins = vbins
 
-		strokes := filterStrokes(v, pd.Rear.Travel, pd.SampleRate)
+		strokes := filterStrokes(v, pd.Front.Travel, pd.Front.Calibration.MaxStroke, pd.SampleRate)
 		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Front.Calibration.MaxStroke)
-		pd.Front.Strokes.histograms(dt, dv, len(vbins))
+		pd.Front.Strokes.digitize(dt, dv)
 	}
 	if hasRear {
 		tbins := linspace(0, pd.Linkage.MaxRearTravel, TRAVEL_HIST_BINS+1)
 		dt := digitize(pd.Rear.Travel, tbins)
+		pd.Rear.TravelBins = tbins
 
 		v, _ := filter.Process(pd.Rear.Travel, t)
 		pd.Rear.Velocity = v
 		vbins, dv := digitizeVelocity(v)
+		pd.Rear.VelocityBins = vbins
 
-		strokes := filterStrokes(v, pd.Rear.Travel, pd.SampleRate)
+		strokes := filterStrokes(v, pd.Rear.Travel, pd.Linkage.MaxRearTravel, pd.SampleRate)
 		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
-		pd.Rear.Strokes.histograms(dt, dv, len(vbins))
+		pd.Rear.Strokes.digitize(dt, dv)
 	}
 
 	pd.airtimes()
