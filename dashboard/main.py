@@ -385,6 +385,8 @@ if telemetry.Front.Present and telemetry.Rear.Present:
     p_balance_compression, p_balance_rebound = balance_figures(
         telemetry.Front.Strokes,
         telemetry.Rear.Strokes,
+        telemetry.Front.Calibration.MaxStroke,
+        telemetry.Linkage.MaxRearTravel,
         front_color,
         rear_color)
 

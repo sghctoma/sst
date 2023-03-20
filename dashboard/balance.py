@@ -8,23 +8,45 @@ from bokeh.plotting import figure
 from psst import Strokes
 
 
-def _balance_data(front_strokes: Strokes, rear_strokes: Strokes):
+def _travel_velocity(strokes: Strokes, travel_max):
+    ct, cv, rt, rv = [], [], [], []
+    for c in strokes.Compressions:
+        ct.append(c.Stat.MaxTravel / travel_max * 100)
+        cv.append(c.Stat.MaxVelocity)
+    for r in strokes.Rebounds:
+        rt.append(r.Stat.MaxTravel / travel_max * 100)
+        rv.append(r.Stat.MaxVelocity)
+
+    ct = np.array(ct)
+    cv = np.array(cv)
+    rt = np.array(rt)
+    rv = np.array(rv)
+    cp = ct.argsort()
+    rp = rt.argsort()
+    return ct[cp], cv[cp], rt[rp], rv[rp]
+
+
+def _balance_data(front_strokes: Strokes, rear_strokes: Strokes,
+                  front_max: float, rear_max: float):
     fct, fcv = [], []
     for c in front_strokes.Compressions:
-        fct.append(c.Stat.MaxTravel)
+        fct.append(c.Stat.MaxTravel / front_max * 100)
         fcv.append(c.Stat.MaxVelocity)
     frt, frv = [], []
     for r in front_strokes.Rebounds:
-        frt.append(r.Stat.MaxTravel)
+        frt.append(r.Stat.MaxTravel / front_max * 100)
         frv.append(r.Stat.MaxVelocity)
     rct, rcv = [], []
     for c in front_strokes.Compressions:
-        rct.append(c.Stat.MaxTravel)
+        rct.append(c.Stat.MaxTravel / rear_max * 100)
         rcv.append(c.Stat.MaxVelocity)
     rrt, rrv = [], []
     for r in front_strokes.Rebounds:
-        rrt.append(r.Stat.MaxTravel)
+        rrt.append(r.Stat.MaxTravel / rear_max * 100)
         rrv.append(r.Stat.MaxVelocity)
+
+    fct, fcv, frt, frv = _travel_velocity(front_strokes, front_max)
+    rct, rcv, rrt, rrv = _travel_velocity(rear_strokes, rear_max)
 
     fcp = np.poly1d(np.polyfit(fct, fcv, 1))
     frp = np.poly1d(np.polyfit(frt, frv, 1))
@@ -39,14 +61,15 @@ def _balance_data(front_strokes: Strokes, rear_strokes: Strokes):
     return fc, rc, fr, rr
 
 
-def update_balance(pc: figure, pr: figure, front_strokes: Strokes,
-                   rear_strokes: Strokes):
+def update_balance(pc: figure, pr: figure,
+                   front_strokes: Strokes, rear_strokes: Strokes,
+                   front_max: float, rear_max: float):
     ds_fc = pc.select_one('ds_fc')
     ds_rc = pc.select_one('ds_rc')
     ds_fr = pr.select_one('ds_fr')
     ds_rr = pr.select_one('ds_rr')
     ds_fc.data, ds_rc.data, ds_fr.data, ds_rr.data = _balance_data(
-        front_strokes, rear_strokes)
+        front_strokes, rear_strokes, front_max, rear_max)
     pc.x_range = Range1d(0, np.fmax(
         ds_fc.data['travel'][-1], ds_rc.data['travel'][-1]))
     pr.x_range = Range1d(0, np.fmax(
@@ -54,8 +77,10 @@ def update_balance(pc: figure, pr: figure, front_strokes: Strokes,
 
 
 def balance_figures(front_strokes: Strokes, rear_strokes: Strokes,
+                    front_max: float, rear_max: float,
                     front_color: tuple[str], rear_color: tuple[str]):
-    fc, rc, fr, rr = _balance_data(front_strokes, rear_strokes)
+    fc, rc, fr, rr = _balance_data(front_strokes, rear_strokes,
+                                   front_max, rear_max)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)
     rear_compression_source = ColumnDataSource(name='ds_rc', data=rc)
     front_rebound_source = ColumnDataSource(name='ds_fr', data=fr)
