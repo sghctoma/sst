@@ -327,16 +327,18 @@ def _velocity_band_stats(strokes: Strokes, velocity: list[float],
     lsc, hsc = 0, 0
     for c in strokes.Compressions:
         total_count += c.Stat.Count
-        lsc += np.count_nonzero(
+        stroke_lsc = np.count_nonzero(
             velocity_[c.Start:c.End+1] < high_speed_threshold)
-        hsc += c.Stat.Count - lsc
+        lsc += stroke_lsc
+        hsc += c.Stat.Count - stroke_lsc
 
     lsr, hsr = 0, 0
     for r in strokes.Rebounds:
-        total_count += c.Stat.Count
-        lsr += np.count_nonzero(
+        total_count += r.Stat.Count
+        stroke_lsr = np.count_nonzero(
             velocity_[r.Start:r.End+1] > -high_speed_threshold)
-        hsr += r.Stat.Count - lsr
+        lsr += stroke_lsr
+        hsr += r.Stat.Count - stroke_lsr
 
     lsc = lsc / total_count * 100.0
     hsc = hsc / total_count * 100.0
