@@ -79,7 +79,7 @@ class Telemetry:
         self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]
 
 
-def dataclass_from_dict(klass, d):
+def dataclass_from_dict(klass: type, d: dict):
     # source: https://stackoverflow.com/a/54769644
     try:
         fieldtypes = {f.name: f.type for f in datafields(klass)}

@@ -20,13 +20,14 @@ from bokeh.models.widgets.buttons import Button
 from bokeh.models.widgets.inputs import TextInput, TextAreaInput
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
+from bokeh.plotting import figure
 
 from balance import balance_figures, update_balance
 from travel import add_airtime_labels
 from fft import fft_figure, update_fft
 from leverage import leverage_ratio_figure, shock_wheel_figure
 from map import track_data, map_figure_notrack, map_figure
-from psst import Telemetry, dataclass_from_dict
+from psst import Strokes, Telemetry, dataclass_from_dict
 from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
 from travel import update_travel_histogram
@@ -243,121 +244,90 @@ cancelled with a double tap.
 '''
 
 
-def on_selectiongeometry(event):
-    pass  # XXX
-    '''
-    start = int(event.geometry['x0'] * telemetry.SampleRate)
-    end = int(event.geometry['x1'] * telemetry.SampleRate)
-    mask = np.full(record_num, False)
-    mask[start:end] = True
-
-    if telemetry.Front.Present:
-        f_mask = front_topouts_mask & mask
-        if np.count_nonzero(f_mask):
-            update_travel_histogram(
-                p_front_travel_hist,
-                front_travel,
-                telemetry.Front.Calibration.MaxStroke,
-                telemetry.Front.DigitizedTravel,
-                f_mask)
-            update_fft(p_front_fft, front_travel[f_mask], tick)
-            update_velocity_histogram(
-                p_front_vel_hist,
-                telemetry.Front.DigitizedTravel,
-                telemetry.Front.DigitizedVelocity,
-                front_velocity,
-                f_mask & front_stroke_mask)
-            update_velocity_band_stats(
-                p_front_vel_stats,
-                front_velocity[f_mask & front_stroke_mask],
-                hst)
-
-    if telemetry.Rear.Present:
-        r_mask = rear_topouts_mask & mask
-        if np.count_nonzero(r_mask):
-            update_travel_histogram(
-                p_rear_travel_hist,
-                rear_travel,
-                telemetry.Linkage.MaxRearTravel,
-                telemetry.Rear.DigitizedTravel,
-                r_mask)
-            update_fft(p_rear_fft, rear_travel[r_mask], tick)
-            update_velocity_histogram(
-                p_rear_vel_hist,
-                telemetry.Rear.DigitizedTravel,
-                telemetry.Rear.DigitizedVelocity,
-                rear_velocity,
-                r_mask & rear_stroke_mask)
-            update_velocity_band_stats(
-                p_rear_vel_stats,
-                rear_velocity[r_mask & rear_stroke_mask],
-                hst)
-
-    if telemetry.Front.Present and telemetry.Rear.Present:
-        update_balance(
-            p_balance_compression,
-            p_balance_rebound,
-            front_travel[mask],
-            telemetry.Front.Calibration.MaxStroke,
-            front_velocity[mask],
-            rear_travel[mask],
-            telemetry.Linkage.MaxRearTravel,
-            rear_velocity[mask])
-    '''
-
-
-def on_doubletap():
-    pass  # XXX
-    '''
+def _update_front(strokes: Strokes = None):
     if telemetry.Front.Present:
         update_travel_histogram(
             p_front_travel_hist,
-            front_travel,
-            telemetry.Front.Calibration.MaxStroke,
-            telemetry.Front.DigitizedTravel,
-            front_topouts_mask)
-        update_fft(p_front_fft, front_travel[front_topouts_mask], tick)
+            strokes if strokes else telemetry.Front.Strokes,
+            telemetry.Front.TravelBins)
+        update_fft(
+            p_front_fft,
+            strokes if strokes else telemetry.Front.Strokes,
+            telemetry.Front.Travel,
+            tick)
         update_velocity_histogram(
             p_front_vel_hist,
-            telemetry.Front.DigitizedTravel,
-            telemetry.Front.DigitizedVelocity,
-            front_velocity,
-            front_topouts_mask & front_stroke_mask)
+            strokes if strokes else telemetry.Front.Strokes,
+            telemetry.Front.Velocity,
+            telemetry.Front.TravelBins,
+            telemetry.Front.VelocityBins)
         update_velocity_band_stats(
             p_front_vel_stats,
-            front_velocity[front_topouts_mask & front_stroke_mask],
+            strokes if strokes else telemetry.Front.Strokes,
+            telemetry.Front.Velocity,
             hst)
 
+
+def _update_rear(strokes: Strokes = None):
     if telemetry.Rear.Present:
         update_travel_histogram(
             p_rear_travel_hist,
-            rear_travel,
-            telemetry.Linkage.MaxRearTravel,
-            telemetry.Rear.DigitizedTravel,
-            rear_topouts_mask)
-        update_fft(p_rear_fft, rear_travel[rear_topouts_mask], tick)
+            strokes if strokes else telemetry.Rear.Strokes,
+            telemetry.Rear.TravelBins)
+        update_fft(
+            p_rear_fft,
+            strokes if strokes else telemetry.Rear.Strokes,
+            telemetry.Rear.Travel,
+            tick)
         update_velocity_histogram(
             p_rear_vel_hist,
-            telemetry.Rear.DigitizedTravel,
-            telemetry.Rear.DigitizedVelocity,
-            rear_velocity,
-            rear_topouts_mask & rear_stroke_mask)
+            strokes if strokes else telemetry.Rear.Strokes,
+            telemetry.Rear.Velocity,
+            telemetry.Rear.TravelBins,
+            telemetry.Rear.VelocityBins)
         update_velocity_band_stats(
             p_rear_vel_stats,
-            rear_velocity[rear_topouts_mask & rear_stroke_mask],
+            strokes if strokes else telemetry.Rear.Strokes,
+            telemetry.Rear.Velocity,
             hst)
 
+
+def _update_balance(f_strokes: Strokes = None, r_strokes: Strokes = None):
     if telemetry.Front.Present and telemetry.Rear.Present:
         update_balance(
             p_balance_compression,
             p_balance_rebound,
-            front_travel,
+            f_strokes if f_strokes else telemetry.Front.Strokes,
+            r_strokes if r_strokes else telemetry.Rear.Strokes,
             telemetry.Front.Calibration.MaxStroke,
-            front_velocity,
-            rear_travel,
-            telemetry.Linkage.MaxRearTravel,
-            rear_velocity)
-    '''
+            telemetry.Linkage.MaxRearTravel)
+
+
+def on_selectiongeometry(event: SelectionGeometry):
+    start = int(event.geometry['x0'] * telemetry.SampleRate)
+    end = int(event.geometry['x1'] * telemetry.SampleRate)
+    front_strokes = Strokes(
+        Compressions=[c for c in telemetry.Front.Strokes.Compressions if
+                      c.Start > start and c.End < end],
+        Rebounds=[r for r in telemetry.Front.Strokes.Rebounds if
+                  r.Start > start and r.End < end]
+    )
+    rear_strokes = Strokes(
+        Compressions=[c for c in telemetry.Rear.Strokes.Compressions if
+                      c.Start > start and c.End < end],
+        Rebounds=[r for r in telemetry.Rear.Strokes.Rebounds if
+                  r.Start > start and r.End < end]
+    )
+
+    _update_front(front_strokes)
+    _update_rear(rear_strokes)
+    _update_balance(front_strokes, rear_strokes)
+
+
+def on_doubletap():
+    _update_front()
+    _update_rear()
+    _update_balance()
 
 
 p_travel = travel_figure(telemetry, lod, front_color, rear_color)
@@ -543,7 +513,7 @@ Disable tools for mobile browsers to allow scrolling
 '''
 
 
-def disable_tools(p):
+def disable_tools(p: figure):
     p.toolbar.active_drag = None
     p.toolbar.active_scroll = None
     p.toolbar.active_inspect = None

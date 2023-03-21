@@ -4,7 +4,9 @@ from datetime import datetime
 from functools import partial
 
 import requests
+from sqlite3 import Cursor
 
+from bokeh.events import ButtonClick
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
 from bokeh.models.layouts import Row
@@ -16,9 +18,9 @@ from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
-def session_list(sessions, full_access, api):
+def session_list(sessions: list, full_access: bool, api: str):
 
-    def deletesession(event, id):
+    def deletesession(event: ButtonClick, id: int):
         r = requests.delete(f'{api}/session/{id}')
         to_remove = None
         if r.status_code == 204:
@@ -157,7 +159,7 @@ def _settings_widgets():
             Spinner(placeholder="n/a", width=130))])
 
 
-def _setups_widgets(cur):
+def _setups_widgets(cur: Cursor):
     res = cur.execute('SELECT setup_id, name FROM setups')
     options = [(str(r[0]), r[1]) for r in res.fetchall()]
     return Select(
@@ -166,7 +168,7 @@ def _setups_widgets(cur):
         value=options[0][0])
 
 
-def session_dialog(cur, full_access, api):
+def session_dialog(cur: Cursor, full_access: bool, api: str):
     if not full_access:
         return column(name='dialog_session', children=[
                       Div(text="Ah-ah-ah, your didn't say the magic word!")])
@@ -193,11 +195,21 @@ def session_dialog(cur, full_access, api):
     def on_addbuttonclick():
         front = settings_display.children[1].children
         rear = settings_display.children[2].children
+        f_spring = front[1].value
+        f_hsr = front[2].value
+        f_lsr = front[3].value
+        f_lsc = front[4].value
+        f_hsc = front[5].value
+        r_spring = rear[1].value
+        r_hsr = rear[2].value
+        r_lsr = rear[3].value
+        r_lsc = rear[4].value
+        r_hsc = rear[5].value
         settings_table = \
-            f"Front: Spring = {front[1].value}, " + \
-            f"HSR = {front[2].value}, LSR = {front[3].value}, LSC = {front[4].value}, HSC = {front[5].value}\n" + \
-            f"Rear: Spring = {rear[1].value}, " + \
-            f"HSR = {rear[2].value}, LSR = {rear[3].value}, LSC = {rear[4].value}, HSC = {rear[5].value}"
+            f"Front: Spring = {f_spring}, " + \
+            f"HSR = {f_hsr}, LSR = {f_lsr}, LSC = {f_lsc}, HSC = {f_hsc}\n" + \
+            f"Rear: Spring = {r_spring}, " + \
+            f"HSR = {r_hsr}, LSR = {r_lsr}, LSC = {r_lsc}, HSC = {r_hsc}"
 
         names, notes = files_ds.data['names'], files_ds.data['notes']
         success = 0
