@@ -198,7 +198,8 @@ if telemetry.Front.Present:
         telemetry.Front.Velocity,
         hst)
     p_front_fft = fft_figure(
-        telemetry.Front.Travel, # XXX filter to strokes
+        telemetry.Front.Strokes,
+        telemetry.Front.Travel,
         tick,
         front_color,
         "Frequencies (front)")
@@ -224,7 +225,8 @@ if telemetry.Rear.Present:
         telemetry.Rear.Velocity,
         hst)
     p_rear_fft = fft_figure(
-        telemetry.Rear.Travel, # XXX filter to strokes
+        telemetry.Rear.Strokes,
+        telemetry.Rear.Travel,
         tick,
         rear_color,
         "Frequencies (rear)")

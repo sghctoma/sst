@@ -6,9 +6,14 @@ from bokeh.models.tools import HoverTool, WheelZoomTool
 from bokeh.plotting import figure
 from scipy.fft import rfft, rfftfreq
 
+from psst import Strokes
 
-def _fft_data(travel, tick):
-    balanced_travel = travel - np.mean(travel)
+
+def _fft_data(strokes: Strokes, travel: list[float], tick: float):
+    stroke_travel = []
+    for s in strokes.Compressions + strokes.Rebounds:
+        stroke_travel.extend(travel[s.Start:s.End+1])
+    balanced_travel = stroke_travel - np.mean(stroke_travel)
     n = np.max([20000, len(balanced_travel)])
     balanced_travel_f = rfft(balanced_travel, n=n)
     balanced_spectrum = np.abs(balanced_travel_f)
@@ -23,8 +28,10 @@ def _fft_data(travel, tick):
     return dict(freqs=freqs, spectrum=balanced_spectrum[:len(freqs)])
 
 
-def fft_figure(travel, tick, color, title):
-    source = ColumnDataSource(name='ds_fft', data=_fft_data(travel, tick))
+def fft_figure(strokes: Strokes, travel: list[float], tick: float,
+               color: tuple[str], title: str):
+    data = _fft_data(strokes, travel, tick)
+    source = ColumnDataSource(name='ds_fft', data=data)
     p = figure(
         title=title,
         min_height=150,
@@ -50,8 +57,8 @@ def fft_figure(travel, tick, color, title):
     return p
 
 
-def update_fft(p, travel, tick):
+def update_fft(p: figure, strokes: Strokes, travel: list[float], tick: float):
     ds = p.select_one('ds_fft')
-    ds.data = _fft_data(travel, tick)
+    ds.data = _fft_data(strokes, travel, tick)
     b = p.select_one('b_fft')
     b.glyph.width = 4.9 / len(ds.data['freqs'])
