@@ -42,6 +42,9 @@
 *.idb
 *.pdb
 
+# Profiling files
+*.lprof
+
 # build directories
 firmware/pico/build/
 firmware/pico-w/build/
