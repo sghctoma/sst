@@ -21,7 +21,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
                   front_color: tuple[str], rear_color: tuple[str]):
     length = len(telemetry.Front.Travel if telemetry.Front.Present else
                  telemetry.Rear.Travel)
-    time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
+    time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
     front_max = telemetry.Front.Calibration.MaxStroke
     rear_max = telemetry.Linkage.MaxRearTravel
 
@@ -33,7 +33,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
         tr_lod = np.around(telemetry.Rear.Travel[::lod], 4)
     else:
         tr_lod = np.full(length, 0)[::lod]
-    source = ColumnDataSource(data=dict(t=time[::lod], f=tf_lod, r=tr_lod,))
+    source = ColumnDataSource(data=dict(t=time, f=tf_lod, r=tr_lod,))
     p = figure(
         name='travel',
         title="Wheel travel",
@@ -137,7 +137,7 @@ def _travel_histogram_data(strokes: Strokes, bins: list[float]):
     hist = np.zeros(len(bins) - 1)
     total_count = 0
     for s in strokes.Compressions + strokes.Rebounds:
-        total_count += s.End - s.Start + 1
+        total_count += s.Stat.Count
         for d in s.DigitizedTravel:
             hist[d] += 1
     hist = hist / total_count * 100.0

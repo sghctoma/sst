@@ -15,6 +15,7 @@ from scipy.stats import norm
 
 from psst import Strokes, Telemetry
 
+TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM = 10
 HISTOGRAM_RANGE_MULTIPLIER = 1.5
 HISTOGRAM_RANGE_HIGH = 2000
 HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
@@ -24,7 +25,7 @@ def velocity_figure(telemetry: Telemetry, lod: int,
                     front_color: tuple[str], rear_color: tuple[str]):
     length = len(telemetry.Front.Velocity if telemetry.Front.Present else
                  telemetry.Rear.Velocity)
-    time = np.around(np.arange(0, length) / telemetry.SampleRate, 4)
+    time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
 
     if telemetry.Front.Present:
         vf_lod = np.around(telemetry.Front.Velocity[::lod], 4) / 1000
@@ -35,7 +36,7 @@ def velocity_figure(telemetry: Telemetry, lod: int,
     else:
         vr_lod = np.full(length, 0)[::lod]
     source = ColumnDataSource(data=dict(
-        t=time[::lod],
+        t=time,
         f=vf_lod,
         r=vr_lod,
     ))
@@ -98,14 +99,14 @@ def _normal_distribution_data(strokes: Strokes, velocity: list[float],
 
 def _velocity_histogram_data(strokes: Strokes, step: float,
                              tbins: list[float], vbins: list[float]):
-    vtbins_length = 10  # XXX un-hardcode
-    hist = np.zeros((vtbins_length, len(vbins) - 1))
+    divider = (len(tbins) - 1) // TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM
+    hist = np.zeros((TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM, len(vbins) - 1))
     total_count = 0
     for s in strokes.Compressions + strokes.Rebounds:
-        total_count += s.End - s.Start + 1
-        for i in range(len(s.DigitizedVelocity)):
+        total_count += s.Stat.Count
+        for i in range(s.Stat.Count):
             vbin = s.DigitizedVelocity[i]
-            tbin = s.DigitizedTravel[i] // ((len(tbins) - 1) // vtbins_length)
+            tbin = s.DigitizedTravel[i] // divider
             hist[tbin][vbin] += 1
     hist = hist / total_count * 100.0
 
