@@ -49,6 +49,22 @@ parser.add_argument(
 cmd_args = parser.parse_args()
 
 query_args = curdoc().session_context.request.arguments
+# lod - Level of Detail for travel graph (downsample ratio)
+try:
+    lod = int(query_args.get('lod')[0])
+except BaseException:
+    lod = 5
+
+# hst - High Speed Threshold for velocity graphs/statistics in mm/s
+try:
+    hst = int(query_args.get('hst')[0])
+except BaseException:
+    hst = 350
+
+try:
+    s = int(query_args.get('session')[0].decode('utf-8'))
+except BaseException:
+    s = -1
 
 con = sqlite3.connect(cmd_args.database)
 cur = con.cursor()
@@ -70,11 +86,7 @@ sessions = res.fetchall()
 if not sessions:
     curdoc().add_root(Div(text="No sessions in the database!"))
     raise Exception("Empty data directory")
-
-try:
-    s = int(query_args.get('session')[0].decode('utf-8'))
-except BaseException:
-    s = sessions[0][0]
+s = sessions[0][0] if s < 0 else s
 
 res = cur.execute('''
     SELECT name,description,data,track
@@ -160,18 +172,6 @@ setup_figure = Div(
         <br /><b>Rear calibration:</b>{setup_data[9]}<br />
         {calibration_table.format(setup_data[12], setup_data[11], setup_data[10])}
         ''')
-
-# lod - Level of Detail for travel graph (downsample ratio)
-try:
-    lod = int(query_args.get('lod')[0])
-except BaseException:
-    lod = 5
-
-# hst - High Speed Threshold for velocity graphs/statistics in mm/s
-try:
-    hst = int(query_args.get('hst')[0])
-except BaseException:
-    hst = 350
 
 front_color, rear_color = Spectral11[1], Spectral11[2]
 front_record_num, rear_record_num, record_num = 0, 0, 0
