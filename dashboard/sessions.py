@@ -18,7 +18,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
-def session_list(sessions: list, full_access: bool, api: str):
+def session_list(sessions: list, full_access: bool, api: str) -> column:
 
     def deletesession(event: ButtonClick, id: int):
         r = requests.delete(f'{api}/session/{id}')
@@ -103,7 +103,7 @@ def session_list(sessions: list, full_access: bool, api: str):
     return column(name='sessions', width=245, children=session_rows)
 
 
-def _file_widgets():
+def _file_widgets() -> (FileInput, DataTable, ColumnDataSource):
     file_input = FileInput(name='input_sst', accept='.sst', multiple=True)
     ds = ColumnDataSource(name='ds_sst', data=dict(
         files=[], names=[], notes=[]))
@@ -134,7 +134,7 @@ def _file_widgets():
     return file_input, file_table, ds
 
 
-def _settings_widgets():
+def _settings_widgets() -> row:
     return row(sizing_mode='stretch_width', children=[
         column(
             Div(text="<b>&nbsp;</b>", width=130, height=31),
@@ -159,7 +159,7 @@ def _settings_widgets():
             Spinner(placeholder="n/a", width=130))])
 
 
-def _setups_widgets(cur: Cursor):
+def _setups_widgets(cur: Cursor) -> Select:
     res = cur.execute('SELECT setup_id, name FROM setups')
     options = [(str(r[0]), r[1]) for r in res.fetchall()]
     return Select(
@@ -168,7 +168,7 @@ def _setups_widgets(cur: Cursor):
         value=options[0][0])
 
 
-def session_dialog(cur: Cursor, full_access: bool, api: str):
+def session_dialog(cur: Cursor, full_access: bool, api: str) -> column:
     if not full_access:
         return column(name='dialog_session', children=[
                       Div(text="Ah-ah-ah, your didn't say the magic word!")])

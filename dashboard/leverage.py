@@ -3,7 +3,7 @@ import numpy as np
 from bokeh.plotting import figure
 
 
-def shock_wheel_figure(coeffs, max_stroke, color):
+def shock_wheel_figure(coeffs, max_stroke, color) -> figure:
     f = np.poly1d(np.flip(coeffs))
     p = figure(
         name='sw',
@@ -28,7 +28,7 @@ def shock_wheel_figure(coeffs, max_stroke, color):
     return p
 
 
-def leverage_ratio_figure(wtlr, color):
+def leverage_ratio_figure(wtlr, color) -> figure:
     p = figure(
         name='lr',
         title="Leverage Ratio",

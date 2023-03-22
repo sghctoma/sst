@@ -1,5 +1,7 @@
 import numpy as np
 
+from typing import Any
+
 from bokeh import events
 from bokeh.models import ColumnDataSource
 from bokeh.models.annotations import BoxAnnotation, ColorBar, Label, Span
@@ -22,7 +24,7 @@ HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
 
 
 def velocity_figure(telemetry: Telemetry, lod: int,
-                    front_color: tuple[str], rear_color: tuple[str]):
+                    front_color: tuple[str], rear_color: tuple[str]) -> figure:
     length = len(telemetry.Front.Velocity if telemetry.Front.Present else
                  telemetry.Rear.Velocity)
     time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
@@ -86,7 +88,7 @@ def velocity_figure(telemetry: Telemetry, lod: int,
 
 
 def _normal_distribution_data(strokes: Strokes, velocity: list[float],
-                              step: float):
+                              step: float) -> dict[str, np.array]:
     stroke_velocity = []
     for s in strokes.Compressions + strokes.Rebounds:
         stroke_velocity.extend(velocity[s.Start:s.End+1])
@@ -98,7 +100,8 @@ def _normal_distribution_data(strokes: Strokes, velocity: list[float],
 
 
 def _velocity_histogram_data(strokes: Strokes, step: float,
-                             tbins: list[float], vbins: list[float]):
+                             tbins: list[float], vbins: list[float]) -> (
+                             dict[str, Any], float):
     divider = (len(tbins) - 1) // TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM
     hist = np.zeros((TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM, len(vbins) - 1))
     total_count = 0
@@ -142,7 +145,7 @@ def update_velocity_histogram(p: figure, strokes: Strokes,
 
 def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
                               tbins: list[float], vbins: list[float],
-                              high_speed_threshold: int, title: str):
+                              high_speed_threshold: int, title: str) -> figure:
     step = vbins[1] - vbins[0]
     sd, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
     source = ColumnDataSource(name='ds_hist', data=sd)
@@ -270,7 +273,7 @@ def _add_velocity_stat_labels(p: figure, strokes: Strokes, mx):
     p.add_layout(l_maxc)
 
 
-def _velocity_stats(strokes: Strokes):
+def _velocity_stats(strokes: Strokes) -> (float, float, float, float):
     csum = 0
     ccount = 0
     maxc = 0
@@ -322,7 +325,8 @@ def update_velocity_stats(p: figure, strokes: Strokes, mx: float):
 
 
 def _velocity_band_stats(strokes: Strokes, velocity: list[float],
-                         high_speed_threshold: float):
+                         high_speed_threshold: float) -> (
+                         float, float, float, float):
     velocity_ = np.array(velocity)
     total_count = 0
     lsc, hsc = 0, 0
@@ -350,7 +354,7 @@ def _velocity_band_stats(strokes: Strokes, velocity: list[float],
 
 
 def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
-                               high_speed_threshold: float):
+                               high_speed_threshold: float) -> figure:
     hsr, lsr, lsc, hsc = _velocity_band_stats(strokes, velocity,
                                               high_speed_threshold)
     source = ColumnDataSource(name='ds_stats', data=dict(

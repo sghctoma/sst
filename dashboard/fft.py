@@ -9,7 +9,8 @@ from scipy.fft import rfft, rfftfreq
 from psst import Strokes
 
 
-def _fft_data(strokes: Strokes, travel: list[float], tick: float):
+def _fft_data(strokes: Strokes, travel: list[float], tick: float) -> (
+              dict[str, np.array]):
     stroke_travel = []
     for s in strokes.Compressions + strokes.Rebounds:
         stroke_travel.extend(travel[s.Start:s.End+1])
@@ -29,7 +30,7 @@ def _fft_data(strokes: Strokes, travel: list[float], tick: float):
 
 
 def fft_figure(strokes: Strokes, travel: list[float], tick: float,
-               color: tuple[str], title: str):
+               color: tuple[str], title: str) -> figure:
     data = _fft_data(strokes, travel, tick)
     source = ColumnDataSource(name='ds_fft', data=data)
     p = figure(

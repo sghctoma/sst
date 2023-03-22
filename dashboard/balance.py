@@ -1,5 +1,7 @@
 import numpy as np
 
+from typing import Any
+
 from bokeh.models import ColumnDataSource
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
@@ -8,7 +10,8 @@ from bokeh.plotting import figure
 from psst import Strokes
 
 
-def _travel_velocity(strokes: Strokes, travel_max):
+def _travel_velocity(strokes: Strokes, travel_max) -> (
+                     np.array, np.array, np.array, np.array):
     ct, cv, rt, rv = [], [], [], []
     for c in strokes.Compressions:
         ct.append(c.Stat.MaxTravel / travel_max * 100)
@@ -27,7 +30,8 @@ def _travel_velocity(strokes: Strokes, travel_max):
 
 
 def _balance_data(front_strokes: Strokes, rear_strokes: Strokes,
-                  front_max: float, rear_max: float):
+                  front_max: float, rear_max: float) -> (
+                  dict[str, Any]):
     fct, fcv = [], []
     for c in front_strokes.Compressions:
         fct.append(c.Stat.MaxTravel / front_max * 100)
@@ -78,7 +82,8 @@ def update_balance(pc: figure, pr: figure,
 
 def balance_figures(front_strokes: Strokes, rear_strokes: Strokes,
                     front_max: float, rear_max: float,
-                    front_color: tuple[str], rear_color: tuple[str]):
+                    front_color: tuple[str], rear_color: tuple[str]) -> (
+                    figure, figure):
     fc, rc, fr, rr = _balance_data(front_strokes, rear_strokes,
                                    front_max, rear_max)
     front_compression_source = ColumnDataSource(name='ds_fc', data=fc)

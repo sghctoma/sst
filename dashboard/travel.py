@@ -18,7 +18,7 @@ HISTOGRAM_RANGE_MULTIPLIER = 1.3
 
 
 def travel_figure(telemetry: Telemetry, lod: int,
-                  front_color: tuple[str], rear_color: tuple[str]):
+                  front_color: tuple[str], rear_color: tuple[str]) -> figure:
     length = len(telemetry.Front.Travel if telemetry.Front.Present else
                  telemetry.Rear.Travel)
     time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
@@ -133,7 +133,8 @@ def travel_figure(telemetry: Telemetry, lod: int,
     return p
 
 
-def _travel_histogram_data(strokes: Strokes, bins: list[float]):
+def _travel_histogram_data(strokes: Strokes, bins: list[float]) -> (
+                           dict[str, list[float]]):
     hist = np.zeros(len(bins) - 1)
     total_count = 0
     for s in strokes.Compressions + strokes.Rebounds:
@@ -145,7 +146,7 @@ def _travel_histogram_data(strokes: Strokes, bins: list[float]):
 
 
 def travel_histogram_figure(strokes: Strokes, bins: list[float],
-                            color: tuple[str], title: str):
+                            color: tuple[str], title: str) -> figure:
     max_travel = bins[-1]
     data = _travel_histogram_data(strokes, bins)
     source = ColumnDataSource(name='ds_hist', data=data)
@@ -172,7 +173,8 @@ def travel_histogram_figure(strokes: Strokes, bins: list[float],
     return p
 
 
-def _travel_stats(strokes: Strokes, max_travel: float):
+def _travel_stats(strokes: Strokes, max_travel: float) -> (
+                  float, float, str, str):
     sum = 0
     count = 0
     mx = 0

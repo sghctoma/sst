@@ -7,6 +7,8 @@ import gpxpy
 import gpxpy.gpx
 import xyzservices.providers as xyz
 
+from typing import Any
+
 from bokeh.events import MouseMove
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
@@ -18,7 +20,7 @@ from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
 
 
-def _geographic_to_mercator(y_lat, x_lon):
+def _geographic_to_mercator(y_lat, x_lon) -> (float, float):
     if abs(x_lon) > 180 or abs(y_lat) >= 90:
         return None
 
@@ -29,7 +31,7 @@ def _geographic_to_mercator(y_lat, x_lon):
     return y_m, x_m
 
 
-def _gpx_to_dict(gpx_data):
+def _gpx_to_dict(gpx_data) -> dict[str, Any]:
     gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
     gpx_file = io.BytesIO(gpx_data)
     gpx = gpxpy.parse(gpx_file)
@@ -45,7 +47,7 @@ def _gpx_to_dict(gpx_data):
     return gpx_dict
 
 
-def _session_track(start, end, t, track):
+def _session_track(start, end, t, track) -> dict[str, list[float]]:
     session_indices = np.where(np.logical_and(t >= start, t <= end))
     if len(session_indices[0]) == 0:
         return None
@@ -73,7 +75,8 @@ def _session_track(start, end, t, track):
     return dict(lon=list(y[0, :]), lat=list(y[1, :]))
 
 
-def track_data(track, start_timestamp, end_timestamp):
+def track_data(track, start_timestamp, end_timestamp) -> (
+               dict[str, Any], dict[str, list[float]]):
     if not track:
         return None, None
 
@@ -96,7 +99,7 @@ def track_data(track, start_timestamp, end_timestamp):
     return full_track, session_track
 
 
-def _notrack_label():
+def _notrack_label() -> Div:
     label = Div(
         text="No GPX track for session",
         stylesheets=['''
@@ -117,7 +120,7 @@ def _notrack_label():
     return label
 
 
-def _upload_button(con, id, start_time, end_time, map, travel):
+def _upload_button(con, id, start_time, end_time, map, travel) -> FileInput:
     file_input = FileInput(
         name='input_gpx',
         accept='.gpx',
@@ -198,7 +201,8 @@ def _upload_button(con, id, start_time, end_time, map, travel):
     return file_input
 
 
-def map_figure_notrack(session_id, con, start_time, end_time, map, travel):
+def map_figure_notrack(session_id, con, start_time, end_time, map, travel) -> (
+                       layout):
     if con:
         content = _upload_button(
             con, session_id, start_time, end_time, map, travel)
@@ -213,7 +217,7 @@ def map_figure_notrack(session_id, con, start_time, end_time, map, travel):
         children=[content])
 
 
-def map_figure(full_track, session_track):
+def map_figure(full_track, session_track) -> (figure, CustomJS):
     ds_track = ColumnDataSource(data=full_track)
     ds_session = ColumnDataSource(data=session_track)
 
