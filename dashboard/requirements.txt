@@ -5,3 +5,6 @@ pytz==2022.7.1
 requests==2.28.2
 SciPy==1.8.1
 xyzservices==2022.9.0
+Flask==2.2.3
+Flask-Session==0.4.0
+SQLAlchemy==2.0.7

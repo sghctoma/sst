@@ -67,3 +67,6 @@ dashboard/venv
 
 # Small utilities for debuging, etc.
 tools/
+
+# Flask-Session directory
+dashboard/flask_session

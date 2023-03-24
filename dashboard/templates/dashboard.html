@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="static/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="static/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="static/favicon_io/favicon-16x16.png">
+    <link rel="manifest" href="static/favicon_io/site.webmanifest">
+    <link href="static/common.css" rel="stylesheet"/>
+    <link href="static/tabs.css" rel="stylesheet"/>
+    {% if suspension_count == 1 -%}
+    <link href="static/layout-single.css" rel="stylesheet"/>
+    {%- elif suspension_count == 2 %}
+    <link href="static/layout-double.css" rel="stylesheet"/>
+    {% endif %}
+    {{ resources }}
+    <style>
+      html, body {
+        box-sizing: border-box;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    <script>
+      const embed_plot = function(plot_name, div_id = null) {
+      	fetch("/" + plot_name)
+          .then(function(response) { return response.json(); })
+          .then(function(item) { return Bokeh.embed.embed_item(item, div_id); })
+      };
+      embed_plot("description", "description");
+      embed_plot("sessions", "sessions");
+    </script>
+    {{ components_script }}
+  </head>
+  <body>
+    <input type="checkbox" id="drawer-toggle" name="drawer-toggle"/>
+    <label for="drawer-toggle" id="drawer-toggle-label"></label>
+    <header>sufni suspension telemetry <div style="float: right;"><span id="sname">{{ name }}</span> ({{ date }} UTC)</div></header>
+    <nav id="drawer">
+      <h4>Sessions</h4><a style="font-size: 14px; color: #d0d0d0; text-decoration: none;" href="#open-modal">(add new...)</a>
+      <div id="sessions" class="sessions"></div>
+    </nav>
+
+    <div id="page-content" class="container">
+      <div id="travel" class="travel">{{ div_travel }}</div>
+      <div id="velocity" class="velocity">{{ div_velocity }}</div>
+      <div id="description" class="description"></div>
+      <div id="map" class="map">{{ div_map }}</div>
+      <div id="lr" class="lr">{{ div_lr }}</div>
+      <div id="sw" class="sw">{{ div_sw }}</div>
+      <div id="setup" class="setup">{{ div_setup }}</div>
+
+      <div class="tabs">
+        <input class="radiotab" name="tabs" tabindex="1" type="radio" id="tabone" checked="checked">
+        <label class="label" style="grid-column: 1" for="tabone">Spring rate</label>
+        <div class="panel springrate" tabindex="1">
+          {% if suspension_count == 1 -%}
+          <div id="travel-hist" class="travel-hist"></div>
+          <div id="fft" class="fft"></div>
+          <script>
+            embed_plot("travel/hist", "travel-hist");
+            embed_plot("travel/fft", "fft");
+          </script>
+          {%- elif suspension_count == 2 %}
+          <div id="front-travel-hist" class="front-travel-hist"></div>
+          <div id="rear-travel-hist" class="rear-travel-hist"></div>
+          <div id="front-fft" class="front-fft"></div>
+          <div id="rear-fft" class="rear-fft"></div>
+          <script>
+            embed_plot("travel/histogram/front", "front-travel-hist");
+            embed_plot("travel/histogram/rear", "rear-travel-hist");
+            embed_plot("travel/fft/front", "front-fft");
+            embed_plot("travel/fft/rear", "rear-fft");
+          </script>
+          {% endif %}
+        </div>
+
+        <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabtwo">
+        <label class="label" style="grid-column: 2" for="tabtwo">Damping</label>
+        <div class="panel damping" tabindex="1">
+          {% if suspension_count == 1 -%}
+          <div id="velocity-hist" class="velocity-hist"></div>
+          <script>
+            embed_plot("velocity/histogram", "velocity-hist");
+          </script>
+          {%- elif suspension_count == 2 %}
+          <div id="front-velocity-hist" class="front-velocity-hist"></div>
+          <div id="rear-velocity-hist" class="rear-velocity-hist"></div>
+          <script>
+            embed_plot("velocity/histogram/front", "front-velocity-hist");
+            embed_plot("velocity/histogram/rear", "rear-velocity-hist");
+          </script>
+          {% endif %}
+        </div>
+
+    
+        {% if suspension_count == 2 -%}
+        <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabthree">
+        <label class="label" style="grid-column: 3" for="tabthree" >Balance</label>
+        <div class="panel balance" tabindex="1">
+          <div id="balance-compression" class="balance-compression"></div>
+          <div id="balance-rebound" class="balance-rebound"></div>
+        </div>
+          <script>
+            embed_plot("balance/compression", "balance-compression");
+            embed_plot("balance/rebound", "balance-rebound");
+          </script>
+        {% endif %}
+      </div>
+    </div>
+
+    <div id="open-modal" class="modal-window">
+      <div>
+          <a href="#" title="Close" class="modal-close">Close</a>
+          <h1>Import sessions</h1>
+          <div id="session-dialog"></div>
+          <script>
+            embed_plot("session-dialog", "session-dialog");
+          </script>
+      </div>
+    </div>
+  </body>
+</html>
