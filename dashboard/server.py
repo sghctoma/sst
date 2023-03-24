@@ -7,11 +7,7 @@ from datetime import datetime
 from flask import Flask, request, session
 from flask_session import Session
 from jinja2 import Template
-from sqlalchemy import (
-    Column, Integer, LargeBinary, MetaData, String, Table,
-    ForeignKey,
-    create_engine, select, desc
-)
+from sqlalchemy import create_engine
 
 from bokeh.embed import json_item
 from bokeh.models import ColumnDataSource
@@ -19,60 +15,10 @@ from bokeh.plotting import figure
 from bokeh.resources import CDN
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
+from database import stmt_sessions, stmt_session, stmt_cache
 from description import description_figure
 from psst import Strokes, Telemetry, dataclass_from_dict
 
-
-metadata_obj = MetaData()
-
-bokeh_cache_table = Table(
-    'bokeh_cache',
-    metadata_obj,
-    Column('session_id', Integer, ForeignKey('sessions.session_id')),
-    Column('script', String),
-    Column('div_travel', String),
-    Column('div_velocity', String),
-    Column('div_map', String),
-    Column('div_lr', String),
-    Column('div_sw', String),
-    Column('div_setup', String),
-    Column('json_f_fft', String),
-    Column('json_r_fft', String),
-    Column('json_f_thist', String),
-    Column('json_r_thist', String),
-    Column('json_f_vhist', String),
-    Column('json_r_vhist', String),
-    Column('json_cbalance', String),
-    Column('json_rbalance', String),
-)
-
-tracks_table = Table(
-    'tracks',
-    metadata_obj,
-    Column('track_id', Integer, primary_key=True),
-    Column('track', String, nullable=False),
-)
-
-sessions_table = Table(
-    'sessions',
-    metadata_obj,
-    Column('session_id', Integer, primary_key=True),
-    Column('name', String),
-    Column('setup_id', Integer, ForeignKey('setups.setup_id'), nullable=False),
-    Column('description', String),
-    Column('timestamp', Integer),
-    Column('data', LargeBinary),
-    Column('track_id', Integer, ForeignKey('tracks.track_id'), nullable=False),
-)
-
-app = Flask(__name__)
-app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)
-
-with open('templates/dashboard.html', 'r') as f:
-    template_html = f.read()
-    dashboard_page = Template(template_html)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -86,6 +32,18 @@ parser.add_argument(
     help="GoSST HTTP API address:port")
 cmd_args = parser.parse_args()
 
+engine = create_engine(f'sqlite:///{cmd_args.database}')
+dark_minimal = built_in_themes[DARK_MINIMAL]
+
+app = Flask(__name__)
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
+
+with open('templates/dashboard.html', 'r') as f:
+    template_html = f.read()
+    dashboard_page = Template(template_html)
+
 
 def make_plot(title):
     from random import random
@@ -95,11 +53,6 @@ def make_plot(title):
     p = figure(width=400, height=400, tools="lasso_select", title=title)
     p.scatter('x', 'y', source=s, alpha=0.6)
     return p
-
-
-dark_minimal = built_in_themes[DARK_MINIMAL]
-
-engine = create_engine(f'sqlite:///{cmd_args.database}')
 
 
 @app.route('/', defaults={'session_id': None})
@@ -122,23 +75,10 @@ def dashboard(session_id):
     session['full_access'] = True  # XXX
 
     conn = engine.connect()
-    stmt = (select(
-            sessions_table.c.session_id,
-            sessions_table.c.name,
-            sessions_table.c.description,
-            sessions_table.c.timestamp)
-            .order_by(desc(sessions_table.c.timestamp)))
-    res = conn.execute(stmt)
+    res = conn.execute(stmt_sessions())
     session['sessions'] = res.fetchall()
 
-    stmt = (select(
-            sessions_table.c.name,
-            sessions_table.c.description,
-            sessions_table.c.data,
-            tracks_table.c.track)
-            .join(tracks_table, isouter=True)
-            .where(sessions_table.c.session_id == session_id))
-    res = conn.execute(stmt, [(session_id,)])
+    res = conn.execute(stmt_session(session_id))
     session_data = res.fetchone()
     session['session_name'] = session_data[0]
     p_desc = description_figure(
@@ -152,9 +92,7 @@ def dashboard(session_id):
     d = msgpack.unpackb(session_data[2])
     session['telemetry'] = dataclass_from_dict(Telemetry, d)
 
-    stmt = (select(bokeh_cache_table)
-            .where(bokeh_cache_table.c.session_id == session_id))
-    res = conn.execute(stmt)
+    res = conn.execute(stmt_cache(session_id))
     items = res.fetchone()
     if not items:
         return "ERR"
