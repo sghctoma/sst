@@ -53,6 +53,8 @@ def travel_figure(telemetry: Telemetry, lod: int,
         y_range=(front_max, 0),
         output_backend='webgl')
 
+    _add_airtime_labels(p, telemetry.Airtimes)
+
     p.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
     p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p.add_layout(LinearAxis(y_range_name='rear'), 'right')
@@ -239,7 +241,7 @@ def update_travel_histogram(p: figure, strokes: Strokes, bins: list[float]):
     s_max.location = mx
 
 
-def add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
+def _add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
     for airtime in airtimes:
         b = BoxAnnotation(left=airtime.Start, right=airtime.End,
                           fill_color=Spectral11[-2], fill_alpha=0.2)
