@@ -17,6 +17,7 @@ from scipy.stats import norm
 
 from psst import Strokes, Telemetry
 
+
 TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM = 10
 HISTOGRAM_RANGE_MULTIPLIER = 1.5
 HISTOGRAM_RANGE_HIGH = 2000

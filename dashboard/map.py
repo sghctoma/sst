@@ -212,7 +212,7 @@ def map_figure_notrack(session_id, con, start_time, end_time, map, travel) -> (
     return layout(
         name='map',
         sizing_mode='stretch_both',
-        min_height=340,
+        min_height=400,
         styles={'background-color': '#15191c'},
         children=[content])
 
@@ -231,7 +231,7 @@ def map_figure(full_track, session_track) -> (figure, CustomJS):
         x_range=[start_lon - 600, start_lon + 600],
         y_range=[start_lat - 600, start_lat + 600],
         sizing_mode='stretch_both',
-        min_height=340,
+        min_height=400,
         match_aspect=True,
         tools='pan,wheel_zoom,reset',
         toolbar_location='above',
