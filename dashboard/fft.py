@@ -56,10 +56,3 @@ def fft_figure(strokes: Strokes, travel: list[float], tick: float,
            source=source, width=bar_width, line_width=2,
            color=color, fill_alpha=0.4)
     return p
-
-
-def update_fft(p: figure, strokes: Strokes, travel: list[float], tick: float):
-    ds = p.select_one('ds_fft')
-    ds.data = _fft_data(strokes, travel, tick)
-    b = p.select_one('b_fft')
-    b.glyph.width = 4.9 / len(ds.data['freqs'])

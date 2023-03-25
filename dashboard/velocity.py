@@ -126,24 +126,6 @@ def _velocity_histogram_data(strokes: Strokes, step: float,
     return sd, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
 
 
-def update_velocity_histogram(p: figure, strokes: Strokes,
-                              velocity: list[float],
-                              tbins: list[float], vbins: list[float]):
-    ds = p.select_one('ds_hist')
-    step = vbins[1] - vbins[0]
-    sd, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
-    ds.data = sd
-    p.x_range.start = 0
-    p.x_range.end = mx
-    p.y_range.start = HISTOGRAM_RANGE_HIGH
-    p.y_range.end = HISTOGRAM_RANGE_LOW
-
-    ds_normal = p.select_one('ds_normal')
-    ds_normal.data = _normal_distribution_data(strokes, velocity, step)
-
-    update_velocity_stats(p, strokes, mx)
-
-
 def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
                               tbins: list[float], vbins: list[float],
                               high_speed_threshold: int, title: str) -> figure:
@@ -297,34 +279,6 @@ def _velocity_stats(strokes: Strokes) -> (float, float, float, float):
     return avgr, maxr, avgc, maxc
 
 
-def update_velocity_stats(p: figure, strokes: Strokes, mx: float):
-    avgr, maxr, avgc, maxc = _velocity_stats(strokes)
-    top = p.y_range.end
-    bottom = p.y_range.start
-
-    p.select_one('s_avgr').location = avgr
-    p.select_one('s_avgc').location = avgc
-    p.select_one('s_maxr').location = maxr
-    p.select_one('s_maxc').location = maxc
-
-    l_avgr = p.select_one('l_avgr')
-    l_avgr.x = mx
-    l_avgr.y = avgr
-    l_avgr.text = f"avg. rebound vel.: {avgr:.1f} mm/s"
-    l_maxr = p.select_one('l_maxr')
-    l_maxr.x = mx
-    l_maxr.y = np.fmax(top, maxr)
-    l_maxr.text = f"max. rebound vel.: {maxr:.1f} mm/s"
-    l_avgc = p.select_one('l_avgc')
-    l_avgc.x = mx
-    l_avgc.y = avgc
-    l_avgc.text = f"avg. comp. vel.: {avgc:.1f} mm/s"
-    l_maxc = p.select_one('l_maxc')
-    l_maxc.x = mx
-    l_maxc.y = np.fmin(bottom, maxc)
-    l_maxc.text = f"max. comp. vel.: {maxc:.1f} mm/s"
-
-
 def _velocity_band_stats(strokes: Strokes, velocity: list[float],
                          high_speed_threshold: float) -> (
                          float, float, float, float):
@@ -404,28 +358,3 @@ def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
     p.x_range.start = 0
     p.x_range.end = 1
     return p
-
-
-def update_velocity_band_stats(p: figure, strokes: Strokes,
-                               velocity: list[float],
-                               high_speed_threshold: float):
-    ds = p.select_one('ds_stats')
-    hsr, lsr, lsc, hsc = _velocity_band_stats(strokes, velocity,
-                                              high_speed_threshold)
-    ds.data = dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr])
-
-    l_hsr = p.select_one('l_hsr')
-    l_hsr.text = f"HSR:\n{hsr:.2f}%"
-    l_hsr.y = hsc + lsc + lsr + hsr / 2
-    l_lsr = p.select_one('l_lsr')
-    l_lsr.text = f"LSR:\n{lsr:.2f}%"
-    l_lsr.y = hsc + lsc + lsr / 2
-    l_lsc = p.select_one('l_lsc')
-    l_lsc.text = f"LSC:\n{lsc:.2f}%"
-    l_lsc.y = hsc + lsc / 2
-    l_hsc = p.select_one('l_hsc')
-    l_hsc.text = f"HSC:\n{hsc:.2f}%"
-    l_hsc.y = hsc / 2
-
-    p.y_range.start = 0
-    p.y_range.end = hsr + lsr + lsc + hsc

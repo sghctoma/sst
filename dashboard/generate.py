@@ -15,7 +15,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
-from balance import balance_figures
+from balance import balance_figure
 from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
 from map import track_data, map_figure_notrack, map_figure
@@ -168,7 +168,7 @@ if telemetry.Front.Present:
         telemetry.Front.Strokes,
         telemetry.Front.TravelBins,
         front_color,
-        "Speed histogram (front)")
+        "Travel histogram (front)")
     p_front_vel_hist = velocity_histogram_figure(
         telemetry.Front.Strokes,
         telemetry.Front.Velocity,
@@ -236,13 +236,26 @@ p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs,
 Compression and rebound velocity balance
 '''
 if telemetry.Front.Present and telemetry.Rear.Present:
-    p_balance_compression, p_balance_rebound = balance_figures(
-        telemetry.Front.Strokes,
-        telemetry.Rear.Strokes,
+    p_balance_compression = balance_figure(
+        telemetry.Front.Strokes.Compressions,
+        telemetry.Rear.Strokes.Compressions,
         telemetry.Front.Calibration.MaxStroke,
         telemetry.Linkage.MaxRearTravel,
+        False,
         front_color,
-        rear_color)
+        rear_color,
+        'balance_compression',
+        "Compression velocity balance")
+    p_balance_rebound = balance_figure(
+        telemetry.Front.Strokes.Rebounds,
+        telemetry.Rear.Strokes.Rebounds,
+        telemetry.Front.Calibration.MaxStroke,
+        telemetry.Linkage.MaxRearTravel,
+        True,
+        front_color,
+        rear_color,
+        'balance_rebound',
+        "Rebound velocity balance")
 
 '''
 Sessions

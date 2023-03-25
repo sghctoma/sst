@@ -103,6 +103,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
                  ru.left = end;
                  lu.change.emit();
                  ru.change.emit();
+                 update_plots(-1, -1);
                  '''))
     p.js_on_event(
         SelectionGeometry,
@@ -116,6 +117,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
                  ru.left = geometry['x1'];
                  lu.change.emit();
                  ru.change.emit();
+                 update_plots(geometry['x0'], geometry['x1']);
                  '''))
 
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
@@ -218,27 +220,6 @@ def _add_travel_stat_labels(strokes: Strokes, max_travel: float,
     l_max = Label(name='l_max', y=mx, text=mx_text, y_offset=10, **text_props)
     p.add_layout(l_avg)
     p.add_layout(l_max)
-
-
-def update_travel_histogram(p: figure, strokes: Strokes, bins: list[float]):
-    ds = p.select_one('ds_hist')
-    ds.data = _travel_histogram_data(strokes, bins)
-
-    p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(ds.data['right'])
-
-    avg, mx, avg_text, mx_text = _travel_stats(strokes, bins[-1])
-    l_avg = p.select_one('l_avg')
-    l_avg.text = avg_text
-    l_avg.x = p.x_range.end
-    l_avg.y = avg
-    l_max = p.select_one('l_max')
-    l_max.text = mx_text
-    l_max.x = p.x_range.end
-    l_max.y = mx
-    s_avg = p.select_one('s_avg')
-    s_avg.location = avg
-    s_max = p.select_one('s_max')
-    s_max.location = mx
 
 
 def _add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):

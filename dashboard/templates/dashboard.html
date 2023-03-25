@@ -10,12 +10,56 @@
     <link rel="manifest" href="static/favicon_io/site.webmanifest">
     <link href="static/common.css" rel="stylesheet"/>
     <link href="static/tabs.css" rel="stylesheet"/>
+    {{ resources }}
+    <script>
+      const _embed_plot = function(plot_url, div_id) {
+      	fetch(plot_url)
+          .then(function(response) { return response.json(); })
+          .then(function(item) { return Bokeh.embed.embed_item(item, div_id); })
+      };
+      const _clear_plot = function(plot_name) {
+        idx = Bokeh.documents.findIndex(doc => doc.roots()[0].name === plot_name);
+        Bokeh.documents[idx].clear();
+        Bokeh.documents.splice(idx, 1);
+      }
+    </script>
     {% if suspension_count == 1 -%}
     <link href="static/layout-single.css" rel="stylesheet"/>
+    <script>
+      const update_plots = function(start, end) {
+        const args = "?start=" + start + "&end=" + end
+        _clear_plot("fft");
+        _clear_plot("travel_hist");
+        _clear_plot("velocity_hist");
+        _embed_plot("/travel/fft" + args, "fft");
+        _embed_plot("/travel/histogram" + args, "travel-hist");
+        _embed_plot("/travel/velocity" + args, "velocity-hist");
+      }
+    </script>
     {%- elif suspension_count == 2 %}
     <link href="static/layout-double.css" rel="stylesheet"/>
+    <script>
+      const update_plots = function(start, end) {
+        const args = "?start=" + start + "&end=" + end
+        _clear_plot("front_fft");
+        _clear_plot("rear_fft");
+        _clear_plot("front_travel_hist");
+        _clear_plot("rear_travel_hist");
+        _clear_plot("front_velocity_hist");
+        _clear_plot("rear_velocity_hist");
+        _clear_plot("balance_compression");
+        _clear_plot("balance_rebound");
+        _embed_plot("/travel/fft/front" + args, "front-fft");
+        _embed_plot("/travel/fft/rear" + args, "rear-fft");
+        _embed_plot("/travel/histogram/front" + args, "front-travel-hist");
+        _embed_plot("/travel/histogram/rear" + args, "rear-travel-hist");
+        _embed_plot("/velocity/histogram/front" + args, "front-velocity-hist");
+        _embed_plot("/velocity/histogram/rear" + args, "rear-velocity-hist");
+        _embed_plot("/balance/compression" + args, "balance-compression");
+        _embed_plot("/balance/rebound" + args, "balance-rebound");
+      }
+    </script>
     {% endif %}
-    {{ resources }}
     <style>
       html, body {
         box-sizing: border-box;
@@ -25,13 +69,8 @@
       }
     </style>
     <script>
-      const embed_plot = function(plot_name, div_id = null) {
-      	fetch("/" + plot_name)
-          .then(function(response) { return response.json(); })
-          .then(function(item) { return Bokeh.embed.embed_item(item, div_id); })
-      };
-      embed_plot("description", "description");
-      embed_plot("sessions", "sessions");
+      _embed_plot("/description", "description");
+      _embed_plot("/sessions", "sessions");
     </script>
     {{ components_script }}
   </head>
@@ -61,8 +100,8 @@
           <div id="travel-hist" class="travel-hist"></div>
           <div id="fft" class="fft"></div>
           <script>
-            embed_plot("travel/hist", "travel-hist");
-            embed_plot("travel/fft", "fft");
+            _embed_plot("/travel/hist", "travel-hist");
+            _embed_plot("/travel/fft", "fft");
           </script>
           {%- elif suspension_count == 2 %}
           <div id="front-travel-hist" class="front-travel-hist"></div>
@@ -70,10 +109,10 @@
           <div id="front-fft" class="front-fft"></div>
           <div id="rear-fft" class="rear-fft"></div>
           <script>
-            embed_plot("travel/histogram/front", "front-travel-hist");
-            embed_plot("travel/histogram/rear", "rear-travel-hist");
-            embed_plot("travel/fft/front", "front-fft");
-            embed_plot("travel/fft/rear", "rear-fft");
+            _embed_plot("/travel/histogram/front", "front-travel-hist");
+            _embed_plot("/travel/histogram/rear", "rear-travel-hist");
+            _embed_plot("/travel/fft/front", "front-fft");
+            _embed_plot("/travel/fft/rear", "rear-fft");
           </script>
           {% endif %}
         </div>
@@ -84,14 +123,14 @@
           {% if suspension_count == 1 -%}
           <div id="velocity-hist" class="velocity-hist"></div>
           <script>
-            embed_plot("velocity/histogram", "velocity-hist");
+            _embed_plot("/velocity/histogram", "velocity-hist");
           </script>
           {%- elif suspension_count == 2 %}
           <div id="front-velocity-hist" class="front-velocity-hist"></div>
           <div id="rear-velocity-hist" class="rear-velocity-hist"></div>
           <script>
-            embed_plot("velocity/histogram/front", "front-velocity-hist");
-            embed_plot("velocity/histogram/rear", "rear-velocity-hist");
+            _embed_plot("/velocity/histogram/front", "front-velocity-hist");
+            _embed_plot("/velocity/histogram/rear", "rear-velocity-hist");
           </script>
           {% endif %}
         </div>
@@ -105,8 +144,8 @@
           <div id="balance-rebound" class="balance-rebound"></div>
         </div>
           <script>
-            embed_plot("balance/compression", "balance-compression");
-            embed_plot("balance/rebound", "balance-rebound");
+            _embed_plot("/balance/compression", "balance-compression");
+            _embed_plot("/balance/rebound", "balance-rebound");
           </script>
         {% endif %}
       </div>
@@ -118,7 +157,7 @@
           <h1>Import sessions</h1>
           <div id="session-dialog"></div>
           <script>
-            embed_plot("session-dialog", "session-dialog");
+            _embed_plot("/session-dialog", "session-dialog");
           </script>
       </div>
     </div>
