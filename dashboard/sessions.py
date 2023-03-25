@@ -1,15 +1,11 @@
 import html
 
 from datetime import datetime
-from functools import partial
 
 import requests
 from sqlite3 import Cursor
 
-from bokeh.events import ButtonClick
-from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models.layouts import Row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.sources import ColumnDataSource
 from bokeh.models.widgets.buttons import Button
@@ -18,18 +14,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
 
 
-def session_list(sessions: list, full_access: bool, api: str) -> column:
-
-    def deletesession(event: ButtonClick, id: int):
-        r = requests.delete(f'{api}/session/{id}')
-        to_remove = None
-        if r.status_code == 204:
-            rows = curdoc().select({'name': 'session', 'type': Row})
-            for r in rows:
-                if r.children[1].id == event.model.id:
-                    to_remove = r
-            sessions = curdoc().select_one({'name': 'sessions'})
-            sessions.children.remove(to_remove)
+def session_list(sessions: list, full_access: bool) -> column:
 
     session_rows = []
     last_day = datetime.min
@@ -70,6 +55,7 @@ def session_list(sessions: list, full_access: bool, api: str) -> column:
             color:white;
         }
     """
+    p_sessions = column(name='sessions', width=245)
     for s in sessions:
         d = datetime.fromtimestamp(s[3])
         desc = s[2] if s[2] else f"No description for {s[1]}"
@@ -84,10 +70,11 @@ def session_list(sessions: list, full_access: bool, api: str) -> column:
             css_classes=['tooltip'],
             text=f"""
                 &nbsp;&nbsp;
-                <a href='dashboard?session={s[0]}'>{s[1]}</a>
+                <a href='/{s[0]}'>{s[1]}</a>
                 <span class='tooltiptext'>{desc}</span>""")]
         if full_access:
             b = Button(
+                tags=[s[0]],
                 label="del",
                 sizing_mode='fixed',
                 height=20,
@@ -97,10 +84,20 @@ def session_list(sessions: list, full_access: bool, api: str) -> column:
                     "position": "unset",
                     "margin-left": "auto ",
                     "margin-right": "5px"})
-            b.on_click(partial(deletesession, id=s[0]))
+            b.js_on_click(CustomJS(
+                args=dict(s=p_sessions, id=s[0]), code='''
+                    fetch("/" + id, { method: 'DELETE' });
+                    const i = s.children.findIndex(c => c.name == "session_" + id);
+                    const children = [...s.children];
+                    children[i].destroy();
+                    children.splice(i, 1);
+                    s.children = children;
+                '''))
             children.append(b)
-        session_rows.append(row(width=245, name='session', children=children))
-    return column(name='sessions', width=245, children=session_rows)
+        session_rows.append(row(width=245, name=f'session_{s[0]}',
+                                children=children))
+    p_sessions.children = session_rows
+    return p_sessions
 
 
 def _file_widgets() -> (FileInput, DataTable, ColumnDataSource):

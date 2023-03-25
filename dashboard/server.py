@@ -25,6 +25,7 @@ from database import stmt_sessions, stmt_session, stmt_cache
 from description import description_figure
 from fft import fft_figure
 from psst import Strokes, Telemetry, dataclass_from_dict
+from sessions import session_list
 from travel import travel_histogram_figure
 from velocity import velocity_band_stats_figure, velocity_histogram_figure
 
@@ -136,7 +137,7 @@ def dashboard(session_id):
 
     conn = engine.connect()
     res = conn.execute(stmt_sessions())
-    session['sessions'] = res.fetchall()
+    session['sessions'] = [list(r) for r in res.fetchall()]
 
     res = conn.execute(stmt_session(session_id))
     session_data = res.fetchone()
@@ -198,7 +199,7 @@ def description():
 
 @app.route('/sessions')
 def sessions():
-    p = make_plot("test")
+    p = session_list(session['sessions'], session['full_access'])
     return json.dumps(json_item(p, theme=dark_minimal))
 
 
@@ -342,6 +343,15 @@ def balance_compression(stroke_type):
 def session_dialog():
     p = make_plot("test")
     return json.dumps(json_item(p, theme=dark_minimal))
+
+
+@app.route('/<int:id>', methods=['DELETE'])
+def delete_session(id: int):
+    if 'full_access' in session and session['full_access']:
+        print(f'deleting {id}')
+        return '', 204
+    else:
+        return '', 401
 
 
 if __name__ == '__main__':
