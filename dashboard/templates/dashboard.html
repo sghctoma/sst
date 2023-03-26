@@ -70,7 +70,7 @@
     </style>
     <script>
       _embed_plot("/description", "description");
-      _embed_plot("/sessions", "sessions");
+      //XXX _embed_plot("/sessions", "sessions");
     </script>
     {{ components_script }}
   </head>
@@ -79,8 +79,7 @@
     <label for="drawer-toggle" id="drawer-toggle-label"></label>
     <header>sufni suspension telemetry <div style="float: right;"><span id="sname">{{ name }}</span> ({{ date }} UTC)</div></header>
     <nav id="drawer">
-      <h4>Sessions</h4><a style="font-size: 14px; color: #d0d0d0; text-decoration: none;" href="#open-modal">(add new...)</a>
-      <div id="sessions" class="sessions"></div>
+      {% include 'sessions.html' %}
     </nav>
 
     <div id="page-content" class="container">

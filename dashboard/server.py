@@ -8,7 +8,7 @@ import pytz
 from datetime import datetime
 from flask import Flask, request, session
 from flask_session import Session
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 from typing import Callable
 
@@ -25,7 +25,6 @@ from database import stmt_sessions, stmt_session, stmt_cache
 from description import description_figure
 from fft import fft_figure
 from psst import Strokes, Telemetry, dataclass_from_dict
-from sessions import session_list
 from travel import travel_histogram_figure
 from velocity import velocity_band_stats_figure, velocity_histogram_figure
 
@@ -51,9 +50,8 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
 
-with open('templates/dashboard.html', 'r') as f:
-    template_html = f.read()
-    dashboard_page = Template(template_html)
+jinja_env = Environment(loader=FileSystemLoader('templates'))
+dashboard_template = jinja_env.get_template('dashboard.html')
 
 
 def make_plot(title):
@@ -64,6 +62,21 @@ def make_plot(title):
     p = figure(width=400, height=400, tools="lasso_select", title=title)
     p.scatter('x', 'y', source=s, alpha=0.6)
     return p
+
+
+def _sessions_list() -> dict[str, tuple[int, str, str]]:
+    last_day = datetime.min
+    sessions_dict = dict()
+    for s in session['sessions']:
+        d = datetime.fromtimestamp(s[3])
+        desc = s[2] if s[2] else f"No description for {s[1]}"
+        date_str = d.strftime('%Y.%m.%d')
+        if d.date() != last_day:
+            sessions_dict[date_str] = [(s[0], s[1], desc)]
+            last_day = d.date()
+        else:
+            sessions_dict[date_str].append((s[0], s[1], desc))
+    return sessions_dict
 
 
 def _filter_strokes(strokes: Strokes, start: int, end: int) -> Strokes:
@@ -153,6 +166,12 @@ def dashboard(session_id):
     d = msgpack.unpackb(session_data[2])
     session['telemetry'] = dataclass_from_dict(Telemetry, d)
 
+    suspension_count = 0
+    if session['telemetry'].Front.Present:
+        suspension_count += 1
+    if session['telemetry'].Rear.Present:
+        suspension_count += 1
+
     res = conn.execute(stmt_cache(session_id))
     items = res.fetchone()
     if not items:
@@ -178,11 +197,13 @@ def dashboard(session_id):
     utc_str = datetime.fromtimestamp(session['telemetry'].Timestamp,
                                      pytz.UTC).strftime('%Y.%m.%d %H:%M')
 
-    return dashboard_page.render(
+    return dashboard_template.render(
+        sessions=_sessions_list(),
         resources=CDN.render(),
-        suspension_count=2,
+        suspension_count=suspension_count,
         name=session['session_name'],
         date=utc_str,
+        full_access=session['full_access'],
         components_script=components_script,
         div_travel=div_travel,
         div_velocity=div_velocity,
@@ -195,12 +216,6 @@ def dashboard(session_id):
 @app.route('/description')
 def description():
     return session['description']
-
-
-@app.route('/sessions')
-def sessions():
-    p = session_list(session['sessions'], session['full_access'])
-    return json.dumps(json_item(p, theme=dark_minimal))
 
 
 @app.route('/travel/histogram', defaults={'suspension': None})

@@ -20,7 +20,6 @@ from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
 from map import track_data, map_figure_notrack, map_figure
 from psst import Telemetry, dataclass_from_dict
-from sessions import session_dialog, session_list
 from travel import travel_figure, travel_histogram_figure
 from velocity import velocity_figure
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
@@ -62,17 +61,7 @@ s = cmd_args.session
 con = sqlite3.connect(cmd_args.database)
 cur = con.cursor()
 
-full_access = False
-
-res = cur.execute('''
-    SELECT session_id, name, description, timestamp
-    FROM sessions
-    ORDER BY timestamp DESC''')
-sessions = res.fetchall()
-
-if not sessions:
-    raise Exception("Empty data directory")
-s = sessions[0][0] if s < 0 else s
+full_access = False  # XXX
 
 res = cur.execute('''
     SELECT name,description,data,track
@@ -257,11 +246,6 @@ if telemetry.Front.Present and telemetry.Rear.Present:
         'balance_rebound',
         "Rebound velocity balance")
 
-'''
-Sessions
-'''
-sessions_list = session_list(sessions, full_access, cmd_args.gosst_api)
-session_dialog = session_dialog(cur, full_access, cmd_args.gosst_api)
 
 '''
 Map

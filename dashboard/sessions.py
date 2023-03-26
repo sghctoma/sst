@@ -1,8 +1,6 @@
 import html
-
-from datetime import datetime
-
 import requests
+
 from sqlite3 import Cursor
 
 from bokeh.layouts import column, row
@@ -12,92 +10,6 @@ from bokeh.models.widgets.buttons import Button
 from bokeh.models.widgets.inputs import FileInput, Select, Spinner
 from bokeh.models.widgets.markups import Div
 from bokeh.models.widgets.tables import CellEditor, DataTable, TableColumn
-
-
-def session_list(sessions: list, full_access: bool) -> column:
-
-    session_rows = []
-    last_day = datetime.min
-    tooltip_css = """
-        :host(.tooltip) {
-            position: relative;
-            display: inline-block;
-        }
-
-        :host(.tooltip) .tooltiptext {
-            visibility: hidden;
-            width: 200px;
-            background-color: #0a0a0a;
-            color: #fff;
-            text-align: center;
-            padding: 5px 0;
-            border-radius: 6px;
-            position: absolute;
-            z-index: 1;
-            top: 20px;
-            left: 40px;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-
-        :host(.tooltip:hover) .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        :host(.tooltip) a {
-            font-size: 14px;
-            color: #d0d0d0;
-            text-decoration: none;
-        }
-
-        :host(.tooltip) a:hover {
-            color:white;
-        }
-    """
-    p_sessions = column(name='sessions', width=245)
-    for s in sessions:
-        d = datetime.fromtimestamp(s[3])
-        desc = s[2] if s[2] else f"No description for {s[1]}"
-        if d.date() != last_day:
-            session_rows.append(Div(
-                text=f"<p>{d.strftime('%Y.%m.%d')}</p><hr />",
-                stylesheets=["p { font-size: 14px; color: #d0d0d0; }"]))
-            last_day = d.date()
-        children = [Div(
-            name=str(s[0]),
-            stylesheets=[tooltip_css],
-            css_classes=['tooltip'],
-            text=f"""
-                &nbsp;&nbsp;
-                <a href='/{s[0]}'>{s[1]}</a>
-                <span class='tooltiptext'>{desc}</span>""")]
-        if full_access:
-            b = Button(
-                tags=[s[0]],
-                label="del",
-                sizing_mode='fixed',
-                height=20,
-                width=20,
-                button_type='danger',
-                styles={
-                    "position": "unset",
-                    "margin-left": "auto ",
-                    "margin-right": "5px"})
-            b.js_on_click(CustomJS(
-                args=dict(s=p_sessions, id=s[0]), code='''
-                    fetch("/" + id, { method: 'DELETE' });
-                    const i = s.children.findIndex(c => c.name == "session_" + id);
-                    const children = [...s.children];
-                    children[i].destroy();
-                    children.splice(i, 1);
-                    s.children = children;
-                '''))
-            children.append(b)
-        session_rows.append(row(width=245, name=f'session_{s[0]}',
-                                children=children))
-    p_sessions.children = session_rows
-    return p_sessions
 
 
 def _file_widgets() -> (FileInput, DataTable, ColumnDataSource):
