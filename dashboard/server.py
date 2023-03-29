@@ -177,6 +177,15 @@ def dashboard(session_id):
     if not items:
         return "ERR"
 
+    # Interactions can't work across Bokeh documents, and bokeh.embed.json_item
+    # generates a separate document for each item. Therefore, we put everything
+    # that does not need to be updated on range selection into a document, and
+    # save them with bokeh.embed.components. Everything else (i.e. the travel
+    # and velocity histograms, FFT and balance plots) are saved with json_item.
+    #
+    # NOTE: This works only because we do not currently need any interactions
+    #       between plots different groups. If that changes some day, we might
+    #       have to ditch interactions or do them "manually" (without Bokeh).
     components_script = items[1]
     div_travel = items[2]
     div_velocity = items[3]
