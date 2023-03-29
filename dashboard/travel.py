@@ -146,7 +146,7 @@ def _travel_histogram_data(strokes: Strokes, bins: list[float]) -> (
         for d in s.DigitizedTravel:
             hist[d] += 1
     hist = hist / total_count * 100.0
-    return dict(y=bins[:-1], right=hist)
+    return dict(y=bins[:-1], right=hist.tolist())
 
 
 def travel_histogram_figure(strokes: Strokes, bins: list[float],
@@ -159,6 +159,7 @@ def travel_histogram_figure(strokes: Strokes, bins: list[float],
         min_height=300,
         min_border_left=70,
         min_border_right=50,
+        x_range=(0, HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])),
         sizing_mode="stretch_both",
         x_axis_label="Time (%)",
         y_axis_label='Travel (mm)',
@@ -166,8 +167,6 @@ def travel_histogram_figure(strokes: Strokes, bins: list[float],
         tools='ypan,ywheel_zoom,reset',
         active_drag='ypan',
         output_backend='webgl')
-    p.x_range.start = 0
-    p.x_range.end = HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right'])
     p.y_range.flipped = True
     p.hbar(y='y', height=max_travel / (len(bins) - 1) - 3,
            left=0, right='right', source=source, line_width=2,
@@ -238,3 +237,16 @@ def _add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
             text_baseline='middle',
             text=f"{airtime.End-airtime.Start:.2f}s air")
         p_travel.add_layout(airtime_label)
+
+
+def update_travel_histogram(strokes: Strokes, bins: list[float]):
+    data = _travel_histogram_data(strokes, bins)
+    avg, mx, avg_text, mx_text = _travel_stats(strokes, bins[-1])
+    return dict(
+        data=data,
+        range_end=HISTOGRAM_RANGE_MULTIPLIER * np.max(data['right']),
+        avg=avg,
+        mx=mx,
+        avg_text=avg_text,
+        mx_text=mx_text,
+    )

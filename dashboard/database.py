@@ -6,25 +6,26 @@ from sqlalchemy import (
 
 metadata_obj = MetaData()
 
-bokeh_cache_table = Table(
-    'bokeh_cache',
+bokeh_components_table = Table(
+    'bokeh_components',
     metadata_obj,
     Column('session_id', Integer, ForeignKey('sessions.session_id')),
     Column('script', String),
-    Column('div_travel', String),
-    Column('div_velocity', String),
-    Column('div_map', String),
-    Column('div_lr', String),
-    Column('div_sw', String),
-    Column('div_setup', String),
-    Column('json_f_fft', String),
-    Column('json_r_fft', String),
-    Column('json_f_thist', String),
-    Column('json_r_thist', String),
-    Column('json_f_vhist', String),
-    Column('json_r_vhist', String),
-    Column('json_cbalance', String),
-    Column('json_rbalance', String),
+    Column('travel', String),
+    Column('velocity', String),
+    Column('map', String),
+    Column('lr', String),
+    Column('sw', String),
+    Column('setup', String),
+    Column('desc', String),
+    Column('f_thist', String),
+    Column('f_fft', String),
+    Column('f_vhist', String),
+    Column('r_thist', String),
+    Column('r_fft', String),
+    Column('r_vhist', String),
+    Column('cbalance', String),
+    Column('rbalance', String),
 )
 
 tracks_table = Table(
@@ -68,5 +69,5 @@ def stmt_session(session_id: int):
 
 def stmt_cache(session_id: int):
     return (select(
-        bokeh_cache_table)
-        .where(bokeh_cache_table.c.session_id == session_id))
+        bokeh_components_table)
+        .where(bokeh_components_table.c.session_id == session_id))

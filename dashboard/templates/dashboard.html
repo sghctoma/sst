@@ -11,53 +11,53 @@
     <link href="static/common.css" rel="stylesheet"/>
     <link href="static/tabs.css" rel="stylesheet"/>
     {{ resources }}
-    <script>
-      const _embed_plot = function(plot_url, div_id) {
-      	fetch(plot_url)
-          .then(function(response) { return response.json(); })
-          .then(function(item) { return Bokeh.embed.embed_item(item, div_id); })
-      };
-      const _clear_plot = function(plot_name) {
-        idx = Bokeh.documents.findIndex(doc => doc.roots()[0].name === plot_name);
-        Bokeh.documents[idx].clear();
-        Bokeh.documents.splice(idx, 1);
-      }
-    </script>
+    <script src="static/update.js"></script>
     {% if suspension_count == 1 -%}
     <link href="static/layout-single.css" rel="stylesheet"/>
     <script>
-      const update_plots = function(start, end) {
-        const args = "?start=" + start + "&end=" + end
-        _clear_plot("fft");
-        _clear_plot("travel_hist");
-        _clear_plot("velocity_hist");
-        _embed_plot("/travel/fft" + args, "fft");
-        _embed_plot("/travel/histogram" + args, "travel-hist");
-        _embed_plot("/travel/velocity" + args, "velocity-hist");
-      }
+      const process_update_json = function(update_json) {
+        const u = JSON.parse(update_json); 
+        const fft = Bokeh.documents[0].get_model_by_name("fft");
+        const thist = Bokeh.documents[0].get_model_by_name("travel_hist");
+        const vhist = Bokeh.documents[0].get_model_by_name("velocity_hist");
+
+        if (u.front !== null) {
+          update_fft(fft, u.front.fft);
+          update_thist(thist, u.front.thist);
+          update_vhist(vhist.children[0], u.front.vhist);
+          update_vbands(vhist.children[1], u.front.vbands);
+        } else {
+          update_fft(fft, u.rear.fft);
+          update_thist(thist, u.rear.thist);
+          update_vhist(vhist.children[0], u.rear.vhist);
+          update_vbands(vhist.children[1], u.rear.vbands);
+        }
+      };
     </script>
     {%- elif suspension_count == 2 %}
     <link href="static/layout-double.css" rel="stylesheet"/>
-    <script>
-      const update_plots = function(start, end) {
-        const args = "?start=" + start + "&end=" + end
-        _clear_plot("front_fft");
-        _clear_plot("rear_fft");
-        _clear_plot("front_travel_hist");
-        _clear_plot("rear_travel_hist");
-        _clear_plot("front_velocity_hist");
-        _clear_plot("rear_velocity_hist");
-        _clear_plot("balance_compression");
-        _clear_plot("balance_rebound");
-        _embed_plot("/travel/fft/front" + args, "front-fft");
-        _embed_plot("/travel/fft/rear" + args, "rear-fft");
-        _embed_plot("/travel/histogram/front" + args, "front-travel-hist");
-        _embed_plot("/travel/histogram/rear" + args, "rear-travel-hist");
-        _embed_plot("/velocity/histogram/front" + args, "front-velocity-hist");
-        _embed_plot("/velocity/histogram/rear" + args, "rear-velocity-hist");
-        _embed_plot("/balance/compression" + args, "balance-compression");
-        _embed_plot("/balance/rebound" + args, "balance-rebound");
-      }
+    <script>      
+      const process_update_json = function(u) {
+        const f_fft = Bokeh.documents[0].get_model_by_name("front_fft");
+        const r_fft = Bokeh.documents[0].get_model_by_name("rear_fft");
+        const f_thist = Bokeh.documents[0].get_model_by_name("front_travel_hist");
+        const r_thist = Bokeh.documents[0].get_model_by_name("rear_travel_hist");
+        const f_vhist = Bokeh.documents[0].get_model_by_name("front_velocity_hist");
+        const r_vhist = Bokeh.documents[0].get_model_by_name("rear_velocity_hist");
+        const cbalance = Bokeh.documents[0].get_model_by_name("balance_compression");
+        const rbalance = Bokeh.documents[0].get_model_by_name("balance_rebound");
+
+        update_fft(f_fft, u.front.fft);
+        update_fft(r_fft, u.rear.fft);
+        update_thist(f_thist, u.front.thist);
+        update_thist(r_thist, u.rear.thist);
+        update_vhist(f_vhist.children[0], u.front.vhist);
+        update_vhist(r_vhist.children[0], u.rear.vhist);
+        update_vbands(f_vhist.children[1], u.front.vbands);
+        update_vbands(r_vhist.children[1], u.rear.vbands);
+        update_balance(cbalance, u.balance.compression);
+        update_balance(rbalance, u.balance.rebound);
+      };
     </script>
     {% endif %}
     <style>
@@ -68,10 +68,6 @@
         padding: 0;
       }
     </style>
-    <script>
-      _embed_plot("/description", "description");
-      //XXX _embed_plot("/sessions", "sessions");
-    </script>
     {{ components_script }}
   </head>
   <body>
@@ -83,36 +79,32 @@
     </nav>
 
     <div id="page-content" class="container">
-      <div id="travel" class="travel">{{ div_travel }}</div>
-      <div id="velocity" class="velocity">{{ div_velocity }}</div>
-      <div id="description" class="description"></div>
-      <div id="map" class="map">{{ div_map }}</div>
-      <div id="lr" class="lr">{{ div_lr }}</div>
-      <div id="sw" class="sw">{{ div_sw }}</div>
-      <div id="setup" class="setup">{{ div_setup }}</div>
+      <div class="travel">{{ components_divs[0] }}</div>
+      <div class="velocity">{{ components_divs[1] }}</div>
+      <div class="map">{{ components_divs[2] }}</div>
+      <div class="lr">{{ components_divs[3] }}</div>
+      <div class="sw">{{ components_divs[4] }}</div>
+      <div class="setup">{{ components_divs[5] }}</div>
+      <div class="description">{{ components_divs[6] }}</div>
 
       <div class="tabs">
         <input class="radiotab" name="tabs" tabindex="1" type="radio" id="tabone" checked="checked">
         <label class="label" style="grid-column: 1" for="tabone">Spring rate</label>
         <div class="panel springrate" tabindex="1">
           {% if suspension_count == 1 -%}
-          <div id="travel-hist" class="travel-hist"></div>
-          <div id="fft" class="fft"></div>
-          <script>
-            _embed_plot("/travel/hist", "travel-hist");
-            _embed_plot("/travel/fft", "fft");
-          </script>
+          <div class="travel-hist">
+            {{ components_divs[7] }}
+            {{ components_divs[10] }}
+          </div>
+          <div class="fft">
+            {{ components_divs[8] }}
+            {{ components_divs[11] }}
+          </div>
           {%- elif suspension_count == 2 %}
-          <div id="front-travel-hist" class="front-travel-hist"></div>
-          <div id="rear-travel-hist" class="rear-travel-hist"></div>
-          <div id="front-fft" class="front-fft"></div>
-          <div id="rear-fft" class="rear-fft"></div>
-          <script>
-            _embed_plot("/travel/histogram/front", "front-travel-hist");
-            _embed_plot("/travel/histogram/rear", "rear-travel-hist");
-            _embed_plot("/travel/fft/front", "front-fft");
-            _embed_plot("/travel/fft/rear", "rear-fft");
-          </script>
+          <div class="front-travel-hist">{{ components_divs[7] }}</div>
+          <div class="rear-travel-hist">{{ components_divs[10] }}</div>
+          <div class="front-fft">{{ components_divs[8] }}</div>
+          <div class="rear-fft">{{ components_divs[11] }}</div>
           {% endif %}
         </div>
 
@@ -120,17 +112,13 @@
         <label class="label" style="grid-column: 2" for="tabtwo">Damping</label>
         <div class="panel damping" tabindex="1">
           {% if suspension_count == 1 -%}
-          <div id="velocity-hist" class="velocity-hist"></div>
-          <script>
-            _embed_plot("/velocity/histogram", "velocity-hist");
-          </script>
+          <div class="velocity-hist">
+            {{ components_divs[9] }}
+            {{ components_divs[12] }}
+          </div>
           {%- elif suspension_count == 2 %}
-          <div id="front-velocity-hist" class="front-velocity-hist"></div>
-          <div id="rear-velocity-hist" class="rear-velocity-hist"></div>
-          <script>
-            _embed_plot("/velocity/histogram/front", "front-velocity-hist");
-            _embed_plot("/velocity/histogram/rear", "rear-velocity-hist");
-          </script>
+          <div class="front-velocity-hist">{{ components_divs[9] }}</div>
+          <div class="rear-velocity-hist">{{ components_divs[12] }}</div>
           {% endif %}
         </div>
 
@@ -139,13 +127,9 @@
         <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabthree">
         <label class="label" style="grid-column: 3" for="tabthree" >Balance</label>
         <div class="panel balance" tabindex="1">
-          <div id="balance-compression" class="balance-compression"></div>
-          <div id="balance-rebound" class="balance-rebound"></div>
+          <div class="balance-compression">{{ components_divs[13] }}</div>
+          <div class="balance-rebound">{{ components_divs[14] }}</div>
         </div>
-          <script>
-            _embed_plot("/balance/compression", "balance-compression");
-            _embed_plot("/balance/rebound", "balance-rebound");
-          </script>
         {% endif %}
       </div>
     </div>
@@ -155,9 +139,7 @@
           <a href="#" title="Close" class="modal-close">Close</a>
           <h1>Import sessions</h1>
           <div id="session-dialog"></div>
-          <script>
-            _embed_plot("/session-dialog", "session-dialog");
-          </script>
+          <!-- XXX -->
       </div>
     </div>
   </body>

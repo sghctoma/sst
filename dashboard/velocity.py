@@ -97,7 +97,7 @@ def _normal_distribution_data(strokes: Strokes, velocity: list[float],
     mu, std = norm.fit(stroke_velocity)
     ny = np.linspace(stroke_velocity.min(), stroke_velocity.max(), 100)
     pdf = norm.pdf(ny, mu, std) * step * 100
-    return dict(pdf=pdf, ny=ny)
+    return dict(pdf=pdf.tolist(), ny=ny.tolist())
 
 
 def _velocity_histogram_data(strokes: Strokes, step: float,
@@ -121,8 +121,8 @@ def _velocity_histogram_data(strokes: Strokes, step: float,
         if sm > largest_bin:
             largest_bin = sm
 
-    sd = {str(k): v for k, v in enumerate(hist)}
-    sd['y'] = np.array(vbins[:-1]) + step / 2
+    sd = {str(k): v.tolist() for k, v in enumerate(hist)}
+    sd['y'] = (np.array(vbins[:-1]) + step / 2).tolist()
     return sd, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
 
 
@@ -137,7 +137,8 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
         title=title,
         height=600,
         sizing_mode='stretch_width',
-        y_range=[HISTOGRAM_RANGE_HIGH, HISTOGRAM_RANGE_LOW],
+        x_range=(0, mx),
+        y_range=(HISTOGRAM_RANGE_HIGH, HISTOGRAM_RANGE_LOW),
         x_axis_label="Time (%)",
         y_axis_label='Speed (mm/s)',
         toolbar_location='above',
@@ -145,8 +146,6 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
         active_drag='ypan',
         output_backend='webgl')
     p.yaxis[0].formatter = PrintfTickFormatter(format="%5d")
-    p.x_range.start = 0
-    p.x_range.end = mx
     palette = Spectral11[1:]
     k = list(sd.keys())
     k.remove('y')
@@ -320,6 +319,8 @@ def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
         title="Speed\nzones\n\n\n",
         width=70,
         height=600,
+        x_range=(0, 1),
+        y_range=(0, 1),
         sizing_mode='fixed',
         tools='',
         toolbar_location=None)
@@ -353,8 +354,42 @@ def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
     p.add_layout(l_lsc)
     p.add_layout(l_hsc)
 
-    p.y_range.start = 0
     p.y_range.end = hsr + lsr + lsc + hsc
-    p.x_range.start = 0
-    p.x_range.end = 1
     return p
+
+
+def update_velocity_histogram(strokes: Strokes, velocity: list[float],
+                              tbins: list[float], vbins: list[float]):
+    step = vbins[1] - vbins[0]
+    data, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
+    avgr, maxr, avgc, maxc = _velocity_stats(strokes)
+    return dict(
+        data=data,
+        mx=mx,
+        normal_data=_normal_distribution_data(strokes, velocity, step),
+        avgr=avgr,
+        maxr=maxr,
+        avgc=avgc,
+        maxc=maxc,
+        avgr_text=f"avg. rebound vel.: {avgr:.1f} mm/s",
+        maxr_text=f"max. rebound vel.: {maxr:.1f} mm/s",
+        avgc_text=f"avg. comp. vel.: {avgc:.1f} mm/s",
+        maxc_text=f"max. comp. vel.: {maxc:.1f} mm/s",
+    )
+
+
+def update_velocity_band_stats(strokes: Strokes, velocity: list[float],
+                               high_speed_threshold: float):
+    hsr, lsr, lsc, hsc = _velocity_band_stats(strokes, velocity,
+                                              high_speed_threshold)
+    return dict(
+        data=dict(x=[0], hsc=[hsc], lsc=[lsc], lsr=[lsr], hsr=[hsr]),
+        hsr=hsr,
+        lsr=lsr,
+        lsc=lsc,
+        hsc=hsc,
+        hsr_text=f"HSR:\n{hsr:.2f}%",
+        lsr_text=f"LSR:\n{lsr:.2f}%",
+        lsc_text=f"LSC:\n{lsc:.2f}%",
+        hsc_text=f"HSC:\n{hsc:.2f}%",
+    )

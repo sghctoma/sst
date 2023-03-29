@@ -17,10 +17,10 @@ def _fft_data(strokes: Strokes, travel: list[float], tick: float) -> (
     balanced_travel = stroke_travel - np.mean(stroke_travel)
     n = np.max([20000, len(balanced_travel)])
     balanced_travel_f = rfft(balanced_travel, n=n)
-    balanced_spectrum = np.abs(balanced_travel_f)
+    balanced_spectrum = np.abs(balanced_travel_f).tolist()
 
     freqs = rfftfreq(n, tick)
-    freqs = freqs[freqs <= 10]  # cut off FFT graph at 10 Hz
+    freqs = freqs[freqs <= 10].tolist()  # cut off FFT graph at 10 Hz
 
     # TODO put a label that shows the most prominent frequencies
     # max_freq_idx = np.argpartition(balanced_spectrum, -1)[-1:]
@@ -56,3 +56,11 @@ def fft_figure(strokes: Strokes, travel: list[float], tick: float,
            source=source, width=bar_width, line_width=2,
            color=color, fill_alpha=0.4)
     return p
+
+
+def update_fft(strokes: Strokes, travel: list[float], tick: float):
+    data = _fft_data(strokes, travel, tick)
+    return dict(
+        data=data,
+        width=4.9 / len(data['freqs'])
+    )

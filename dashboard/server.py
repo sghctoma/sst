@@ -1,32 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import msgpack
 import pytz
 
 from datetime import datetime
-from flask import Flask, request, session
+from flask import Flask, jsonify, request, session
 from flask_session import Session
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
-from typing import Callable
 
-from bokeh.embed import json_item
-from bokeh.layouts import row
-from bokeh.models import ColumnDataSource
 from bokeh.palettes import Spectral11
-from bokeh.plotting import figure
 from bokeh.resources import CDN
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
-from balance import balance_figure
+from balance import update_balance
 from database import stmt_sessions, stmt_session, stmt_cache
-from description import description_figure
-from fft import fft_figure
-from psst import Strokes, Telemetry, dataclass_from_dict
-from travel import travel_histogram_figure
-from velocity import velocity_band_stats_figure, velocity_histogram_figure
+from fft import update_fft
+from psst import Suspension, Strokes, Telemetry, dataclass_from_dict
+from travel import update_travel_histogram
+from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
 parser = argparse.ArgumentParser()
@@ -54,16 +47,6 @@ jinja_env = Environment(loader=FileSystemLoader('templates'))
 dashboard_template = jinja_env.get_template('dashboard.html')
 
 
-def make_plot(title):
-    from random import random
-    x = [x for x in range(500)]
-    y = [random() for _ in range(500)]
-    s = ColumnDataSource(data=dict(x=x, y=y))
-    p = figure(width=400, height=400, tools="lasso_select", title=title)
-    p.scatter('x', 'y', source=s, alpha=0.6)
-    return p
-
-
 def _sessions_list() -> dict[str, tuple[int, str, str]]:
     last_day = datetime.min
     sessions_dict = dict()
@@ -80,6 +63,8 @@ def _sessions_list() -> dict[str, tuple[int, str, str]]:
 
 
 def _filter_strokes(strokes: Strokes, start: int, end: int) -> Strokes:
+    if start is None or end is None:
+        return strokes
     return Strokes(
         Compressions=[c for c in strokes.Compressions if
                       c.Start > start and c.End < end],
@@ -108,25 +93,28 @@ def _validate_range(start: int, end: int) -> bool:
             start >= 0 and end < mx)
 
 
-def _plot_json(susp: str, cname: str, fplot: Callable, rplot: Callable) -> str:
-    start, end = _extract_range()
-    t = session['telemetry']
-    if not _validate_range(start, end):
-        if (susp == 'front' or not susp) and t.Front.Present:
-            return session[f'json_f_{cname}']
-
-        if (susp == 'rear' or not susp) and t.Rear.Present:
-            return session[f'json_r_{cname}']
-    else:
-        if (susp == 'front' or not susp) and t.Front.Present:
-            strokes = _filter_strokes(t.Front.Strokes, start, end)
-            p = fplot(strokes)
-            return json.dumps(json_item(p, theme=dark_minimal))
-
-        if (susp == 'rear' or not susp) and t.Rear.Present:
-            strokes = _filter_strokes(t.Rear.Strokes, start, end)
-            p = rplot(strokes)
-            return json.dumps(json_item(p, theme=dark_minimal))
+def _update_data(strokes: Strokes, suspension: Suspension):
+    tick = 1.0 / session['telemetry'].SampleRate
+    fft = update_fft(strokes, suspension.Travel, tick)
+    thist = update_travel_histogram(strokes, suspension.TravelBins)
+    vhist = update_velocity_histogram(
+        strokes,
+        suspension.Velocity,
+        suspension.TravelBins,
+        suspension.VelocityBins
+    )
+    vbands = update_velocity_band_stats(
+        strokes,
+        suspension.Velocity,
+        session['hst']
+    )
+    return dict(
+        fft=fft,
+        thist=thist,
+        vhist=vhist,
+        vbands=vbands,
+        balance=None
+    )
 
 
 @app.route('/', defaults={'session_id': None})
@@ -155,12 +143,6 @@ def dashboard(session_id):
     res = conn.execute(stmt_session(session_id))
     session_data = res.fetchone()
     session['session_name'] = session_data[0]
-    p_desc = description_figure(
-        session_data[0],
-        session_data[1],
-        session['full_access'])
-    session['description'] = json.dumps(json_item(p_desc, theme=dark_minimal))
-
     session['track_json'] = session_data[3]  # XXX is this necessary?
 
     d = msgpack.unpackb(session_data[2])
@@ -173,35 +155,12 @@ def dashboard(session_id):
         suspension_count += 1
 
     res = conn.execute(stmt_cache(session_id))
-    items = res.fetchone()
-    if not items:
-        return "ERR"
+    components = res.fetchone()
+    if not components:
+        return "ERR"  # XXX
 
-    # Interactions can't work across Bokeh documents, and bokeh.embed.json_item
-    # generates a separate document for each item. Therefore, we put everything
-    # that does not need to be updated on range selection into a document, and
-    # save them with bokeh.embed.components. Everything else (i.e. the travel
-    # and velocity histograms, FFT and balance plots) are saved with json_item.
-    #
-    # NOTE: This works only because we do not currently need any interactions
-    #       between plots different groups. If that changes some day, we might
-    #       have to ditch interactions or do them "manually" (without Bokeh).
-    components_script = items[1]
-    div_travel = items[2]
-    div_velocity = items[3]
-    div_map = items[4]
-    div_lr = items[5]
-    div_sw = items[6]
-    div_setup = items[7]
-
-    session['json_f_fft'] = items[8]
-    session['json_r_fft'] = items[9]
-    session['json_f_thist'] = items[10]
-    session['json_r_thist'] = items[11]
-    session['json_f_vhist'] = items[12]
-    session['json_r_vhist'] = items[13]
-    session['json_cbalance'] = items[14]
-    session['json_rbalance'] = items[15]
+    components_script = components[1]
+    components_divs = components[2:]
 
     utc_str = datetime.fromtimestamp(session['telemetry'].Timestamp,
                                      pytz.UTC).strftime('%Y.%m.%d %H:%M')
@@ -214,159 +173,41 @@ def dashboard(session_id):
         date=utc_str,
         full_access=session['full_access'],
         components_script=components_script,
-        div_travel=div_travel,
-        div_velocity=div_velocity,
-        div_map=div_map,
-        div_lr=div_lr,
-        div_sw=div_sw,
-        div_setup=div_setup)
+        components_divs=components_divs)
 
 
-@app.route('/description')
-def description():
-    return session['description']
-
-
-@app.route('/travel/histogram', defaults={'suspension': None})
-@app.route('/travel/histogram/<string:suspension>')
-def travel_hist(suspension):
-    def fplot(strokes: Strokes) -> figure:
-        p = travel_histogram_figure(
-            strokes,
-            session['telemetry'].Front.TravelBins,
-            front_color,
-            "Travel histogram (front)")
-        p.name = 'front_travel_hist'
-        return p
-
-    def rplot(strokes: Strokes) -> figure:
-        p = travel_histogram_figure(
-            strokes,
-            session['telemetry'].Rear.TravelBins,
-            rear_color,
-            "Travel histogram (rear)")
-        p.name = 'rear_travel_hist'
-        return p
-
-    return _plot_json(suspension, 'thist', fplot, rplot)
-
-
-@app.route('/travel/fft', defaults={'suspension': None})
-@app.route('/travel/fft/<string:suspension>')
-def fft(suspension):
-    def fplot(strokes: Strokes) -> figure:
-        p = fft_figure(
-            strokes,
-            session['telemetry'].Front.Travel,
-            1.0 / session['telemetry'].SampleRate,
-            front_color,
-            "Frequencies (front)")
-        p.name = 'front_fft'
-        return p
-
-    def rplot(strokes: Strokes) -> figure:
-        p = fft_figure(
-            strokes,
-            session['telemetry'].Rear.Travel,
-            1.0 / session['telemetry'].SampleRate,
-            rear_color,
-            "Frequencies (rear)")
-        p.name = 'rear_fft'
-        return p
-
-    return _plot_json(suspension, 'fft', fplot, rplot)
-
-
-@app.route('/velocity/histogram', defaults={'suspension': None})
-@app.route('/velocity/histogram/<string:suspension>')
-def velocity_hist(suspension):
-    def fplot(strokes: Strokes) -> figure:
-        hist = velocity_histogram_figure(
-            strokes,
-            session['telemetry'].Front.Velocity,
-            session['telemetry'].Front.TravelBins,
-            session['telemetry'].Front.VelocityBins,
-            session['hst'],
-            "Speed histogram (front)"
-        )
-        stats = velocity_band_stats_figure(
-            strokes,
-            session['telemetry'].Front.Velocity,
-            session['hst'],
-        )
-        p = row(
-            name='front_velocity_hist',
-            sizing_mode='stretch_width',
-            children=[hist, stats]
-        )
-        return p
-
-    def rplot(strokes: Strokes) -> figure:
-        hist = velocity_histogram_figure(
-            strokes,
-            session['telemetry'].Rear.Velocity,
-            session['telemetry'].Rear.TravelBins,
-            session['telemetry'].Rear.VelocityBins,
-            session['hst'],
-            "Speed histogram (rear)"
-        )
-        stats = velocity_band_stats_figure(
-            strokes,
-            session['telemetry'].Rear.Velocity,
-            session['hst'],
-        )
-        p = row(
-            name='rear_velocity_hist',
-            sizing_mode='stretch_width',
-            children=[hist, stats]
-        )
-        return p
-
-    return _plot_json(suspension, 'vhist', fplot, rplot)
-
-
-@app.route('/balance/<string:stroke_type>')
-def balance_compression(stroke_type):
+@app.route('/updates')
+def updates():
     start, end = _extract_range()
-    if not _validate_range(start, end):
-        return session[f'json_{stroke_type[0]}balance']
-
     t = session['telemetry']
-    front_strokes = _filter_strokes(t.Front.Strokes, start, end)
-    rear_strokes = _filter_strokes(t.Rear.Strokes, start, end)
-    if stroke_type == 'compression':
-        p = balance_figure(
-            front_strokes.Compressions,
-            rear_strokes.Compressions,
-            t.Front.Calibration.MaxStroke,
-            t.Linkage.MaxRearTravel,
-            False,
-            front_color,
-            rear_color,
-            'balance_compression',
-            "Compression velocity balance"
+    if not _validate_range(start, end):
+        start = None
+        end = None
+
+    updated_data = {'front': None, 'rear': None}
+    if t.Front.Present:
+        f_strokes = _filter_strokes(t.Front.Strokes, start, end)
+        updated_data['front'] = _update_data(f_strokes, t.Front)
+    if t.Rear.Present:
+        r_strokes = _filter_strokes(t.Rear.Strokes, start, end)
+        updated_data['rear'] = _update_data(r_strokes, t.Rear)
+    if t.Front.Present and t.Rear.Present:
+        updated_data['balance'] = dict(
+            compression=update_balance(
+                f_strokes.Compressions,
+                r_strokes.Compressions,
+                t.Front.Calibration.MaxStroke,
+                t.Linkage.MaxRearTravel
+            ),
+            rebound=update_balance(
+                f_strokes.Rebounds,
+                r_strokes.Rebounds,
+                t.Front.Calibration.MaxStroke,
+                t.Linkage.MaxRearTravel
+            ),
         )
-        return json.dumps(json_item(p, theme=dark_minimal))
 
-    if stroke_type == 'rebound':
-        p = balance_figure(
-            front_strokes.Rebounds,
-            rear_strokes.Rebounds,
-            t.Front.Calibration.MaxStroke,
-            t.Linkage.MaxRearTravel,
-            True,
-            front_color,
-            rear_color,
-            'balance_rebound',
-            "Rebound velocity balance"
-        )
-        return json.dumps(json_item(p, theme=dark_minimal))
-
-
-@app.route('/session-dialog')
-def session_dialog():
-    p = make_plot("test")
-    return json.dumps(json_item(p, theme=dark_minimal))
+    return jsonify(updated_data)
 
 
 @app.route('/<int:id>', methods=['DELETE'])

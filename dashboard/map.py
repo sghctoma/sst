@@ -84,6 +84,7 @@ def track_data(track, start_timestamp, end_timestamp) -> (
         full_track = json.loads(track)
     else:
         full_track = dict(track)  # Copy, so that we leage the original intact.
+
     # We don't yet use elevation data, so currently there is no need to include
     # it in the datasource. It is just saved to the database for future use.
     full_track.pop('ele', None)

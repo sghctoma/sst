@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import sqlite3
 
 import msgpack
 import numpy as np
 
 from bokeh.events import MouseMove
-from bokeh.embed import components, json_item
+from bokeh.embed import components
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
 from bokeh.models.widgets.markups import Div
@@ -16,6 +15,7 @@ from bokeh.palettes import Spectral11
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
 from balance import balance_figure
+from description import description_figure
 from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
 from map import track_data, map_figure_notrack, map_figure
@@ -246,6 +246,13 @@ if telemetry.Front.Present and telemetry.Rear.Present:
         'balance_rebound',
         "Rebound velocity balance")
 
+'''
+Description
+'''
+p_desc = description_figure(
+    session_name,
+    description,
+    full_access)
 
 '''
 Map
@@ -278,6 +285,18 @@ if telemetry.Front.Present:
 if telemetry.Rear.Present:
     suspension_count += 1
 
+dark_minimal_theme = built_in_themes[DARK_MINIMAL]
+
+curdoc().add_root(p_travel)
+curdoc().add_root(p_velocity)
+curdoc().add_root(p_map)
+curdoc().add_root(p_lr)
+curdoc().add_root(p_sw)
+curdoc().add_root(p_setup)
+curdoc().add_root(p_desc)
+columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw',
+           'setup', 'desc']
+
 if telemetry.Front.Present:
     prefix = 'front_' if suspension_count == 2 else ''
     p_front_travel_hist.name = f'{prefix}travel_hist'
@@ -288,6 +307,10 @@ if telemetry.Front.Present:
         children=[
             p_front_vel_hist,
             p_front_vel_stats])
+    curdoc().add_root(p_front_travel_hist)
+    curdoc().add_root(p_front_fft)
+    curdoc().add_root(p_front_velocity)
+    columns.extend(['f_thist', 'f_fft', 'f_vhist'])
 if telemetry.Rear.Present:
     prefix = 'rear_' if suspension_count == 2 else ''
     p_rear_travel_hist.name = f'{prefix}travel_hist'
@@ -298,47 +321,18 @@ if telemetry.Rear.Present:
         children=[
             p_rear_vel_hist,
             p_rear_vel_stats])
+    curdoc().add_root(p_rear_travel_hist)
+    curdoc().add_root(p_rear_fft)
+    curdoc().add_root(p_rear_velocity)
+    columns.extend(['r_thist', 'r_fft', 'r_vhist'])
+if suspension_count == 2:
+    curdoc().add_root(p_balance_compression)
+    curdoc().add_root(p_balance_rebound)
+    columns.extend(['cbalance', 'rbalance'])
 
-dark_minimal_theme = built_in_themes[DARK_MINIMAL]
-
-curdoc().add_root(p_travel)
-curdoc().add_root(p_velocity)
-curdoc().add_root(p_map)
-curdoc().add_root(p_lr)
-curdoc().add_root(p_sw)
-curdoc().add_root(p_setup)
 script, divs = components(curdoc().roots, theme=dark_minimal_theme)
-
-cur.execute('''
-    INSERT INTO bokeh_cache (
-        session_id,
-        script,
-        div_travel,
-        div_velocity,
-        div_map,
-        div_lr,
-        div_sw,
-        div_setup,
-        json_f_fft,
-        json_r_fft,
-        json_f_thist,
-        json_r_thist,
-        json_f_vhist,
-        json_r_vhist,
-        json_cbalance,
-        json_rbalance)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        s,
-        script,
-        divs[0], divs[1], divs[2], divs[3], divs[4], divs[5],
-        json.dumps(json_item(p_front_fft, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_rear_fft, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_front_travel_hist, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_rear_travel_hist, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_front_velocity, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_rear_velocity, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_balance_compression, theme=dark_minimal_theme)),
-        json.dumps(json_item(p_balance_rebound, theme=dark_minimal_theme)),
-    ))
+cur.execute(f'''
+    INSERT INTO bokeh_components ({','.join(columns)})
+    VALUES ({','.join(['?'] * len(columns))})
+    ''', (s, script, *divs))
 con.commit()
