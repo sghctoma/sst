@@ -33,7 +33,7 @@ var Sql = `
 		raw_lr_data TEXT NOT NULL
 	);
 	CREATE TABLE IF NOT EXISTS tracks(
-		track_ID INTEGER PRIMARY KEY,
+		track_id INTEGER PRIMARY KEY,
 		track TEXT NOT NULL
 	);
     CREATE TABLE IF NOT EXISTS sessions(
@@ -46,4 +46,23 @@ var Sql = `
 		track_id INTEGER NOT NULL,
 		FOREIGN KEY (setup_id) REFERENCES setups (setup_id),
 		FOREIGN KEY (track_id) REFERENCES tracks (track_id)
+	);
+	CREATE TABLE IF NOT EXISTS bokeh_cache(
+		session_id INTEGER NOT NULL,
+		script TEXT NOT NULL,
+		div_travel TEXT NOT NULL,
+		div_velocity TEXT NOT NULL,
+		div_map TEXT NOT NULL,
+		div_lr TEXT NOT NULL,
+		div_sw TEXT NOT NULL,
+		div_setup TEXT NOT NULL,
+		json_f_fft TEXT,
+		json_r_fft TEXT,
+		json_f_thist TEXT,
+		json_r_thist TEXT,
+		json_f_vhist TEXT,
+		json_r_vhist TEXT,
+		json_cbalance TEXT,
+		json_rbalance TEXT,
+		FOREIGN KEY (session_id) REFERENCES sessions (session_id)
 	);`
