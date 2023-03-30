@@ -6,7 +6,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.plotting import figure
 
 
-def description_figure(name: str, desc: str, full_access: bool) -> figure:
+def description_figure(name: str, desc: str) -> figure:
     savebutton = Button(
         label="save",
         disabled=True,
@@ -21,6 +21,7 @@ def description_figure(name: str, desc: str, full_access: bool) -> figure:
 
     name_input = TextInput(
         value=name,
+        disabled=True,
         sizing_mode='stretch_width',
         margin=(0, 0, 0, 0),
         styles={
@@ -33,11 +34,16 @@ def description_figure(name: str, desc: str, full_access: bool) -> figure:
                 color: #d0d0d0;
                 background-color: #20262B;
                 font-size: 110%;
+            }
+            :host input[disabled] {
+                color: #d0d0d0;
+                background-color: #20262B;
             }"""],
         tags=[name])
 
     desc_input = TextAreaInput(
         value=desc,
+        disabled=True,
         sizing_mode='stretch_both',
         margin=(0, 0, 0, 0),
         stylesheets=["""
@@ -47,6 +53,10 @@ def description_figure(name: str, desc: str, full_access: bool) -> figure:
                 font-size: 110%;
                 padding: 12px;
                 min-height: 180px;
+            }
+            :host textarea[disabled] {
+                color: #d0d0d0;
+                background-color: #20262B;
             }"""],
         styles={
             "padding": "5px",
@@ -79,9 +89,8 @@ def description_figure(name: str, desc: str, full_access: bool) -> figure:
     children = [Div(text="<h3>Notes</h3>",
                     sizing_mode='stretch_width',
                     height=25,
-                    stylesheets=[":host h3 {margin-block-start: 0px;}"])]
-    if full_access:
-        children.append(savebutton)
+                    stylesheets=[":host h3 {margin-block-start: 0px;}"]),
+                savebutton]
     return column(
         name='description',
         sizing_mode='stretch_both',

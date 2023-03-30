@@ -6,10 +6,11 @@ import sqlite3
 import msgpack
 import numpy as np
 
-from bokeh.events import MouseMove
+from bokeh.events import DocumentReady, MouseMove
 from bokeh.embed import components
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
+from bokeh.models.callbacks import CustomJS
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.themes import built_in_themes, DARK_MINIMAL
@@ -249,10 +250,7 @@ if telemetry.Front.Present and telemetry.Rear.Present:
 '''
 Description
 '''
-p_desc = description_figure(
-    session_name,
-    description,
-    full_access)
+p_desc = description_figure(session_name, description)
 
 '''
 Map
@@ -329,6 +327,11 @@ if suspension_count == 2:
     curdoc().add_root(p_balance_compression)
     curdoc().add_root(p_balance_rebound)
     columns.extend(['cbalance', 'rbalance'])
+
+# Some Bokeh models (like the description box or the map) need to be
+# dynamically initialized based on values in a particular Flask session.
+curdoc().js_on_event(DocumentReady, CustomJS(
+    args=dict(), code='init_models();'))
 
 script, divs = components(curdoc().roots, theme=dark_minimal_theme)
 cur.execute(f'''

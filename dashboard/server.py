@@ -214,6 +214,17 @@ def updates():
 def delete_session(id: int):
     if 'full_access' in session and session['full_access']:
         print(f'deleting {id}')
+        # TODO implement delete...
+        return '', 204
+    else:
+        return '', 401
+
+
+@app.route('/<int:id>', methods=['PATCH'])
+def update_session(id: int):
+    if 'full_access' in session and session['full_access']:
+        print(f'updating {id}')
+        # TODO implement delete...
         return '', 204
     else:
         return '', 401
