@@ -1,7 +1,7 @@
 from sqlalchemy import (
     Column, Integer, LargeBinary, MetaData, String, Table,
     ForeignKey,
-    insert, desc, select, update
+    desc, delete, insert, select, update
 )
 
 
@@ -68,8 +68,20 @@ def stmt_session(session_id: int):
         .where(sessions_table.c.session_id == session_id))
 
 
+def stmt_session_delete(session_id: int):
+    return (delete(
+        sessions_table)
+        .where(sessions_table.c.session_id == session_id))
+
+
 def stmt_cache(session_id: int):
     return (select(
+        bokeh_components_table)
+        .where(bokeh_components_table.c.session_id == session_id))
+
+
+def stmt_cache_delete(session_id: int):
+    return (delete(
         bokeh_components_table)
         .where(bokeh_components_table.c.session_id == session_id))
 

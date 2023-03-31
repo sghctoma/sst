@@ -19,7 +19,9 @@ from balance import update_balance
 from database import (
     stmt_sessions,
     stmt_session,
+    stmt_session_delete,
     stmt_cache,
+    stmt_cache_delete,
     stmt_track,
     stmt_session_tracks,
     stmt_description
@@ -250,7 +252,12 @@ def delete_session(id: int):
     if not _check_access():
         return '', 401
 
-    print(f'deleting {id}')
+    with engine.connect() as conn:
+        conn.execute(stmt_session_delete(id))
+        conn.execute(stmt_cache_delete(id))
+        # TODO: delete track too, if no other sessions use it
+        conn.commit()
+
     return '', 204
 
 
