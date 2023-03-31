@@ -156,7 +156,9 @@ def dashboard(session_id):
     if not session_data:
         return empty_template.render(
             sessions=_sessions_list(),
-            full_access=session['full_access']
+            full_access=session['full_access'],
+            type="error",
+            message="Session not found!",
         )
 
     session['session_name'] = session_data[0]
@@ -185,7 +187,9 @@ def dashboard(session_id):
     if not components:
         return empty_template.render(
             sessions=_sessions_list(),
-            full_access=session['full_access']
+            full_access=session['full_access'],
+            type="warning",
+            message="Session cache not yet ready!",
         )
 
     components_script = components[1]

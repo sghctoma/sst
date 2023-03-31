@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="static/favicon_io/favicon-16x16.png">
     <link rel="manifest" href="static/favicon_io/site.webmanifest">
     <link href="static/common.css" rel="stylesheet"/>
+    <link href="static/alerts.css" rel="stylesheet"/>
   </head>
   <body>
     <input type="checkbox" id="drawer-toggle" name="drawer-toggle"/>
@@ -19,7 +20,14 @@
     </nav>
 
     <div id="page-content" class="container">
-    <!-- TODO: error message -->
+    <label>
+      <input type="checkbox" class="alertCheckbox" autocomplete="off" />
+      <div class="alert {{ type }}">
+        <span class="alertClose">X</span>
+        <span class="alertText">{{ message }}
+        <br class="clear"/></span>
+      </div>
+    </label>
     </div>
 
     <div id="open-modal" class="modal-window">
