@@ -6,7 +6,7 @@ from bokeh.models.widgets.markups import Div
 from bokeh.plotting import figure
 
 
-def description_figure(name: str, desc: str) -> figure:
+def description_figure(session_id: int, name: str, desc: str) -> figure:
     name_input = TextInput(
         value=name,
         disabled=True,
@@ -68,7 +68,34 @@ def description_figure(name: str, desc: str) -> figure:
             "margin-left": "auto",
             "margin-right": "5px"})
 
-    savebutton.js_on_click(CustomJS(args=dict(), code='''
+    savebutton.js_on_click(CustomJS(
+        args=dict(n=name_input, d=desc_input, id=session_id), code='''
+        var nn = n.value_input;
+        if (!nn) {
+            nn = n.value;
+        }
+        var nd = d.value_input;
+        if (!nd) {
+            nd = d.value;
+        }
+        const params = {
+            method: "PATCH",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({"name": nn, "desc": nd}),
+        };
+        fetch("/" + id, params)
+            .then((response) => {
+                if (response.ok) {
+                    cb_obj.origin.disabled = true;
+                    document.getElementById("sname").innerHTML = nn;
+                    document.getElementById("session_a_" + id).innerHTML = nn;
+                } else {
+                    alert("Could not update session data!");
+                };
+            })
         '''))
 
     desc_input.js_on_change('value_input', CustomJS(

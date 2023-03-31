@@ -248,7 +248,7 @@ if telemetry.Front.Present and telemetry.Rear.Present:
 '''
 Description
 '''
-p_desc = description_figure(session_name, description)
+p_desc = description_figure(s, session_name, description)
 
 '''
 Map

@@ -4,6 +4,7 @@ from sqlalchemy import (
     insert, desc, select, update
 )
 
+
 metadata_obj = MetaData()
 
 bokeh_components_table = Table(
@@ -94,3 +95,10 @@ def stmt_session_tracks(session_id: int, track_id: int,
         .where(sessions_table.c.session_id.in_(stmt_select))
         .values(track_id=track_id))
     return stmt_update
+
+
+def stmt_description(session_id: int, name: str, desc: str):
+    return (update(
+        sessions_table)
+        .where(sessions_table.c.session_id == session_id)
+        .values(name=name, description=desc))

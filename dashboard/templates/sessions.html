@@ -86,7 +86,7 @@ const remove_session = function(id) {
 {% for session in s %}
 <div id="session_{{ session[0] }}" style="display: block;">
 <div class="tooltip" style="display: inline-block; margin: 5px; margin-left: 15px;">
-<a href="/{{ session[0] }}" sytle="display: inline-block;">{{ session[1] }}</a>
+<a id="session_a_{{ session[0] }}" href="/{{ session[0] }}" sytle="display: inline-block;">{{ session[1] }}</a>
 <span class="tooltiptext">{{ session[2] }}</span>
 </div>
 {% if full_access %}

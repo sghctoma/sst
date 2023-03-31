@@ -21,7 +21,8 @@ from database import (
     stmt_session,
     stmt_cache,
     stmt_track,
-    stmt_session_tracks
+    stmt_session_tracks,
+    stmt_description
 )
 from fft import update_fft
 from psst import Suspension, Strokes, Telemetry, dataclass_from_dict
@@ -258,7 +259,11 @@ def update_session(id: int):
     if not _check_access():
         return '', 401
 
-    print(f'updating {id}')
+    data = request.json
+    with engine.connect() as conn:
+        conn.execute(stmt_description(id, data['name'], data['desc']))
+        conn.commit()
+
     return '', 204
 
 

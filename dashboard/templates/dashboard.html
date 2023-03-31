@@ -16,7 +16,6 @@
       // Description box
       {% if full_access -%}
       const desc = Bokeh.documents[0].get_model_by_name("description");
-      desc.children[0].children[1].disabled=false  // save button
       desc.children[1].disabled = false;           // name input
       desc.children[2].disabled = false;           // description textarea
       {% endif %}
