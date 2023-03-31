@@ -209,3 +209,54 @@ h4 {
   } 
 }
 
+.drop-container {
+  position: relative;
+  top: 200px;
+  left: 50%;
+  margin-top: -20px;
+  margin-left: -90px;
+  justify-content: center;
+  align-items: center;
+  background: #0a0a0a;  
+  height: 34px;
+  width: 180px;
+  padding: 6px 12px;
+  border: 1px dashed #ccc;
+  cursor: pointer;
+  transition: background .3s, border .3s;
+}
+
+.drop-container:hover {
+  background: #404040;
+}
+
+.drop-container:hover .drop-title {
+  color: #d0d0d0;
+}
+
+.drop-title {
+  color: #d0d0d0;
+  font-size: 14px;
+  text-align: center;
+  transition: color .2s ease-in-out;
+}
+
+.static-label {
+  position: relative;
+  top: 200px;
+  left: 50%;
+  margin-top: -20px;
+  margin-left: -90px;
+  justify-content: center;
+  align-items: center;
+  color: #d0d0d0;
+  background: #0a0a0a;  
+  height: 34px;
+  width: 180px;
+  padding: 6px 12px;
+  border: 1px dashed #ccc;
+}
+
+input[type=file] {
+  display: none;
+}

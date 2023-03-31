@@ -9,7 +9,7 @@ import numpy as np
 from bokeh.events import DocumentReady, MouseMove
 from bokeh.embed import components
 from bokeh.io import curdoc
-from bokeh.layouts import column, row
+from bokeh.layouts import row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
@@ -19,7 +19,7 @@ from balance import balance_figure
 from description import description_figure
 from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
-from map import track_data, map_figure_notrack, map_figure
+from map import map_figure
 from psst import Telemetry, dataclass_from_dict
 from travel import travel_figure, travel_histogram_figure
 from velocity import velocity_figure
@@ -61,8 +61,6 @@ s = cmd_args.session
 
 con = sqlite3.connect(cmd_args.database)
 cur = con.cursor()
-
-full_access = False  # XXX
 
 res = cur.execute('''
     SELECT name,description,data,track
@@ -255,24 +253,8 @@ p_desc = description_figure(session_name, description)
 '''
 Map
 '''
-full_track, session_track = track_data(track_json, start_time, end_time)
-p_map = column(
-    name='map',
-    sizing_mode='stretch_both',
-    min_height=340,
-    styles={'background-color': '#15191c'})
-
-if session_track is None:
-    m = map_figure_notrack(
-        s,
-        con if full_access else None,
-        start_time, end_time,
-        p_map, p_travel)
-else:
-    m, on_mousemove = map_figure(full_track, session_track)
-    p_travel.js_on_event(MouseMove, on_mousemove)
-
-p_map.children = [m]
+p_map, on_mousemove = map_figure()
+p_travel.js_on_event(MouseMove, on_mousemove)
 
 '''
 Construct the layout.

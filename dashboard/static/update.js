@@ -1,8 +1,8 @@
 const update_plots = function(start, end) {
   const args = "?start=" + start + "&end=" + end
   fetch('/updates' + args)
-    .then(function(response) { return response.json(); })
-    .then(function(update) { process_update_json(update); })
+    .then((response) => { return response.json(); })
+    .then((update) => { process_update_json(update); })
 }
 
 const update_fft = function(p, u) {
@@ -82,4 +82,26 @@ const update_balance = function(p, u) {
   p.select_one("ds_f").data = u.f_data;
   p.select_one("ds_r").data = u.r_data;
   p.x_range.end = u.range_end;
+}
+
+const update_map = function(map, full_track, session_track) {
+  const start_lon = session_track["lon"][0];
+  const start_lat = session_track["lat"][0];
+
+  map.select_one("ds_track").data = full_track;
+  map.select_one("ds_session").data = session_track;
+
+  const ratio = map.inner_height / map.inner_width;
+  map.x_range.start = start_lon - 600;
+  map.x_range.end = start_lon + 600;
+  map.y_range.start = start_lat - (600 * ratio);
+  map.y_range.end = start_lat + (600 * ratio);
+
+  const start_point = map.select_one("start_point");
+  start_point.x = full_track["lon"][0];
+  start_point.y = full_track["lat"][0];
+
+  const end_point = map.select_one("end_point");
+  end_point.x = full_track["lon"].slice(-1)[0];
+  end_point.y = full_track["lat"].slice(-1)[0];
 }

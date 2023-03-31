@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import msgpack
 import pytz
 
@@ -15,9 +16,16 @@ from bokeh.resources import CDN
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
 from balance import update_balance
-from database import stmt_sessions, stmt_session, stmt_cache
+from database import (
+    stmt_sessions,
+    stmt_session,
+    stmt_cache,
+    stmt_track,
+    stmt_session_tracks
+)
 from fft import update_fft
 from psst import Suspension, Strokes, Telemetry, dataclass_from_dict
+from map import gpx_to_dict, track_data
 from travel import update_travel_histogram
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
@@ -45,6 +53,7 @@ Session(app)
 
 jinja_env = Environment(loader=FileSystemLoader('templates'))
 dashboard_template = jinja_env.get_template('dashboard.html')
+empty_template = jinja_env.get_template('empty.html')
 
 
 def _sessions_list() -> dict[str, tuple[int, str, str]]:
@@ -117,6 +126,10 @@ def _update_data(strokes: Strokes, suspension: Suspension):
     )
 
 
+def _check_access():
+    return 'full_access' in session and session['full_access']
+
+
 @app.route('/', defaults={'session_id': None})
 @app.route('/<int:session_id>')
 def dashboard(session_id):
@@ -142,29 +155,48 @@ def dashboard(session_id):
 
     res = conn.execute(stmt_session(session_id))
     session_data = res.fetchone()
+    if not session_data:
+        return empty_template.render(
+            sessions=_sessions_list(),
+            full_access=session['full_access']
+        )
+
     session['session_name'] = session_data[0]
-    session['track_json'] = session_data[3]  # XXX is this necessary?
 
     d = msgpack.unpackb(session_data[2])
-    session['telemetry'] = dataclass_from_dict(Telemetry, d)
+    t = dataclass_from_dict(Telemetry, d)
+    session['telemetry'] = t
 
     suspension_count = 0
-    if session['telemetry'].Front.Present:
+    if t.Front.Present:
         suspension_count += 1
-    if session['telemetry'].Rear.Present:
+    if t.Rear.Present:
         suspension_count += 1
+
+    record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
+    elapsed_time = record_num / t.SampleRate
+    start_time = t.Timestamp
+    end_time = start_time + elapsed_time
+    session['start_time'] = start_time
+    session['end_time'] = end_time
+    full_track, session_track = track_data(session_data[3],
+                                           start_time, end_time)
 
     res = conn.execute(stmt_cache(session_id))
     components = res.fetchone()
     if not components:
-        return "ERR"  # XXX
+        return empty_template.render(
+            sessions=_sessions_list(),
+            full_access=session['full_access']
+        )
 
     components_script = components[1]
     components_divs = components[2:]
 
-    utc_str = datetime.fromtimestamp(session['telemetry'].Timestamp,
+    utc_str = datetime.fromtimestamp(t.Timestamp,
                                      pytz.UTC).strftime('%Y.%m.%d %H:%M')
 
+    conn.close()
     return dashboard_template.render(
         sessions=_sessions_list(),
         resources=CDN.render(),
@@ -172,6 +204,8 @@ def dashboard(session_id):
         name=session['session_name'],
         date=utc_str,
         full_access=session['full_access'],
+        full_track=full_track,
+        session_track=session_track,
         components_script=components_script,
         components_divs=components_divs)
 
@@ -212,22 +246,43 @@ def updates():
 
 @app.route('/<int:id>', methods=['DELETE'])
 def delete_session(id: int):
-    if 'full_access' in session and session['full_access']:
-        print(f'deleting {id}')
-        # TODO implement delete...
-        return '', 204
-    else:
+    if not _check_access():
         return '', 401
+
+    print(f'deleting {id}')
+    return '', 204
 
 
 @app.route('/<int:id>', methods=['PATCH'])
 def update_session(id: int):
-    if 'full_access' in session and session['full_access']:
-        print(f'updating {id}')
-        # TODO implement delete...
-        return '', 204
-    else:
+    if not _check_access():
         return '', 401
+
+    print(f'updating {id}')
+    return '', 204
+
+
+@app.route('/gpx', methods=['PUT'])
+def upload_gpx():
+    if not _check_access():
+        return '', 401
+
+    track_dict = gpx_to_dict(request.data)
+    ts, tf = track_dict['time'][0], track_dict['time'][-1]
+    full_track, session_track = track_data(
+        track_dict, session['start_time'], session['end_time'])
+    if session_track is None:
+        return '', 400
+    data = dict(full_track=full_track, session_track=session_track)
+
+    with engine.connect() as conn:
+        res = conn.execute(stmt_track(json.dumps(track_dict)))
+        track_id = res.fetchone()[0]
+        conn.execute(stmt_session_tracks(
+            session['id'], track_id, ts, tf))
+        conn.commit()
+
+    return jsonify(data), 200
 
 
 if __name__ == '__main__':

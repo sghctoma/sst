@@ -7,18 +7,6 @@ from bokeh.plotting import figure
 
 
 def description_figure(name: str, desc: str) -> figure:
-    savebutton = Button(
-        label="save",
-        disabled=True,
-        sizing_mode='fixed',
-        height=25,
-        width=45,
-        button_type='success',
-        styles={
-            "position": "unset",
-            "margin-left": "auto",
-            "margin-right": "5px"})
-
     name_input = TextInput(
         value=name,
         disabled=True,
@@ -67,6 +55,21 @@ def description_figure(name: str, desc: str) -> figure:
             "background-color": "#15191C",
             "color": "#d0d0d0"},
         tags=[desc])
+
+    savebutton = Button(
+        label="save",
+        disabled=True,
+        sizing_mode='fixed',
+        height=25,
+        width=45,
+        button_type='success',
+        styles={
+            "position": "unset",
+            "margin-left": "auto",
+            "margin-right": "5px"})
+
+    savebutton.js_on_click(CustomJS(args=dict(), code='''
+        '''))
 
     desc_input.js_on_change('value_input', CustomJS(
         args=dict(btn=savebutton, n=name_input), code='''

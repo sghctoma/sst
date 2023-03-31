@@ -1,7 +1,7 @@
 from sqlalchemy import (
     Column, Integer, LargeBinary, MetaData, String, Table,
     ForeignKey,
-    select, desc
+    insert, desc, select, update
 )
 
 metadata_obj = MetaData()
@@ -71,3 +71,26 @@ def stmt_cache(session_id: int):
     return (select(
         bokeh_components_table)
         .where(bokeh_components_table.c.session_id == session_id))
+
+
+def stmt_track(track: str):
+    return (insert(tracks_table)
+            .values(track=track)
+            .returning(tracks_table.c.track_id))
+
+
+def stmt_session_tracks(session_id: int, track_id: int,
+                        start_time: int, end_time: int):
+    s1 = sessions_table.alias()
+    s2 = sessions_table.alias()
+    stmt_select = (select(
+        s1.c.session_id)
+        .join(s2, s1.c.setup_id == s2.c.setup_id)
+        .where(s1.c.session_id == session_id)
+        .where(s2.c.timestamp >= start_time)
+        .where(s2.c.timestamp <= end_time))
+    stmt_update = (update(
+        sessions_table)
+        .where(sessions_table.c.session_id.in_(stmt_select))
+        .values(track_id=track_id))
+    return stmt_update

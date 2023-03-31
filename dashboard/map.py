@@ -1,4 +1,3 @@
-import base64
 import io
 import json
 import math
@@ -9,18 +8,14 @@ import xyzservices.providers as xyz
 
 from typing import Any
 
-from bokeh.events import MouseMove
 from bokeh.models import Circle, ColumnDataSource
 from bokeh.models.callbacks import CustomJS
-from bokeh.layouts import layout
-from bokeh.models.widgets.inputs import FileInput
-from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
 
 
-def _geographic_to_mercator(y_lat, x_lon) -> (float, float):
+def _geographic_to_mercator(y_lat: float, x_lon: float) -> (float, float):
     if abs(x_lon) > 180 or abs(y_lat) >= 90:
         return None
 
@@ -31,23 +26,8 @@ def _geographic_to_mercator(y_lat, x_lon) -> (float, float):
     return y_m, x_m
 
 
-def _gpx_to_dict(gpx_data) -> dict[str, Any]:
-    gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
-    gpx_file = io.BytesIO(gpx_data)
-    gpx = gpxpy.parse(gpx_file)
-    for track in gpx.tracks:
-        for segment in track.segments:
-            for point in segment.points:
-                lat, lon = _geographic_to_mercator(point.latitude,
-                                                   point.longitude)
-                gpx_dict['lat'].append(lat)
-                gpx_dict['lon'].append(lon)
-                gpx_dict['ele'].append(point.elevation)
-                gpx_dict['time'].append(point.time.timestamp())
-    return gpx_dict
-
-
-def _session_track(start, end, t, track) -> dict[str, list[float]]:
+def _session_track(start: int, end: int, t: np.array, track: dict) -> (
+                   dict[str, list[float]]):
     session_indices = np.where(np.logical_and(t >= start, t <= end))
     if len(session_indices[0]) == 0:
         return None
@@ -75,7 +55,23 @@ def _session_track(start, end, t, track) -> dict[str, list[float]]:
     return dict(lon=list(y[0, :]), lat=list(y[1, :]))
 
 
-def track_data(track, start_timestamp, end_timestamp) -> (
+def gpx_to_dict(gpx_data: str) -> dict[str, Any]:
+    gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
+    gpx_file = io.BytesIO(gpx_data)
+    gpx = gpxpy.parse(gpx_file)
+    for track in gpx.tracks:
+        for segment in track.segments:
+            for point in segment.points:
+                lat, lon = _geographic_to_mercator(point.latitude,
+                                                   point.longitude)
+                gpx_dict['lat'].append(lat)
+                gpx_dict['lon'].append(lon)
+                gpx_dict['ele'].append(point.elevation)
+                gpx_dict['time'].append(point.time.timestamp())
+    return gpx_dict
+
+
+def track_data(track: str, start_timestamp: int, end_timestamp: int) -> (
                dict[str, Any], dict[str, list[float]]):
     if not track:
         return None, None
@@ -100,139 +96,19 @@ def track_data(track, start_timestamp, end_timestamp) -> (
     return full_track, session_track
 
 
-def _notrack_label() -> Div:
-    label = Div(
-        text="No GPX track for session",
-        stylesheets=['''
-            :host(.notracklabel)>.bk-clearfix {
-              border: 1px dashed #ccc;
-              padding: 6px 12px;
-              font-size: 14px;
-              color: #a0a0a0;
-              height: 34px;
-              justify-self: center;
-              align-self: center;
-              grid-area: 1/1;
-            }
-            :host(.notracklabel) {
-              display: grid;
-            }'''],
-        css_classes=['notracklabel'])
-    return label
-
-
-def _upload_button(con, id, start_time, end_time, map, travel) -> FileInput:
-    file_input = FileInput(
-        name='input_gpx',
-        accept='.gpx',
-        title="Upload GPX track",
-        stylesheets=['''
-            input[type="file"] {
-              opacity: 0 !important;
-              cursor: pointer;
-              width: 140px;
-              height: 34px;
-              justify-self: center;
-              align-self: center;
-              grid-area: 1/1;
-            }
-            label {
-              border: 1px dashed #ccc;
-              padding: 6px 12px;
-              font-size: 14px;
-              color: #d0d0d0;
-              cursor: pointer;
-              width: 140px;
-              height: 34px;
-              justify-self: center;
-              align-self: center;
-              grid-area: 1/1;
-            }
-            :host(.gpxbutton)>.bk-input-group {
-              display: grid;
-            }'''],
-        css_classes=['gpxbutton'])
-
-    map.js_on_change('tags', CustomJS(args={}, code='''
-        if (cb_obj.tags[0] == 'track_not_applicable') {
-            cb_obj.tags = [];
-            alert("GPX does not contain data for session!");
-        }
-        '''))
-
-    def upload_gpx_data(attr, old, new):
-        gpx_data = base64.b64decode(file_input.value)
-        track_dict = _gpx_to_dict(gpx_data)
-        ts, tf = track_dict['time'][0], track_dict['time'][-1]
-
-        full_track, session_track = track_data(
-            track_dict, start_time, end_time)
-        if session_track is None:
-            map.tags = ['track_not_applicable']
-            return
-
-        m, on_mousemove = map_figure(full_track, session_track)
-        travel.js_on_event(MouseMove, on_mousemove)
-        map.children = [m]
-
-        cur = con.cursor()
-        cur.execute('INSERT INTO tracks (track) VALUES (?)',
-                    (json.dumps(track_dict),))
-        res = cur.execute('SELECT last_insert_rowid()')
-        con.commit()
-        track_id = res.fetchone()[0]
-
-        cur.execute('''
-            UPDATE sessions
-            SET track_id=?
-            WHERE session_id
-            IN (
-                SELECT s2.session_id
-                FROM sessions s1
-                INNER JOIN sessions s2
-                ON s1.setup_id=s2.setup_id
-                WHERE s1.session_id=?
-                AND s2.timestamp>=?
-                AND s2.timestamp<=?
-            )''', (track_id, id, ts, tf))
-        con.commit()
-        cur.close()
-
-    file_input.on_change('value', upload_gpx_data)
-    return file_input
-
-
-def map_figure_notrack(session_id, con, start_time, end_time, map, travel) -> (
-                       layout):
-    if con:
-        content = _upload_button(
-            con, session_id, start_time, end_time, map, travel)
-    else:
-        content = _notrack_label()
-
-    return layout(
-        name='map',
-        sizing_mode='stretch_both',
-        min_height=400,
-        styles={'background-color': '#15191c'},
-        children=[content])
-
-
-def map_figure(full_track, session_track) -> (figure, CustomJS):
-    ds_track = ColumnDataSource(data=full_track)
-    ds_session = ColumnDataSource(data=session_track)
-
-    start_lon = ds_session.data['lon'][0]
-    start_lat = ds_session.data['lat'][0]
+def map_figure() -> (figure, CustomJS):
+    ds_track = ColumnDataSource(name='ds_track', data=dict(lat=[], lon=[]))
+    ds_session = ColumnDataSource(name='ds_session', data=dict(lat=[], lon=[]))
 
     p = figure(
         name='map',
         x_axis_type=None,
         y_axis_type=None,
-        x_range=[start_lon - 600, start_lon + 600],
-        y_range=[start_lat - 600, start_lat + 600],
+        x_range=(-600, 600),
+        y_range=(-600, 600),
         sizing_mode='stretch_both',
         min_height=400,
+        height=400,
         match_aspect=True,
         tools='pan,wheel_zoom,reset',
         toolbar_location='above',
@@ -246,33 +122,33 @@ def map_figure(full_track, session_track) -> (figure, CustomJS):
     p.add_tile(tile_provider)
     p.line(x='lon', y='lat', source=ds_track,
            color=Spectral11[3], alpha=0.5, width=2)
-    p.circle(x=ds_track.data['lon'][0], y=ds_track.data['lat'][0],
-             color='#229954', alpha=0.8, size=10)
-    p.circle(x=ds_track.data['lon'][-1], y=ds_track.data['lat'][-1],
-             color='#E74C3C', alpha=0.8, size=10)
     p.line(x='lon', y='lat', source=ds_session,
            color=Spectral11[10], alpha=0.8, width=5)
+    cs = Circle(name='start_point', x=0, y=0, size=10,
+                line_color='black', fill_color='#229954', fill_alpha=0.8)
+    ce = Circle(name='end_point', x=0, y=0, size=10,
+                line_color='black', fill_color='#E74C3C', fill_alpha=0.8)
+    p.add_glyph(cs)
+    p.add_glyph(ce)
 
-    pos_marker = Circle(
-        x=ds_session.data['lon'][0],
-        y=ds_session.data['lat'][0],
-        size=13,
-        line_color='black',
-        fill_color='gray')
+    pos_marker = Circle(x=0, y=0, size=13,
+                        line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
 
     on_mousemove = CustomJS(
         args=dict(dss=ds_session, pos=pos_marker),
         code='''
-            let idx = Math.floor(cb_obj.x * 10);
-            if (idx < 0) {
-                idx = 0;
-            } else if (idx >= dss.data['lon'].length) {
-                idx = dss.data['lon'].length - 1;
-            }
-            let lon = dss.data['lon'][idx];
-            let lat = dss.data['lat'][idx];
-            pos.x = lon;
-            pos.y = lat;''')
+            if (dss.data['lat'].length != 0) {
+                let idx = Math.floor(cb_obj.x * 10);
+                if (idx < 0) {
+                    idx = 0;
+                } else if (idx >= dss.data['lon'].length) {
+                    idx = dss.data['lon'].length - 1;
+                }
+                let lon = dss.data['lon'][idx];
+                let lat = dss.data['lat'][idx];
+                pos.x = lon;
+                pos.y = lat;
+            }''')
 
     return p, on_mousemove

@@ -13,12 +13,23 @@
     {{ resources }}
     <script>
     const init_models = function() {
-    {% if full_access -%}
+      // Description box
+      {% if full_access -%}
       const desc = Bokeh.documents[0].get_model_by_name("description");
       desc.children[0].children[1].disabled=false  // save button
       desc.children[1].disabled = false;           // name input
       desc.children[2].disabled = false;           // description textarea
-    {% endif %}
+      {% endif %}
+
+      // Map
+      const map = Bokeh.documents[0].get_model_by_name("map");
+      {% if session_track is not none -%}
+      const full_track = {{ full_track }};
+      const session_track = {{ session_track }};
+      update_map(map, full_track, session_track);
+      {%- else %}
+      map.visible = false;
+      {% endif %}
     }
     </script>
     <script src="static/update.js"></script>
@@ -70,14 +81,6 @@
       };
     </script>
     {% endif %}
-    <style>
-      html, body {
-        box-sizing: border-box;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-    </style>
     {{ components_script }}
   </head>
   <body>
@@ -91,11 +94,60 @@
     <div id="page-content" class="container">
       <div class="travel">{{ components_divs[0] }}</div>
       <div class="velocity">{{ components_divs[1] }}</div>
-      <div class="map">{{ components_divs[2] }}</div>
       <div class="lr">{{ components_divs[3] }}</div>
       <div class="sw">{{ components_divs[4] }}</div>
       <div class="setup">{{ components_divs[5] }}</div>
       <div class="description">{{ components_divs[6] }}</div>
+
+      <div class="map" style="height: 400px">
+      {{ components_divs[2] }}
+      {% if session_track is none -%}
+      {%if full_access %}
+        <div id="nomap" style="min-height: 400px; background: #15191c;">
+          <label for="track-selector" class="drop-container">
+            <span class="drop-title">Upload GPX track</span>
+            <input type="file" id="track-selector" accept=".gpx" required>
+          </label>
+          <script>
+          const track_selector = document.getElementById('track-selector');
+          const get_gpx = async function(event) {
+            const file = event.target.files[0];
+            const gpx = await file.text();
+            const params = {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/octet-stream",
+              },
+              body: gpx
+            }
+            fetch("/gpx", params)
+              .then((response) => {
+                if (response.ok) {
+                  return response.json();
+                } else {
+                  alert("GPX track is not applicable!");
+                };
+              })
+              .then((data) => {
+                if (data !== undefined) {
+                  document.getElementById("nomap").remove();
+                  const map = Bokeh.documents[0].get_model_by_name("map");
+                  map.visible = true;
+                  update_map(map, data.full_track, data.session_track);
+                }
+              })
+          }
+          track_selector.addEventListener('change', get_gpx);
+          </script>
+        </div>
+      {%- else %}
+        <div id="nomap" style="min-height: 400px; background: #15191c;">
+          <span class="static-label">No GPX track</span>
+        </div>
+      {% endif %}
+      {% endif %}
+      </div>
 
       <div class="tabs">
         <input class="radiotab" name="tabs" tabindex="1" type="radio" id="tabone" checked="checked">
@@ -149,7 +201,7 @@
           <a href="#" title="Close" class="modal-close">Close</a>
           <h1>Import sessions</h1>
           <div id="session-dialog"></div>
-          <!-- XXX -->
+          <!-- TODO: create session upload dialog... -->
       </div>
     </div>
   </body>
