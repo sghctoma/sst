@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import sqlite3
 
 import msgpack
 import numpy as np
@@ -14,8 +13,10 @@ from bokeh.models.callbacks import CustomJS
 from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
 from bokeh.themes import built_in_themes, DARK_MINIMAL
+from sqlalchemy import create_engine
 
 from balance import balance_figure
+from database import stmt_session, stmt_setup, stmt_cache_insert
 from description import description_figure
 from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
@@ -59,15 +60,10 @@ lod = cmd_args.lod
 hst = cmd_args.hst
 s = cmd_args.session
 
-con = sqlite3.connect(cmd_args.database)
-cur = con.cursor()
+engine = create_engine(f'sqlite:///{cmd_args.database}')
+conn = engine.connect()
 
-res = cur.execute('''
-    SELECT name,description,data,track
-    FROM sessions
-    LEFT JOIN tracks
-    ON sessions.track_id = tracks.track_id
-    WHERE session_id=?''', (s,))
+res = conn.execute(stmt_session(s))
 session_data = res.fetchone()
 if not session_data:
     raise Exception("No such session")
@@ -78,18 +74,7 @@ track_json = session_data[3]
 d = msgpack.unpackb(session_data[2])
 telemetry = dataclass_from_dict(Telemetry, d)
 
-res = cur.execute('''
-    SELECT setups.name,linkages.name,fcal.*,rcal.*
-    FROM setups
-    INNER JOIN linkages
-    ON linkages.linkage_id=setups.linkage_id
-    iNNER JOIN calibrations fcal
-    ON fcal.calibration_id=setups.front_calibration_id
-    INNER JOIN calibrations rcal
-    ON rcal.calibration_id=setups.rear_calibration_id
-    INNER JOIN sessions
-    ON sessions.setup_id=setups.setup_id
-    WHERE session_id=?''', (s,))
+res = conn.execute(stmt_setup(s))
 setup_data = res.fetchone()
 if not setup_data:
     raise Exception("Missing setup data")
@@ -316,8 +301,8 @@ curdoc().js_on_event(DocumentReady, CustomJS(
     args=dict(), code='init_models();'))
 
 script, divs = components(curdoc().roots, theme=dark_minimal_theme)
-cur.execute(f'''
-    INSERT INTO bokeh_components ({','.join(columns)})
-    VALUES ({','.join(['?'] * len(columns))})
-    ''', (s, script, *divs))
-con.commit()
+
+components_data = dict(zip(columns, [s, script] + list(divs)))
+conn.execute(stmt_cache_insert(), [components_data])
+conn.commit()
+conn.close()

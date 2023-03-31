@@ -1,5 +1,6 @@
 from sqlalchemy import (
-    Column, Integer, LargeBinary, MetaData, String, Table,
+    Column, MetaData, Table,
+    Float, Integer, LargeBinary, String,
     ForeignKey,
     desc, delete, insert, select, update
 )
@@ -7,26 +8,32 @@ from sqlalchemy import (
 
 metadata_obj = MetaData()
 
+tokens_table = Table(
+    'tokens',
+    metadata_obj,
+    Column('token', String, nullable=False)
+)
+
 bokeh_components_table = Table(
     'bokeh_components',
     metadata_obj,
     Column('session_id', Integer, ForeignKey('sessions.session_id')),
-    Column('script', String),
-    Column('travel', String),
-    Column('velocity', String),
-    Column('map', String),
-    Column('lr', String),
-    Column('sw', String),
-    Column('setup', String),
-    Column('desc', String),
-    Column('f_thist', String),
-    Column('f_fft', String),
-    Column('f_vhist', String),
-    Column('r_thist', String),
-    Column('r_fft', String),
-    Column('r_vhist', String),
-    Column('cbalance', String),
-    Column('rbalance', String),
+    Column('script', String, nullable=False),
+    Column('travel', String, nullable=False),
+    Column('velocity', String, nullable=False),
+    Column('map', String, nullable=False),
+    Column('lr', String, nullable=False),
+    Column('sw', String, nullable=False),
+    Column('setup', String, nullable=False),
+    Column('desc', String, nullable=False),
+    Column('f_thist', String, nullable=False),
+    Column('f_fft', String, nullable=False),
+    Column('f_vhist', String, nullable=False),
+    Column('r_thist', String, nullable=False),
+    Column('r_fft', String, nullable=False),
+    Column('r_vhist', String, nullable=False),
+    Column('cbalance', String, nullable=False),
+    Column('rbalance', String, nullable=False),
 )
 
 tracks_table = Table(
@@ -43,10 +50,46 @@ sessions_table = Table(
     Column('name', String),
     Column('setup_id', Integer, ForeignKey('setups.setup_id'), nullable=False),
     Column('description', String),
-    Column('timestamp', Integer),
-    Column('data', LargeBinary),
-    Column('track_id', Integer, ForeignKey('tracks.track_id'), nullable=False),
+    Column('timestamp', Integer, nullable=False),
+    Column('data', LargeBinary, nullable=False),
+    Column('track_id', Integer, ForeignKey('tracks.track_id')),
 )
+
+setups_table = Table(
+    'setups',
+    metadata_obj,
+    Column('setup_id', Integer, primary_key=True),
+    Column('name', String, nullable=False),
+    Column('linkage_id', Integer, ForeignKey('linkages.linkage_id'),
+           nullable=False),
+    Column('front_calibration_id', Integer,
+           ForeignKey('calibrations.calibration_id')),
+    Column('rear_calibration_id', Integer,
+           ForeignKey('calibrations.calibration_id')),
+)
+
+calibrations_table = Table(
+    'calibrations',
+    metadata_obj,
+    Column('calibration_id', Integer, primary_key=True),
+    Column('name', String, nullable=False),
+    Column('arm', Float, nullable=False),
+    Column('dist', Float, nullable=False),
+    Column('stroke', Float, nullable=False),
+    Column('angle', Float, nullable=False),
+)
+
+linkages_table = Table(
+    'linkages',
+    metadata_obj,
+    Column('linkage_id', Integer, primary_key=True),
+    Column('name', String, nullable=False),
+    Column('raw_lr_data', String, nullable=False),
+)
+
+
+def stmst_tokens():
+    return select(tokens_table)
 
 
 def stmt_sessions():
@@ -78,6 +121,10 @@ def stmt_cache(session_id: int):
     return (select(
         bokeh_components_table)
         .where(bokeh_components_table.c.session_id == session_id))
+
+
+def stmt_cache_insert():
+    return insert(bokeh_components_table)
 
 
 def stmt_cache_delete(session_id: int):
@@ -114,3 +161,18 @@ def stmt_description(session_id: int, name: str, desc: str):
         sessions_table)
         .where(sessions_table.c.session_id == session_id)
         .values(name=name, description=desc))
+
+
+def stmt_setup(session_id: int):
+    fcal = calibrations_table.alias()
+    rcal = calibrations_table.alias()
+    return (select(
+        setups_table.c.name,
+        linkages_table.c.name,
+        fcal,
+        rcal)
+        .join(linkages_table, linkages_table.c.linkage_id == setups_table.c.linkage_id)
+        .join(fcal, fcal.c.calibration_id == setups_table.c.front_calibration_id)
+        .join(rcal, rcal.c.calibration_id == setups_table.c.rear_calibration_id)
+        .join(sessions_table, sessions_table.c.setup_id == setups_table.c.setup_id)
+        .where(sessions_table.c.session_id == session_id))
