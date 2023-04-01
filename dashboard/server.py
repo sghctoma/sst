@@ -113,7 +113,7 @@ def _update_data(strokes: Strokes, suspension: Suspension):
     vbands = update_velocity_band_stats(
         strokes,
         suspension.Velocity,
-        session['hst']
+        350
     )
     return dict(
         fft=fft,
@@ -132,19 +132,6 @@ def _check_access():
 @app.route('/<int:session_id>')
 def dashboard(session_id):
     session['id'] = session_id
-
-    # lod - Level of Detail for travel graph (downsample ratio)
-    try:
-        session['lod'] = int(request.args.get('lod'))
-    except BaseException:
-        session['lod'] = 5
-
-    # hst - High Speed Threshold for velocity graphs/statistics in mm/s
-    try:
-        session['hst'] = int(request.args.get('hst'))
-    except BaseException:
-        session['hst'] = 350
-
     session['full_access'] = True  # XXX
 
     conn = engine.connect()
