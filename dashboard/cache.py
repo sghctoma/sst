@@ -33,11 +33,6 @@ parser.add_argument(
     required=True,
     help="SQLite database path")
 parser.add_argument(
-    "-g", "--gosst_api",
-    required=False,
-    default="http://127.0.0.1:8080",
-    help="GoSST HTTP API address:port")
-parser.add_argument(
     "-s", "--session",
     type=int,
     required=True,

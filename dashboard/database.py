@@ -88,7 +88,7 @@ linkages_table = Table(
 )
 
 
-def stmst_tokens():
+def stmt_tokens():
     return select(tokens_table)
 
 

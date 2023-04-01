@@ -17,6 +17,7 @@ from bokeh.themes import built_in_themes, DARK_MINIMAL
 
 from balance import update_balance
 from database import (
+    stmt_tokens,
     stmt_sessions,
     stmt_session,
     stmt_session_delete,
@@ -131,10 +132,15 @@ def _check_access():
 @app.route('/', defaults={'session_id': None})
 @app.route('/<int:session_id>')
 def dashboard(session_id):
-    session['id'] = session_id
-    session['full_access'] = True  # XXX
-
     conn = engine.connect()
+
+    session['id'] = session_id
+
+    res = conn.execute(stmt_tokens())
+    token = request.headers.get('X-Token', '')
+    print(token)
+    session['full_access'] = token in [r[0] for r in res.fetchall()]
+
     res = conn.execute(stmt_sessions())
     session['sessions'] = [list(r) for r in res.fetchall()]
 
