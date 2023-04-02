@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/blockloop/scan"
 	"github.com/gin-gonic/gin"
@@ -16,12 +15,12 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	queries "gosst/internal/db"
 	psst "gosst/internal/psst"
-	schema "gosst/internal/schema"
 )
 
 type setup struct {
-	Id               int    `db:"setup_id"             json:"id" `
+	Id               int    `db:"id"                   json:"id" `
 	Name             string `db:"name"                 json:"name"              binding:"required"`
 	Linkage          int    `db:"linkage_id"           json:"linkage"           binding:"required"`
 	FrontCalibration int    `db:"front_calibration_id" json:"front-calibration" binding:"required"`
@@ -29,7 +28,7 @@ type setup struct {
 }
 
 type session struct {
-	Id          int    `db:"session_id"  json:"id"`
+	Id          int    `db:"id"          json:"id"`
 	Name        string `db:"name"        json:"name"           binding:"required"`
 	Timestamp   int64  `db:"timestamp"   json:"timestamp"`
 	Description string `db:"description" json:"description"    binding:"required"`
@@ -39,7 +38,7 @@ type session struct {
 }
 
 type board struct {
-	Id    string `db:"board_id" json:"id"    binding:"required"`
+	Id    string `db:"id"       json:"id"    binding:"required"`
 	Setup int    `db:"setup_id" json:"setup" binding:"required"`
 }
 
@@ -54,35 +53,19 @@ func (this *RequestHandler) PutBoard(c *gin.Context) {
 		return
 	}
 
-	cols := []string{"board_id", "setup_id"}
-	vals, _ := scan.Values(cols, &board)
-	tx, err := this.Db.Begin()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO boards ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+	vals, _ := scan.Values([]string{"id", "setup_id"}, &board)
 	var lastInsertedId int
-	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	err := this.Db.QueryRow(queries.InsertBoard, vals...).Scan(&lastInsertedId)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-	err = tx.Commit()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
 
 func (this *RequestHandler) DeleteBoard(c *gin.Context) {
-	if _, err := this.Db.Exec("DELETE FROM boards WHERE board_id = ?", c.Param("id")); err != nil {
+	if _, err := this.Db.Exec(queries.DeleteBoard, c.Param("id")); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -90,7 +73,7 @@ func (this *RequestHandler) DeleteBoard(c *gin.Context) {
 }
 
 func (this *RequestHandler) GetSetups(c *gin.Context) {
-	rows, err := this.Db.Query("SELECT * FROM setups")
+	rows, err := this.Db.Query(queries.Setups)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -114,7 +97,7 @@ func (this *RequestHandler) GetSetup(c *gin.Context) {
 	}
 
 	var setup setup
-	rows, err := this.Db.Query("SELECT * FROM setup WHERE setup_id = ?", id)
+	rows, err := this.Db.Query(queries.Setup, id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -137,26 +120,11 @@ func (this *RequestHandler) PutSetup(c *gin.Context) {
 
 	cols := []string{"name", "linkage_id", "front_calibration_id", "rear_calibration_id"}
 	vals, _ := scan.Values(cols, &setup)
-	tx, err := this.Db.Begin()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO setups ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?)", vals...)
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
 	var lastInsertedId int
-	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	err := this.Db.QueryRow(queries.InsertSetup, vals...).Scan(&lastInsertedId)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-	err = tx.Commit()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
@@ -169,7 +137,7 @@ func (this *RequestHandler) DeleteSetup(c *gin.Context) {
 		return
 	}
 
-	if _, err := this.Db.Exec("DELETE FROM setups WHERE setup_id = ?", id); err != nil {
+	if _, err := this.Db.Exec(queries.DeleteSetup, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -177,7 +145,7 @@ func (this *RequestHandler) DeleteSetup(c *gin.Context) {
 }
 
 func (this *RequestHandler) GetCalibrations(c *gin.Context) {
-	rows, err := this.Db.Query("SELECT * FROM calibrations")
+	rows, err := this.Db.Query(queries.Calibrations)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -201,7 +169,7 @@ func (this *RequestHandler) GetCalibration(c *gin.Context) {
 	}
 
 	var cal psst.Calibration
-	rows, err := this.Db.Query("SELECT * FROM calibrations where calibration_id = ?", id)
+	rows, err := this.Db.Query(queries.Calibration, id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -230,26 +198,11 @@ func (this *RequestHandler) PutCalibration(c *gin.Context) {
 
 	cols := []string{"name", "arm", "dist", "stroke", "angle"}
 	vals, _ := scan.Values(cols, &cal)
-	tx, err := this.Db.Begin()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO calibrations ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
 	var lastInsertedId int
-	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	err := this.Db.QueryRow(queries.InsertCalibration, vals...).Scan(&lastInsertedId)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-	err = tx.Commit()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
@@ -262,7 +215,7 @@ func (this *RequestHandler) DeleteCalibration(c *gin.Context) {
 		return
 	}
 
-	if _, err := this.Db.Exec("DELETE FROM calibrations WHERE calibration_id = ?", id); err != nil {
+	if _, err := this.Db.Exec(queries.DeleteCalibration, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -270,7 +223,7 @@ func (this *RequestHandler) DeleteCalibration(c *gin.Context) {
 }
 
 func (this *RequestHandler) GetLinkages(c *gin.Context) {
-	rows, err := this.Db.Query("SELECT * FROM linkages")
+	rows, err := this.Db.Query(queries.Linkages)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -298,7 +251,7 @@ func (this *RequestHandler) GetLinkage(c *gin.Context) {
 	}
 
 	var linkage psst.Linkage
-	rows, err := this.Db.Query("SELECT * FROM linkages where linkage_id = ?", id)
+	rows, err := this.Db.Query(queries.Linkage, id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -331,26 +284,11 @@ func (this *RequestHandler) PutLinkage(c *gin.Context) {
 
 	cols := []string{"name", "raw_lr_data"}
 	vals, _ := scan.Values(cols, &linkage)
-	tx, err := this.Db.Begin()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO linkages ("+strings.Join(cols, ",")+") VALUES (?, ?)", vals...)
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
 	var lastInsertedId int
-	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	err := this.Db.QueryRow(queries.InsertLinkage, vals...).Scan(&lastInsertedId)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-	err = tx.Commit()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
@@ -363,7 +301,7 @@ func (this *RequestHandler) DeleteLinkage(c *gin.Context) {
 		return
 	}
 
-	if _, err := this.Db.Exec("DELETE FROM linkages WHERE linkage_id = ?", id); err != nil {
+	if _, err := this.Db.Exec(queries.DeleteLinkage, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -371,7 +309,7 @@ func (this *RequestHandler) DeleteLinkage(c *gin.Context) {
 }
 
 func (this *RequestHandler) GetSessions(c *gin.Context) {
-	rows, err := this.Db.Query("SELECT session_id, name, timestamp, description, setup_id FROM sessions")
+	rows, err := this.Db.Query(queries.Sessions)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
@@ -393,7 +331,7 @@ func (this *RequestHandler) GetSession(c *gin.Context) {
 		return
 	}
 
-	rows, err := this.Db.Query("SELECT session_id, name, timestamp, description, setup_id FROM sessions where session_id = ?", id)
+	rows, err := this.Db.Query(queries.Session, id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -413,7 +351,7 @@ func (this *RequestHandler) GetSessionData(c *gin.Context) {
 
 	var name string
 	var data []byte
-	err = this.Db.QueryRow("SELECT name, data FROM sessions where session_id = ?", id).Scan(&name, &data)
+	err = this.Db.QueryRow(queries.SessionData, id).Scan(&name, &data)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.AbortWithStatus(http.StatusNotFound)
@@ -434,7 +372,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
-	rows, err := this.Db.Query("SELECT * FROM setups WHERE setup_id = ?", session.Setup)
+	rows, err := this.Db.Query(queries.Setup, session.Setup)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -447,13 +385,13 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	}
 
 	var frontCalibration, rearCalibration psst.Calibration
-	rows, err = this.Db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", setup.FrontCalibration)
+	rows, err = this.Db.Query(queries.Calibration, setup.FrontCalibration)
 	err = scan.RowStrict(&frontCalibration, rows)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	rows, err = this.Db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", setup.RearCalibration)
+	rows, err = this.Db.Query(queries.Calibration, setup.RearCalibration)
 	err = scan.RowStrict(&rearCalibration, rows)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -461,7 +399,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	}
 
 	var linkage psst.Linkage
-	rows, err = this.Db.Query("SELECT * FROM linkages WHERE linkage_id = ?", setup.Linkage)
+	rows, err = this.Db.Query(queries.Linkage, setup.Linkage)
 	err = scan.RowStrict(&linkage, rows)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -493,26 +431,11 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 
 	cols := []string{"name", "timestamp", "description", "setup_id", "data"}
 	vals, _ := scan.Values(cols, &session)
-	tx, err := this.Db.Begin()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO sessions ("+strings.Join(cols, ",")+") VALUES (?, ?, ?, ?, ?)", vals...)
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
 	var lastInsertedId int
-	err = tx.QueryRow("SELECT last_insert_rowid()").Scan(&lastInsertedId)
+	err = this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-	err = tx.Commit()
-	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
@@ -525,7 +448,7 @@ func (this *RequestHandler) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	if _, err := this.Db.Exec("DELETE FROM sessions WHERE session_id = ?", id); err != nil {
+	if _, err := this.Db.Exec(queries.DeleteSession, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -548,8 +471,7 @@ func (this *RequestHandler) PatchSession(c *gin.Context) {
 		return
 	}
 
-	if _, err := this.Db.Exec("UPDATE sessions SET (name, description) = (?, ?) WHERE session_id = ?",
-		sessionMeta.Name, sessionMeta.Description, id); err != nil {
+	if _, err := this.Db.Exec(queries.UpdateSession, sessionMeta.Name, sessionMeta.Description, id); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
 		c.Status(http.StatusNoContent)
@@ -571,7 +493,7 @@ func main() {
 	if err != nil {
 		log.Fatal("could not open database")
 	}
-	if _, err := db.Exec(schema.Sql); err != nil {
+	if _, err := db.Exec(queries.Schema); err != nil {
 		log.Fatal("could not create data tables")
 	}
 

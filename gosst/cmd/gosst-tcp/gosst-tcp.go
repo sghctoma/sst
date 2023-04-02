@@ -15,24 +15,19 @@ import (
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
+	queries "gosst/internal/db"
 	psst "gosst/internal/psst"
-	schema "gosst/internal/schema"
 )
 
 func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) error {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
-	q := `SELECT S.setup_id, S.linkage_id, S.front_calibration_id, S.rear_calibration_id
-		  FROM setups S JOIN boards B
-          WHERE
-		    B.board_id = ? AND
-            S.setup_id = B.setup_id;`
-	err := db.QueryRow(q, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
+	err := db.QueryRow(queries.SetupForBoard, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
 		return err
 	}
 
 	var linkage psst.Linkage
-	rows, err := db.Query("SELECT * FROM linkages WHERE linkage_id = ?", linkageId)
+	rows, err := db.Query(queries.Linkage, linkageId)
 	if err != nil {
 		return err
 	}
@@ -46,7 +41,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) erro
 	}
 
 	var frontCalibration psst.Calibration
-	rows, err = db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", frontCalibrationId)
+	rows, err = db.Query(queries.Calibration, frontCalibrationId)
 	if err != nil {
 		return err
 	}
@@ -56,7 +51,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) erro
 	}
 
 	var rearCalibration psst.Calibration
-	rows, err = db.Query("SELECT * FROM calibrations WHERE calibration_id = ?", rearCalibrationId)
+	rows, err = db.Query(queries.Calibration, rearCalibrationId)
 	if err != nil {
 		return err
 	}
@@ -70,9 +65,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) erro
 	var data []byte
 	enc := codec.NewEncoderBytes(&data, h)
 	enc.Encode(pd)
-	if _, err := db.Exec("INSERT INTO sessions (name, timestamp, description, setup_id, data) VALUES (?, ?, ?, ?, ?)",
-		name, pd.Timestamp, "", setupId, data); err != nil {
-
+	if _, err := db.Exec(queries.InsertSession, name, pd.Timestamp, "", setupId, data); err != nil {
 		return err
 	}
 
@@ -152,7 +145,7 @@ func main() {
 	if err != nil {
 		log.Fatal("[ERR] could not open database")
 	}
-	if _, err := db.Exec(schema.Sql); err != nil {
+	if _, err := db.Exec(queries.Schema); err != nil {
 		log.Fatal("[ERR] could not create data tables")
 	}
 
