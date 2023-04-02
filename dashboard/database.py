@@ -98,6 +98,7 @@ def stmt_sessions():
         sessions_table.c.name,
         sessions_table.c.description,
         sessions_table.c.timestamp)
+        .join(bokeh_components_table, sessions_table.c.session_id == bokeh_components_table.c.session_id)
         .order_by(desc(sessions_table.c.timestamp)))
 
 
