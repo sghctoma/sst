@@ -478,6 +478,47 @@ func (this *RequestHandler) PatchSession(c *gin.Context) {
 	}
 }
 
+func contains(list []string, e string) bool {
+	for _, s := range list {
+		if s == e {
+			return true
+		}
+	}
+	return false
+}
+
+func loadApiTokens(db *sql.DB) ([]string, error) {
+	rows, err := db.Query(queries.Tokens)
+	if err != nil {
+		return nil, err
+	}
+	var tokens []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err == nil {
+			tokens = append(tokens, t)
+		}
+	}
+	return tokens, nil
+}
+
+func (this *RequestHandler) TokenAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokens, err := loadApiTokens(this.Db)
+		if err != nil {
+			log.Println("Could not load API tokens.")
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		token := c.GetHeader("X-Token")
+		if !contains(tokens, token) {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		c.Next()
+	}
+}
+
 func main() {
 	var opts struct {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
@@ -491,40 +532,41 @@ func main() {
 
 	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
-		log.Fatal("could not open database")
+		log.Fatal("Could not open database")
 	}
 	if _, err := db.Exec(queries.Schema); err != nil {
-		log.Fatal("could not create data tables")
+		log.Fatal("Could not create data tables")
 	}
 
+	rh := RequestHandler{Db: db}
 	//XXX gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.SetTrustedProxies(nil)
 
-	router.GET("/calibrations", (&RequestHandler{Db: db}).GetCalibrations)
-	router.GET("/calibration/:id", (&RequestHandler{Db: db}).GetCalibration)
-	router.PUT("/calibration", (&RequestHandler{Db: db}).PutCalibration)
-	router.DELETE("/calibration/:id", (&RequestHandler{Db: db}).DeleteCalibration)
+	router.GET("/calibrations", rh.GetCalibrations)
+	router.GET("/calibration/:id", rh.GetCalibration)
+	router.PUT("/calibration", rh.TokenAuthMiddleware(), rh.PutCalibration)
+	router.DELETE("/calibration/:id", rh.TokenAuthMiddleware(), rh.DeleteCalibration)
 
-	router.GET("/linkages", (&RequestHandler{Db: db}).GetLinkages)
-	router.GET("/linkage/:id", (&RequestHandler{Db: db}).GetLinkage)
-	router.PUT("/linkage", (&RequestHandler{Db: db}).PutLinkage)
-	router.DELETE("/linkage/:id", (&RequestHandler{Db: db}).DeleteLinkage)
+	router.GET("/linkages", rh.GetLinkages)
+	router.GET("/linkage/:id", rh.GetLinkage)
+	router.PUT("/linkage", rh.TokenAuthMiddleware(), rh.PutLinkage)
+	router.DELETE("/linkage/:id", rh.TokenAuthMiddleware(), rh.DeleteLinkage)
 
-	router.GET("/setups", (&RequestHandler{Db: db}).GetSetups)
-	router.GET("/setup/:id", (&RequestHandler{Db: db}).GetSetup)
-	router.PUT("/setup", (&RequestHandler{Db: db}).PutSetup)
-	router.DELETE("/setup/:id", (&RequestHandler{Db: db}).DeleteSetup)
+	router.GET("/setups", rh.GetSetups)
+	router.GET("/setup/:id", rh.GetSetup)
+	router.PUT("/setup", rh.TokenAuthMiddleware(), rh.PutSetup)
+	router.DELETE("/setup/:id", rh.TokenAuthMiddleware(), rh.DeleteSetup)
 
-	router.PUT("/board", (&RequestHandler{Db: db}).PutBoard)
-	router.DELETE("/board/:id", (&RequestHandler{Db: db}).DeleteBoard)
+	router.PUT("/board", rh.TokenAuthMiddleware(), rh.PutBoard)
+	router.DELETE("/board/:id", rh.TokenAuthMiddleware(), rh.DeleteBoard)
 
-	router.GET("/sessions", (&RequestHandler{Db: db}).GetSessions)
-	router.GET("/session/:id", (&RequestHandler{Db: db}).GetSession)
-	router.GET("/sessiondata/:id", (&RequestHandler{Db: db}).GetSessionData)
-	router.PUT("/session", (&RequestHandler{Db: db}).PutSession)
-	router.DELETE("/session/:id", (&RequestHandler{Db: db}).DeleteSession)
-	router.PATCH("/session/:id", (&RequestHandler{Db: db}).PatchSession)
+	router.GET("/sessions", rh.GetSessions)
+	router.GET("/session/:id", rh.GetSession)
+	router.GET("/sessiondata/:id", rh.GetSessionData)
+	router.PUT("/session", rh.TokenAuthMiddleware(), rh.PutSession)
+	router.DELETE("/session/:id", rh.TokenAuthMiddleware(), rh.DeleteSession)
+	router.PATCH("/session/:id", rh.TokenAuthMiddleware(), rh.PatchSession)
 
 	router.Run(opts.Host + ":" + opts.Port)
 }

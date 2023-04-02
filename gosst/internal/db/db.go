@@ -68,6 +68,16 @@ var Schema = `
 		FOREIGN KEY (session_id) REFERENCES sessions (id)
 	);`
 
+var Tokens = `
+	SELECT token
+	FROM tokens`
+
+var InsertToken = `
+	INSERT
+	INTO tokens (token)
+	VALUES (token)
+	RETURNING rowid`
+
 var SetupForBoard = `
 	SELECT S.id, S.linkage_id, S.front_calibration_id, S.rear_calibration_id
 	FROM setups S
