@@ -8,3 +8,4 @@ xyzservices==2022.9.0
 Flask==2.2.3
 Flask-Session==0.4.0
 SQLAlchemy==2.0.7
+gunicorn==20.1.0

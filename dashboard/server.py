@@ -34,14 +34,6 @@ from travel import update_travel_histogram
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-d", "--database",
-    required=True,
-    help="SQLite database path")
-cmd_args = parser.parse_args()
-
-engine = create_engine(f'sqlite:///{cmd_args.database}')
 dark_minimal = built_in_themes[DARK_MINIMAL]
 front_color, rear_color = Spectral11[1], Spectral11[2]
 
@@ -53,6 +45,12 @@ Session(app)
 jinja_env = Environment(loader=FileSystemLoader('templates'))
 dashboard_template = jinja_env.get_template('dashboard.html')
 empty_template = jinja_env.get_template('empty.html')
+
+
+def create_app(database: str):
+    global engine
+    engine = create_engine(f'sqlite:///{database}')
+    return app
 
 
 def _sessions_list() -> dict[str, tuple[int, str, str]]:
@@ -138,7 +136,6 @@ def dashboard(session_id):
 
     res = conn.execute(stmt_tokens())
     token = request.headers.get('X-Token', '')
-    print(token)
     session['full_access'] = token in [r[0] for r in res.fetchall()]
 
     res = conn.execute(stmt_sessions())
@@ -290,4 +287,10 @@ def upload_gpx():
 
 
 if __name__ == '__main__':
-    app.run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-d", "--database",
+        required=True,
+        help="SQLite database path")
+    cmd_args = parser.parse_args()
+    create_app(cmd_args.database).run()
