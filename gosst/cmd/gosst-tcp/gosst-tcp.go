@@ -12,6 +12,7 @@ import (
 
 	"github.com/blockloop/scan"
 	"github.com/jessevdk/go-flags"
+	"github.com/pebbe/zmq4"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
@@ -19,45 +20,45 @@ import (
 	psst "gosst/internal/psst"
 )
 
-func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) error {
+func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int, error) {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
 	err := db.QueryRow(queries.SetupForBoard, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	var linkage psst.Linkage
 	rows, err := db.Query(queries.Linkage, linkageId)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	err = scan.RowStrict(&linkage, rows)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	err = linkage.Process()
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	var frontCalibration psst.Calibration
 	rows, err = db.Query(queries.Calibration, frontCalibrationId)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	err = scan.RowStrict(&frontCalibration, rows)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	var rearCalibration psst.Calibration
 	rows, err = db.Query(queries.Calibration, rearCalibrationId)
 	if err != nil {
-		return err
+		return -1, err
 	}
 	err = scan.RowStrict(&rearCalibration, rows)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	pd := psst.ProcessRecording(sst, name, linkage, frontCalibration, rearCalibration)
@@ -65,11 +66,14 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) erro
 	var data []byte
 	enc := codec.NewEncoderBytes(&data, h)
 	enc.Encode(pd)
-	if _, err := db.Exec(queries.InsertSession, name, pd.Timestamp, "", setupId, data); err != nil {
-		return err
+
+	var lastInsertedId int
+	err = db.QueryRow(queries.InsertSession, name, pd.Timestamp, "", setupId, data).Scan(&lastInsertedId)
+	if err != nil {
+		return -1, err
 	}
 
-	return nil
+	return lastInsertedId, nil
 }
 
 type header struct {
@@ -78,7 +82,7 @@ type header struct {
 	Name    [9]byte
 }
 
-func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
+func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, soc *zmq4.Socket) {
 	bufHeader := make([]byte, 25)
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 25 {
@@ -119,12 +123,16 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 		return
 	}
 
-	if putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data) == nil {
-		conn.Write([]byte{6 /* STATUS_SUCCESS */})
-		log.Print("[OK] session '", name, "' was successfully imported")
-	} else {
+	if id, err := putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data); err != nil {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
-		log.Print("[ERR] session '", name, "' could not be imported")
+		log.Println("[ERR] session '", name, "' could not be imported")
+	} else {
+		conn.Write([]byte{6 /* STATUS_SUCCESS */})
+		log.Println("[OK] session '", name, "' was successfully imported")
+
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, uint32(id))
+		soc.SendBytes(b, 0)
 	}
 }
 
@@ -133,6 +141,8 @@ func main() {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
 		Host         string `short:"h" long:"host" description:"Host to bind on" default:"0.0.0.0"`
 		Port         string `short:"p" long:"port" description:"Port to bind on" default:"557"`
+		ZmqHost      string `short:"H" long:"zhost" description:"ZMQ server host" default:"127.0.0.1"`
+		ZmqPort      string `short:"P" long:"zport" description:"ZMQ server port" default:"5555"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -155,12 +165,24 @@ func main() {
 	}
 	defer l.Close()
 
+	soc, err := zmq4.NewSocket(zmq4.PUSH)
+	defer soc.Close()
+	if err != nil {
+		log.Println("[WARN] could not create ZMQ socket (cache generation disabled)")
+	} else {
+		if err = soc.Connect("tcp://" + opts.ZmqHost + ":" + opts.ZmqPort); err != nil {
+			log.Println("[WARN] could not connect to ZMQ server (cache generation disabled)")
+			soc.Close()
+			soc = nil
+		}
+	}
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
-		go handleRequest(conn, db, &h)
+		go handleRequest(conn, db, &h, soc)
 	}
 }

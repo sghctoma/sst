@@ -285,7 +285,7 @@ if __name__ == '__main__':
         help="SQLite database path")
     parser.add_argument(
         "-a", "--address",
-        default='127.0.0.1',
+        default='0.0.0.0',
         help="ZMQ host")
     parser.add_argument(
         "-p", "--port",
