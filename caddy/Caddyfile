@@ -1,7 +1,10 @@
 :80 {
-	reverse_proxy {
-		to dashboard:5100
-		header_up Origin "http://localhost:5100"
+	handle_path /api/* {
+		reverse_proxy gosst-http:8080
+	}
+
+	handle {
+		reverse_proxy dashboard:5100
 	}
 
 	log {

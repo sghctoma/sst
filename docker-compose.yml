@@ -1,5 +1,13 @@
 version: "3.7"
 services:
+  cache:
+    build:
+      target: cache
+      context: ./dashboard
+      dockerfile: cache.Dockerfile
+    volumes:
+      - data:/data/
+    restart: unless-stopped
   gosst-http:
     build:
       target: gosst-http
@@ -7,6 +15,8 @@ services:
     volumes:
       - data:/data/
     restart: unless-stopped
+    depends_on:
+      - cache
   gosst-tcp:
     build:
       target: gosst-tcp
@@ -16,10 +26,13 @@ services:
     volumes:
       - data:/data/
     restart: unless-stopped
+    depends_on:
+      - cache
   dashboard:
     build:
       target: dashboard
       context: ./dashboard
+      dockerfile: dashboard.Dockerfile
     volumes:
       - data:/data/
     restart: unless-stopped

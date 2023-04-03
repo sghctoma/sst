@@ -15,6 +15,4 @@ COPY ./*.py ./
 COPY ./templates ./templates/
 COPY ./static ./static/
 
-CMD ["bokeh", "serve", "--port", "5100", ".", "--args", \
-     "--database", "/data/gosst.db", \
-     "--gosst_api", "http://gosst-http:8080"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5100", "server:create_app(database='/data/gosst.db')"]

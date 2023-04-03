@@ -11,9 +11,7 @@ from flask_session import Session
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import create_engine
 
-from bokeh.palettes import Spectral11
 from bokeh.resources import CDN
-from bokeh.themes import built_in_themes, DARK_MINIMAL
 
 from balance import update_balance
 from database import (
@@ -33,9 +31,6 @@ from map import gpx_to_dict, track_data
 from travel import update_travel_histogram
 from velocity import update_velocity_band_stats, update_velocity_histogram
 
-
-dark_minimal = built_in_themes[DARK_MINIMAL]
-front_color, rear_color = Spectral11[1], Spectral11[2]
 
 app = Flask(__name__)
 app.config['SESSION_PERMANENT'] = False
