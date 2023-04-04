@@ -177,5 +177,5 @@ def stmt_setup(session_id: int):
         .join(linkages_table, linkages_table.c.id == setups_table.c.linkage_id)
         .join(fcal, fcal.c.id == setups_table.c.front_calibration_id)
         .join(rcal, rcal.c.id == setups_table.c.rear_calibration_id)
-        .join(sessions_table, sessions_table.c.id == setups_table.c.id)
+        .join(sessions_table, sessions_table.c.setup_id == setups_table.c.id)
         .where(sessions_table.c.id == session_id))
