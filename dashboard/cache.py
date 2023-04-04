@@ -8,9 +8,9 @@ import struct
 import sys
 import zmq
 
+from bokeh.document import Document
 from bokeh.events import DocumentReady, MouseMove
 from bokeh.embed import components
-from bokeh.io import curdoc
 from bokeh.layouts import row
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.widgets.markups import Div
@@ -211,14 +211,15 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
         suspension_count += 1
 
     dark_minimal_theme = built_in_themes[DARK_MINIMAL]
+    document = Document()
 
-    curdoc().add_root(p_travel)
-    curdoc().add_root(p_velocity)
-    curdoc().add_root(p_map)
-    curdoc().add_root(p_lr)
-    curdoc().add_root(p_sw)
-    curdoc().add_root(p_setup)
-    curdoc().add_root(p_desc)
+    document.add_root(p_travel)
+    document.add_root(p_velocity)
+    document.add_root(p_map)
+    document.add_root(p_lr)
+    document.add_root(p_sw)
+    document.add_root(p_setup)
+    document.add_root(p_desc)
     columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw',
                'setup', 'desc']
 
@@ -232,9 +233,9 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
             children=[
                 p_front_vel_hist,
                 p_front_vel_stats])
-        curdoc().add_root(p_front_travel_hist)
-        curdoc().add_root(p_front_fft)
-        curdoc().add_root(p_front_velocity)
+        document.add_root(p_front_travel_hist)
+        document.add_root(p_front_fft)
+        document.add_root(p_front_velocity)
         columns.extend(['f_thist', 'f_fft', 'f_vhist'])
     if telemetry.Rear.Present:
         prefix = 'rear_' if suspension_count == 2 else ''
@@ -246,21 +247,21 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
             children=[
                 p_rear_vel_hist,
                 p_rear_vel_stats])
-        curdoc().add_root(p_rear_travel_hist)
-        curdoc().add_root(p_rear_fft)
-        curdoc().add_root(p_rear_velocity)
+        document.add_root(p_rear_travel_hist)
+        document.add_root(p_rear_fft)
+        document.add_root(p_rear_velocity)
         columns.extend(['r_thist', 'r_fft', 'r_vhist'])
     if suspension_count == 2:
-        curdoc().add_root(p_balance_compression)
-        curdoc().add_root(p_balance_rebound)
+        document.add_root(p_balance_compression)
+        document.add_root(p_balance_rebound)
         columns.extend(['cbalance', 'rbalance'])
 
     # Some Bokeh models (like the description box or the map) need to be
     # dynamically initialized based on values in a particular Flask session.
-    curdoc().js_on_event(DocumentReady, CustomJS(
+    document.js_on_event(DocumentReady, CustomJS(
         args=dict(), code='init_models();'))
 
-    script, divs = components(curdoc().roots, theme=dark_minimal_theme)
+    script, divs = components(document.roots, theme=dark_minimal_theme)
 
     components_data = dict(zip(columns, [session_id, script] + list(divs)))
     conn.execute(stmt_cache_insert(), [components_data])
