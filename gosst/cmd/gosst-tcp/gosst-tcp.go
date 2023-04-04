@@ -130,9 +130,11 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, soc *zmq4.Socket) 
 		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Println("[OK] session '", name, "' was successfully imported")
 
-		b := make([]byte, 4)
-		binary.LittleEndian.PutUint32(b, uint32(id))
-		soc.SendBytes(b, 0)
+		if soc != nil {
+			b := make([]byte, 4)
+			binary.LittleEndian.PutUint32(b, uint32(id))
+			soc.SendBytes(b, 0)
+		}
 	}
 }
 

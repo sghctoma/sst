@@ -439,9 +439,14 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	} else {
-		b := make([]byte, 4)
-		binary.LittleEndian.PutUint32(b, uint32(lastInsertedId))
-		this.Socket.SendBytes(b, 0)
+		if this.Socket != nil {
+			b := make([]byte, 4)
+			binary.LittleEndian.PutUint32(b, uint32(lastInsertedId))
+			if _, err := this.Socket.SendBytes(b, 0); err != nil {
+				log.Println("[WARN] could not send session id to cache server!")
+			}
+		}
+
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
