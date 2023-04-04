@@ -32,10 +32,12 @@ const (
 type Calibration struct {
 	Id          int     `codec:"-" db:"calibration_id" json:"id"`
 	Name        string  `codec:"," db:"name"           json:"name"   binding:"required"`
-	ArmLength   float64 `codec:"," db:"arm"            json:"arm"    binding:"required"`
+	ArmLength1  float64 `codec:"," db:"arm1"           json:"arm1"   binding:"required"`
+	ArmLength2  float64 `codec:"," db:"arm2"           json:"arm2"   binding:"required"`
 	MaxDistance float64 `codec:"," db:"dist"           json:"dist"   binding:"required"`
 	MaxStroke   float64 `codec:"," db:"stroke"         json:"stroke" binding:"required"`
 	StartAngle  float64 `codec:"," db:"angle"          json:"angle"`
+	Method		int		`codec:"-" db:"method" 		   json:"method"`
 }
 
 type Linkage struct {
@@ -48,7 +50,7 @@ type Linkage struct {
 }
 
 type suspension struct {
-	Present      bool
+	Present      bool	
 	Calibration  Calibration
 	Travel       []float64
 	Velocity     []float64
@@ -81,19 +83,27 @@ type processed struct {
 	Airtimes   []*airtime
 }
 
-func NewCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *Calibration {
+func NewCalibration(armLength1, armLength2, maxDistance, maxStroke float64, useLegoModule bool, method int) *Calibration {
 	if useLegoModule {
 		// 1M = 5/16 inch = 7.9375 mm
-		armLength = armLength * 7.9375
+		armLength1 = armLength1 * 7.9375
+		armLength2 = armLength2 * 7.9375
 		maxDistance = maxDistance * 7.9375
 	}
-	a := math.Acos(maxDistance / 2.0 / armLength)
+	if method == 1 {
+		a := math.Acos(maxDistance / 2.0 / armLength)
+	}
+	if method == 2 {
+		b := math.Acos(math.Pow(armLength1) + math.Pow(armLength2) - math.Pow(maxDistance)/(2*ArmLength1*ArmLength2))
+	}
 	return &Calibration{
 		Name:        "",
-		ArmLength:   armLength,
+		ArmLength1:   armLength1,
+		ArmLength2:   armLength2,
 		MaxDistance: maxDistance,
 		MaxStroke:   maxStroke,
 		StartAngle:  a,
+		Method:		method,
 	}
 }
 
@@ -129,10 +139,20 @@ func angleToStroke(angle uint16, calibration Calibration) float64 {
 	if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
 		angle = 0
 	}
-	a := 2.0 * math.Pi / 4096.0 * float64(angle)
-	d := 2.0 * calibration.ArmLength * math.Cos(a+calibration.StartAngle)
-	return calibration.MaxDistance - d
+
+	if calibration.Method = 1{
+		a := 2.0 * math.Pi / 4096.0 * float64(angle)
+		d := 2.0 * calibration.ArmLength * math.Cos(a+calibration.StartAngle)
+		return calibration.MaxDistance - d
+	}
+
+	if calibration.Method = 2{
+		a := 2.0 * math.Pi / 4096.0 * float64(angle)
+		d := math.Sqrt(math.Pow(calibration.ArmLength1, 2) + math.Pow(calibration.ArmLength2, 2) - 2 * calibration.ArmLength1 * calibration.ArmLength2 * math.Cos(calibration.StartAngle-a))
+		return calibration.MaxDistance - d
+	}
 }
+
 
 func linspace(min, max float64, num int) []float64 {
 	step := (max - min) / float64(num-1)
