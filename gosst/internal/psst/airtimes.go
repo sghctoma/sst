@@ -5,6 +5,7 @@ import (
 )
 
 func (this *processed) airtimes() {
+	this.Airtimes = make([]*airtime, 0)
 	if this.Front.Present && this.Rear.Present {
 		for _, f := range this.Front.Strokes.idlings {
 			if f.airCandidate {
@@ -23,7 +24,7 @@ func (this *processed) airtimes() {
 				}
 			}
 		}
-		maxMean := (this.Front.Calibration.MaxStroke + this.Linkage.MaxRearTravel) / 2.0
+		maxMean := (this.Linkage.MaxFrontTravel + this.Linkage.MaxRearTravel) / 2.0
 		for _, f := range this.Front.Strokes.idlings {
 			if f.airCandidate {
 				fmean := stat.Mean(this.Front.Travel[f.Start:f.End+1], nil)

@@ -129,6 +129,8 @@ func newStroke(start, end int, duration float64, travel, velocity []float64, max
 }
 
 func (this *strokes) categorize(strokes []*stroke, travel []float64, maxTravel float64) {
+	this.Compressions = make([]*stroke, 0)
+	this.Rebounds = make([]*stroke, 0)
 	for i, stroke := range strokes {
 		if math.Abs(stroke.length) < STROKE_LENGTH_THRESHOLD &&
 			stroke.duration >= IDLING_DURATION_THRESHOLD {
