@@ -318,12 +318,14 @@ if __name__ == '__main__':
         while True:
             try:
                 message = socket.recv()
+                session_id = struct.unpack('<i', message)[0]
+                logging.info(f"generating cache for session {session_id}")
+                create_cache(engine, session_id, cmd_args.lod, cmd_args.hst)
+                logging.info(f"finished generating cache for session {session_id}")
             except KeyboardInterrupt:
                 sys.exit(0)
-            session_id = struct.unpack('<i', message)[0]
-            logging.info(f"generating cache for session {session_id}")
-            create_cache(engine, session_id, cmd_args.lod, cmd_args.hst)
-            logging.info(f"finished generating cache for session {session_id}")
+            except BaseException:
+                logging.error(f"generating cache for session {session_id} failed")
     else:
         if not cmd_args.session:
             print(parser.format_help())
