@@ -217,13 +217,13 @@ def updates():
             compression=update_balance(
                 f_strokes.Compressions,
                 r_strokes.Compressions,
-                t.Front.Calibration.MaxStroke,
+                t.Linkage.MaxFrontTravel,
                 t.Linkage.MaxRearTravel
             ),
             rebound=update_balance(
                 f_strokes.Rebounds,
                 r_strokes.Rebounds,
-                t.Front.Calibration.MaxStroke,
+                t.Linkage.MaxFrontTravel,
                 t.Linkage.MaxRearTravel
             ),
         )

@@ -84,6 +84,7 @@ linkages_table = Table(
     metadata_obj,
     Column('id', Integer, primary_key=True),
     Column('name', String, nullable=False),
+    Column('head_angle', Float, nullable=False),
     Column('raw_lr_data', String, nullable=False),
 )
 

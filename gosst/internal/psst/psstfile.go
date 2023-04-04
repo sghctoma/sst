@@ -41,10 +41,12 @@ type Calibration struct {
 type Linkage struct {
 	Id               int          `codec:"-" db:"linkage_id"  json:"id"`
 	Name             string       `codec:"," db:"name"        json:"name"       binding:"required"`
+	HeadAngle        float64      `codec:"," db:"head_angle"  json:"head_angle" binding:"required"`
 	RawData          string       `codec:"-" db:"raw_lr_data" json:"data"       binding:"required"`
-	LeverageRatio    [][2]float64 `codec:","                  json:"leverage"`
-	ShockWheelCoeffs []float64    `codec:","                  json:"coeffs"`
-	MaxRearTravel    float64      `codec:","                  json:"max_travel"`
+	LeverageRatio    [][2]float64 `codec:","                  json:"-"`
+	ShockWheelCoeffs []float64    `codec:","                  json:"-"`
+	MaxFrontTravel   float64      `codec:","                  json:"-"`
+	MaxRearTravel    float64      `codec:","                  json:"-"`
 }
 
 type suspension struct {
@@ -120,7 +122,6 @@ func (this *Linkage) Process() error {
 
 	this.LeverageRatio = wtlr
 	this.ShockWheelCoeffs = f.Solve()
-	this.MaxRearTravel = wt[len(wt)-1]
 
 	return nil
 }
@@ -151,6 +152,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 
 	p, _ := polygo.NewRealPolynomial(lnk.ShockWheelCoeffs)
 	lnk.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
+	lnk.MaxFrontTravel = math.Sin(lnk.HeadAngle*math.Pi/180.0) * pd.Front.Calibration.MaxStroke
 	pd.Linkage = lnk
 
 	f := bytes.NewReader(sst)
@@ -211,6 +213,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	if hasRear {
 		pd.Rear.Travel = make([]float64, len(records))
 	}
+	front_coeff := math.Sin(lnk.HeadAngle * math.Pi / 180.0)
 	for index, value := range records {
 		if hasFront {
 			// Front travel might under/overshoot because of erronous data
@@ -218,9 +221,9 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			// connection due to vibration), so we don't error out, just cap
 			// travel. Errors like these will be obvious on the graphs, and
 			// the affected regions can be filtered by hand.
-			x := angleToStroke(value.ForkAngle-frontError, pd.Front.Calibration)
+			x := angleToStroke(value.ForkAngle-frontError, pd.Front.Calibration) * front_coeff
 			x = math.Max(0, x)
-			x = math.Min(x, pd.Front.Calibration.MaxStroke)
+			x = math.Min(x, lnk.MaxFrontTravel)
 			pd.Front.Travel[index] = x
 		}
 		if hasRear {
@@ -241,7 +244,7 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	}
 	filter, _ := savitzkygolay.NewFilter(51, 1, 3)
 	if hasFront {
-		tbins := linspace(0, pd.Front.Calibration.MaxStroke, TRAVEL_HIST_BINS+1)
+		tbins := linspace(0, pd.Linkage.MaxFrontTravel, TRAVEL_HIST_BINS+1)
 		dt := digitize(pd.Front.Travel, tbins)
 		pd.Front.TravelBins = tbins
 
@@ -250,9 +253,13 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 		vbins, dv := digitizeVelocity(v)
 		pd.Front.VelocityBins = vbins
 
-		strokes := filterStrokes(v, pd.Front.Travel, pd.Front.Calibration.MaxStroke, pd.SampleRate)
-		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Front.Calibration.MaxStroke)
-		pd.Front.Strokes.digitize(dt, dv)
+		strokes := filterStrokes(v, pd.Front.Travel, pd.Linkage.MaxFrontTravel, pd.SampleRate)
+		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Linkage.MaxFrontTravel)
+		if len(pd.Front.Strokes.Compressions) == 0 && len(pd.Front.Strokes.Rebounds) == 0 {
+			pd.Front.Present = false
+		} else {
+			pd.Front.Strokes.digitize(dt, dv)
+		}
 	}
 	if hasRear {
 		tbins := linspace(0, pd.Linkage.MaxRearTravel, TRAVEL_HIST_BINS+1)
@@ -266,7 +273,11 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 
 		strokes := filterStrokes(v, pd.Rear.Travel, pd.Linkage.MaxRearTravel, pd.SampleRate)
 		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
-		pd.Rear.Strokes.digitize(dt, dv)
+		if len(pd.Rear.Strokes.Compressions) == 0 && len(pd.Rear.Strokes.Rebounds) == 0 {
+			pd.Rear.Present = false
+		} else {
+			pd.Rear.Strokes.digitize(dt, dv)
+		}
 	}
 
 	pd.airtimes()

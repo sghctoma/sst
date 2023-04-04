@@ -4,8 +4,10 @@ from dataclasses import dataclass, fields as datafields
 @dataclass
 class Linkage:
     Name: str
+    HeadAngle: float
     LeverageRatio: list[float]
     ShockWheelCoeffs: list[float]
+    MaxFrontTravel: float
     MaxRearTravel: float
 
 

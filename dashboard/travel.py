@@ -22,7 +22,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
     length = len(telemetry.Front.Travel if telemetry.Front.Present else
                  telemetry.Rear.Travel)
     time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
-    front_max = telemetry.Front.Calibration.MaxStroke
+    front_max = telemetry.Linkage.MaxFrontTravel
     rear_max = telemetry.Linkage.MaxRearTravel
 
     if telemetry.Front.Present:
@@ -55,7 +55,6 @@ def travel_figure(telemetry: Telemetry, lod: int,
 
     _add_airtime_labels(p, telemetry.Airtimes)
 
-    p.yaxis.ticker = FixedTicker(ticks=np.linspace(0, front_max, 10))
     p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p.add_layout(LinearAxis(y_range_name='rear'), 'right')
 

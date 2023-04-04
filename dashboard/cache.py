@@ -179,7 +179,7 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
         p_balance_compression = balance_figure(
             telemetry.Front.Strokes.Compressions,
             telemetry.Rear.Strokes.Compressions,
-            telemetry.Front.Calibration.MaxStroke,
+            telemetry.Linkage.MaxFrontTravel,
             telemetry.Linkage.MaxRearTravel,
             False,
             front_color,
@@ -189,7 +189,7 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
         p_balance_rebound = balance_figure(
             telemetry.Front.Strokes.Rebounds,
             telemetry.Rear.Strokes.Rebounds,
-            telemetry.Front.Calibration.MaxStroke,
+            telemetry.Linkage.MaxFrontTravel,
             telemetry.Linkage.MaxRearTravel,
             True,
             front_color,

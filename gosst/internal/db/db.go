@@ -30,6 +30,7 @@ var Schema = `
     CREATE TABLE IF NOT EXISTS linkages(
         id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
+		head_angle REAL NOT NULL,
 		raw_lr_data TEXT NOT NULL
 	);
 	CREATE TABLE IF NOT EXISTS tracks(
@@ -148,8 +149,8 @@ var Linkage = `
 
 var InsertLinkage = `
 	INSERT
-	INTO linkages (name, raw_lr_data)
-	VALUES (?, ?)
+	INTO linkages (name, head_angle, raw_lr_data)
+	VALUES (?, ?, ?)
 	RETURNING id`
 
 var DeleteLinkage = `

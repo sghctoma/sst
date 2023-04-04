@@ -15,11 +15,12 @@ import (
 
 func main() {
 	var opts struct {
-		TelemetryFile       string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
-		LeverageRatioFile   string `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
-		CalibrationData     string `short:"c" long:"calibration" description:"Calibration data (arm, max. distance, max stroke for front and rear)" required:"true"`
-		CalibrationInModule bool   `short:"m" long:"lego" description:"If present, arm and max. distance are considered to be in LEGO Module"`
-		OutputFile          string `short:"o" long:"output" description:"Output file"`
+		TelemetryFile       string  `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
+		LeverageRatioFile   string  `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
+		HeadAngle           float64 `short:"a" long:"headangle" description:"Head angle" required:"true"`
+		CalibrationData     string  `short:"c" long:"calibration" description:"Calibration data (arm, max. distance, max stroke for front and rear)" required:"true"`
+		CalibrationInModule bool    `short:"m" long:"lego" description:"If present, arm and max. distance are considered to be in LEGO Module"`
+		OutputFile          string  `short:"o" long:"output" description:"Output file"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -27,6 +28,7 @@ func main() {
 	}
 
 	var linkage psst.Linkage
+	linkage.HeadAngle = opts.HeadAngle
 	lb, err := os.ReadFile(opts.LeverageRatioFile)
 	if err != nil {
 		log.Fatalln(err)
