@@ -154,12 +154,18 @@
         <div class="panel springrate" tabindex="1">
           {% if suspension_count == 1 -%}
           <div class="travel-hist">
+            {% if components_divs[7] -%}
             {{ components_divs[7] }}
+            {%- else %}
             {{ components_divs[10] }}
+            {% endif %}
           </div>
           <div class="fft">
+            {% if components_divs[8] -%}
             {{ components_divs[8] }}
+            {%- else %}
             {{ components_divs[11] }}
+            {% endif %}
           </div>
           {%- elif suspension_count == 2 %}
           <div class="front-travel-hist">{{ components_divs[7] }}</div>
@@ -174,8 +180,11 @@
         <div class="panel damping" tabindex="1">
           {% if suspension_count == 1 -%}
           <div class="velocity-hist">
+            {% if components_divs[9] -%}
             {{ components_divs[9] }}
+            {%- else %}
             {{ components_divs[12] }}
+            {% endif %}
           </div>
           {%- elif suspension_count == 2 %}
           <div class="front-velocity-hist">{{ components_divs[9] }}</div>

@@ -54,12 +54,12 @@
     grid-auto-rows: max-content;
   }
     
-  .travel      { grid-column: 1 / 9; grid-row: 1;     }
-  .velocity    { grid-column: 1 / 9; grid-row: 2;     }
-  .map         { grid-column: 7 / 9; grid-row:     3; }
-  .tabs        { grid-column: 1 / 5; grid-row: 3 / 5; }
-  .lr          { grid-column:     5; grid-row:     3; }
-  .sw          { grid-column:     6; grid-row:     3; }
-  .setup       { grid-column: 5 / 7; grid-row:     4; }
-  .description { grid-column: 7 / 9; grid-row:     4; }
+  .travel      { grid-column: 1 / 7; grid-row: 1;     }
+  .velocity    { grid-column: 1 / 7; grid-row: 2;     }
+  .map         { grid-column: 7 / 9; grid-row:     1; }
+  .description { grid-column: 7 / 9; grid-row:     2; }
+  .tabs        { grid-column: 1 / 7; grid-row: 3 / 5; }
+  .lr          { grid-column:     7; grid-row:     3; }
+  .sw          { grid-column:     8; grid-row:     3; }
+  .setup       { grid-column: 7 / 9; grid-row:     4; }
 }
