@@ -27,6 +27,8 @@ with arbitrary sensor data (sort of an input plugin system for the preprocessor)
 \* *The word "sufni" means tool shed in Hungarian, but also used as an adjective
 denoting something as DIY, garage hack, etc.*
 
+**WARNING: This README is quite outdated, a lot has changed recently, and I haven't got the time to update it properly. If you want to build/use the system, feel free to contact me via e-mail for help.**
+
 Dashboard
 ---------
 
