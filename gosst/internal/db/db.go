@@ -15,23 +15,30 @@ var Schema = `
 		linkage_id INTEGER NOT NULL,
 		front_calibration_id INTEGER,
 		rear_calibration_id INTEGER,
-		FOREIGN KEY (linkage_id) REFERENCES linkages (linkage_id),
+		FOREIGN KEY (linkage_id) REFERENCES linkages (id),
 		FOREIGN KEY (front_calibration_id) REFERENCES calibrations (id),
 		FOREIGN KEY (rear_calibration_id) REFERENCES calibrations (id)
 	);
+    CREATE TABLE IF NOT EXISTS calibration_methods (
+        id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT,
+		data TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS calibrations (
         id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
-        arm REAL NOT NULL,
-        dist REAL NOT NULL,
-        stroke REAL NOT NULL,
-        angle REAL NOT NULL
+		method_id INT NOT NULL,
+		inputs TEXT NOT NULL,
+		FOREIGN KEY (method_id) REFERENCES calibration_methods (id)
     );
     CREATE TABLE IF NOT EXISTS linkages(
         id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
 		head_angle REAL NOT NULL,
-		raw_lr_data TEXT NOT NULL
+		raw_lr_data TEXT NOT NULL,
+		front_stroke REAL NOT NULL,
+		rear_stroke REAL NOT NULL
 	);
 	CREATE TABLE IF NOT EXISTS tracks(
 		id INTEGER PRIMARY KEY,
@@ -118,6 +125,26 @@ var DeleteSetup = `
 	FROM setups
 	WHERE id = ?`
 
+var CalibrationMethods = `
+	SELECT *
+	FROM calibration_methods`
+
+var CalibrationMethod = `
+	SELECT *
+	FROM calibration_methods
+	WHERE id = ?`
+
+var InsertCalibrationMethod = `
+	INSERT
+	INTO calibration_methods (name, description, data)
+	VALUES (?, ?, ?)
+	RETURNING id
+	`
+var DeleteCalibrationMethod = `
+	DELETE
+	FROM calibration_methods
+	WHERE id = ?`
+
 var Calibrations = `
 	SELECT *
 	FROM calibrations`
@@ -129,8 +156,8 @@ var Calibration = `
 
 var InsertCalibration = `
 	INSERT
-	INTO calibrations (name, arm, dist, stroke, angle)
-	VALUES (?, ?, ?, ?, ?)
+	INTO calibrations (name, method_id, inputs)
+	VALUES (?, ?, ?)
 	RETURNING id
 	`
 var DeleteCalibration = `
@@ -149,8 +176,8 @@ var Linkage = `
 
 var InsertLinkage = `
 	INSERT
-	INTO linkages (name, head_angle, raw_lr_data)
-	VALUES (?, ?, ?)
+	INTO linkages (name, head_angle, raw_lr_data, front_stroke, rear_stroke)
+	VALUES (?, ?, ?, ?, ?)
 	RETURNING id`
 
 var DeleteLinkage = `

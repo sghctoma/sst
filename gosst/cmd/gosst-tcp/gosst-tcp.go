@@ -32,12 +32,10 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 	if err != nil {
 		return -1, err
 	}
-	err = scan.RowStrict(&linkage, rows)
-	if err != nil {
+	if err = scan.RowStrict(&linkage, rows); err != nil {
 		return -1, err
 	}
-	err = linkage.Process()
-	if err != nil {
+	if err = linkage.Process(); err != nil {
 		return -1, err
 	}
 
@@ -46,8 +44,23 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 	if err != nil {
 		return -1, err
 	}
-	err = scan.RowStrict(&frontCalibration, rows)
+	if err = scan.RowStrict(&frontCalibration, rows); err != nil {
+		return -1, err
+	}
+	if err := frontCalibration.ProcessRawInputs(); err != nil {
+		return -1, err
+	}
+	rows, err = db.Query(queries.CalibrationMethod, frontCalibration.MethodId)
 	if err != nil {
+		return -1, err
+	}
+	if err = scan.RowStrict(&frontCalibration.Method, rows); err != nil {
+		return -1, err
+	}
+	if err = frontCalibration.Method.ProcessRawData(); err != nil {
+		return -1, err
+	}
+	if err = frontCalibration.Prepare(); err != nil {
 		return -1, err
 	}
 
@@ -56,8 +69,20 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 	if err != nil {
 		return -1, err
 	}
-	err = scan.RowStrict(&rearCalibration, rows)
+	if err = scan.RowStrict(&rearCalibration, rows); err != nil {
+		return -1, err
+	}
+	rows, err = db.Query(queries.CalibrationMethod, rearCalibration.MethodId)
 	if err != nil {
+		return -1, err
+	}
+	if err = scan.RowStrict(&rearCalibration.Method, rows); err != nil {
+		return -1, err
+	}
+	if err = rearCalibration.Method.ProcessRawData(); err != nil {
+		return -1, err
+	}
+	if err = rearCalibration.Prepare(); err != nil {
 		return -1, err
 	}
 

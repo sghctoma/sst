@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"log"
-	"math"
 	"net/http"
 	"strconv"
 
@@ -147,6 +146,95 @@ func (this *RequestHandler) DeleteSetup(c *gin.Context) {
 	}
 }
 
+func (this *RequestHandler) GetCalibrationMethods(c *gin.Context) {
+	rows, err := this.Db.Query(queries.CalibrationMethods)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	var cms []psst.CalibrationMethod
+	err = scan.RowsStrict(&cms, rows)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	for idx := range cms {
+		cms[idx].ProcessRawData()
+	}
+
+	c.JSON(http.StatusOK, cms)
+}
+
+func (this *RequestHandler) GetCalibrationMethod(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	var cm psst.CalibrationMethod
+	rows, err := this.Db.Query(queries.CalibrationMethod, id)
+	if err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	err = scan.RowStrict(&cm, rows)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := cm.ProcessRawData(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, cm)
+}
+
+func (this *RequestHandler) PutCalibrationMethod(c *gin.Context) {
+	var cm psst.CalibrationMethod
+	if err := c.ShouldBindJSON(&cm); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	if err := cm.DumpRawData(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	if err := cm.Prepare(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	cols := []string{"name", "description", "data"}
+	vals, _ := scan.Values(cols, &cm)
+	var lastInsertedId int
+	if err := this.Db.QueryRow(queries.InsertCalibrationMethod, vals...).Scan(&lastInsertedId); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	} else {
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
+	}
+}
+
+func (this *RequestHandler) DeleteCalibrationMethod(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	if _, err := this.Db.Exec(queries.DeleteCalibrationMethod, id); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+	} else {
+		c.Status(http.StatusNoContent)
+	}
+}
+
 func (this *RequestHandler) GetCalibrations(c *gin.Context) {
 	rows, err := this.Db.Query(queries.Calibrations)
 	if err != nil {
@@ -159,6 +247,10 @@ func (this *RequestHandler) GetCalibrations(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
+	}
+
+	for idx := range cals {
+		cals[idx].ProcessRawInputs()
 	}
 
 	c.JSON(http.StatusOK, cals)
@@ -183,6 +275,11 @@ func (this *RequestHandler) GetCalibration(c *gin.Context) {
 		return
 	}
 
+	if err = cal.ProcessRawInputs(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
 	c.JSON(http.StatusOK, cal)
 }
 
@@ -192,18 +289,37 @@ func (this *RequestHandler) PutCalibration(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if c.Query("lego") == "1" {
-		// 1M = 5/16 inch = 7.9375 mm
-		cal.ArmLength *= 7.9375
-		cal.MaxDistance *= 7.9375
-	}
-	cal.StartAngle = math.Acos(cal.MaxDistance / 2.0 / cal.ArmLength)
 
-	cols := []string{"name", "arm", "dist", "stroke", "angle"}
+	rows, err := this.Db.Query(queries.CalibrationMethod, cal.MethodId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	var cm psst.CalibrationMethod
+	err = scan.RowStrict(&cm, rows)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	cal.Method = cm
+	if err = cal.Method.ProcessRawData(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err = cal.Prepare(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	if err = cal.DumpRawInput(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	cols := []string{"name", "method_id", "inputs"}
 	vals, _ := scan.Values(cols, &cal)
 	var lastInsertedId int
-	err := this.Db.QueryRow(queries.InsertCalibration, vals...).Scan(&lastInsertedId)
-	if err != nil {
+	if err = this.Db.QueryRow(queries.InsertCalibration, vals...).Scan(&lastInsertedId); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	} else {
@@ -387,16 +503,60 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
-	var frontCalibration, rearCalibration psst.Calibration
+	var frontCalibration psst.Calibration
 	rows, err = this.Db.Query(queries.Calibration, setup.FrontCalibration)
 	err = scan.RowStrict(&frontCalibration, rows)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	if err := frontCalibration.ProcessRawInputs(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	rows, err = this.Db.Query(queries.CalibrationMethod, frontCalibration.MethodId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := scan.RowStrict(&frontCalibration.Method, rows); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := frontCalibration.Method.ProcessRawData(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := frontCalibration.Prepare(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	var rearCalibration psst.Calibration
 	rows, err = this.Db.Query(queries.Calibration, setup.RearCalibration)
 	err = scan.RowStrict(&rearCalibration, rows)
 	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := rearCalibration.ProcessRawInputs(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	rows, err = this.Db.Query(queries.CalibrationMethod, rearCalibration.MethodId)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := scan.RowStrict(&rearCalibration.Method, rows); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := rearCalibration.Method.ProcessRawData(); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if err := rearCalibration.Prepare(); err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -571,6 +731,11 @@ func main() {
 	router.GET("/calibration/:id", rh.GetCalibration)
 	router.PUT("/calibration", rh.TokenAuthMiddleware(), rh.PutCalibration)
 	router.DELETE("/calibration/:id", rh.TokenAuthMiddleware(), rh.DeleteCalibration)
+
+	router.GET("/calibrationmethods", rh.GetCalibrationMethods)
+	router.GET("/calibrationmethod/:id", rh.GetCalibrationMethod)
+	router.PUT("/calibrationmethod", rh.TokenAuthMiddleware(), rh.PutCalibrationMethod)
+	router.DELETE("/calibrationmethod/:id", rh.TokenAuthMiddleware(), rh.DeleteCalibrationMethod)
 
 	router.GET("/linkages", rh.GetLinkages)
 	router.GET("/linkage/:id", rh.GetLinkage)

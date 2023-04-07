@@ -5,19 +5,19 @@ from dataclasses import dataclass, fields as datafields
 class Linkage:
     Name: str
     HeadAngle: float
-    LeverageRatio: list[float]
-    ShockWheelCoeffs: list[float]
+    MaxFrontStroke: float
+    MaxRearStroke: float
     MaxFrontTravel: float
     MaxRearTravel: float
+    LeverageRatio: list[float]
+    ShockWheelCoeffs: list[float]
 
 
 @dataclass
 class Calibration:
     Name: str
-    ArmLength: float
-    MaxDistance: float
-    MaxStroke: float
-    StartAngle: float
+    MethodId: int
+    Inputs: dict[str: float]
 
 
 @dataclass

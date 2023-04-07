@@ -68,15 +68,23 @@ setups_table = Table(
            ForeignKey('calibrations.id')),
 )
 
+calibration_methods_table = Table(
+    'calibration_methods',
+    metadata_obj,
+    Column('id', Integer, primary_key=True),
+    Column('name', String, nullable=False),
+    Column('description', String),
+    Column('data', String, nullable=False),
+)
+
 calibrations_table = Table(
     'calibrations',
     metadata_obj,
     Column('id', Integer, primary_key=True),
     Column('name', String, nullable=False),
-    Column('arm', Float, nullable=False),
-    Column('dist', Float, nullable=False),
-    Column('stroke', Float, nullable=False),
-    Column('angle', Float, nullable=False),
+    Column('method_id', Integer, ForeignKey('calibration_methods.id'),
+           nullable=False),
+    Column('inputs', String, nullable=False),
 )
 
 linkages_table = Table(
@@ -169,6 +177,8 @@ def stmt_description(session_id: int, name: str, desc: str):
 def stmt_setup(session_id: int):
     fcal = calibrations_table.alias()
     rcal = calibrations_table.alias()
+    fcalmod = calibration_methods_table.alias()
+    rcalmod = calibration_methods_table.alias()
     return (select(
         setups_table.c.name,
         linkages_table.c.name,
@@ -176,6 +186,8 @@ def stmt_setup(session_id: int):
         rcal)
         .join(linkages_table, linkages_table.c.id == setups_table.c.linkage_id)
         .join(fcal, fcal.c.id == setups_table.c.front_calibration_id)
+        .join(fcalmod, fcalmod.c.id == fcal.c.method_id)
         .join(rcal, rcal.c.id == setups_table.c.rear_calibration_id)
+        .join(rcalmod, rcalmod.c.id == rcal.c.method_id)
         .join(sessions_table, sessions_table.c.setup_id == setups_table.c.id)
         .where(sessions_table.c.id == session_id))

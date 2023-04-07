@@ -1,26 +1,34 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path"
 	"strings"
 
+	"encoding/json"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
 	psst "gosst/internal/psst"
 )
 
+type calibrations struct {
+	FrontCalibration psst.Calibration       `json:"fcal"`
+	FrontMethod      psst.CalibrationMethod `json:"fmethod"`
+	RearCalibration  psst.Calibration       `json:"rcal"`
+	RearMethod       psst.CalibrationMethod `json:"rmethod"`
+}
+
 func main() {
 	var opts struct {
-		TelemetryFile       string  `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
-		LeverageRatioFile   string  `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
-		HeadAngle           float64 `short:"a" long:"headangle" description:"Head angle" required:"true"`
-		CalibrationData     string  `short:"c" long:"calibration" description:"Calibration data (arm, max. distance, max stroke for front and rear)" required:"true"`
-		CalibrationInModule bool    `short:"m" long:"lego" description:"If present, arm and max. distance are considered to be in LEGO Module"`
-		OutputFile          string  `short:"o" long:"output" description:"Output file"`
+		TelemetryFile     string  `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
+		LeverageRatioFile string  `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
+		HeadAngle         float64 `short:"a" long:"headangle" description:"Head angle" required:"true"`
+		MaxFrontStroke    float64 `short:"f" long:"frontmax" description:"Maximum stroke (front)" required:"true"`
+		MaxRearStroke     float64 `short:"r" long:"rearmax" description:"Maximum stroke (rear)" required:"true"`
+		Calibration       string  `short:"c" long:"calibration" description:"Calibration data file (JSON)" required:"true"`
+		OutputFile        string  `short:"o" long:"output" description:"Output file"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -29,6 +37,8 @@ func main() {
 
 	var linkage psst.Linkage
 	linkage.HeadAngle = opts.HeadAngle
+	linkage.MaxFrontStroke = opts.MaxFrontStroke
+	linkage.MaxRearStroke = opts.MaxRearStroke
 	lb, err := os.ReadFile(opts.LeverageRatioFile)
 	if err != nil {
 		log.Fatalln(err)
@@ -38,20 +48,29 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var farm, fmaxdist, fmaxstroke, rarm, rmaxdist, rmaxstroke float64
-	_, err = fmt.Sscanf(opts.CalibrationData, "%f,%f,%f,%f,%f,%f", &farm, &fmaxdist, &fmaxstroke, &rarm, &rmaxdist, &rmaxstroke)
+	var calibrations calibrations
+	c, err := os.ReadFile(opts.Calibration)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fcal := psst.NewCalibration(farm, fmaxdist, fmaxstroke, opts.CalibrationInModule)
-	rcal := psst.NewCalibration(rarm, rmaxdist, rmaxstroke, opts.CalibrationInModule)
+	if err = json.Unmarshal(c, &calibrations); err != nil {
+		log.Fatalln(err)
+	}
+	calibrations.FrontCalibration.Method = calibrations.FrontMethod
+	if err = calibrations.FrontCalibration.Prepare(); err != nil {
+		log.Fatalln(err)
+	}
+	calibrations.RearCalibration.Method = calibrations.RearMethod
+	if err = calibrations.RearCalibration.Prepare(); err != nil {
+		log.Fatalln(err)
+	}
 
 	tb, err := os.ReadFile(opts.TelemetryFile)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	pd := psst.ProcessRecording(tb, opts.TelemetryFile, linkage, *fcal, *rcal)
+	pd := psst.ProcessRecording(tb, opts.TelemetryFile, linkage, *&calibrations.FrontCalibration, calibrations.RearCalibration)
 
 	var output = opts.OutputFile
 	if output == "" {

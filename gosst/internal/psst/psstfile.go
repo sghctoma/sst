@@ -29,24 +29,18 @@ const (
 	BOTTOMOUT_THRESHOLD                 = 3     // (mm) bottomouts are regions where travel > max_travel - this value
 )
 
-type Calibration struct {
-	Id          int     `codec:"-" db:"calibration_id" json:"id"`
-	Name        string  `codec:"," db:"name"           json:"name"   binding:"required"`
-	ArmLength   float64 `codec:"," db:"arm"            json:"arm"    binding:"required"`
-	MaxDistance float64 `codec:"," db:"dist"           json:"dist"   binding:"required"`
-	MaxStroke   float64 `codec:"," db:"stroke"         json:"stroke" binding:"required"`
-	StartAngle  float64 `codec:"," db:"angle"          json:"angle"`
-}
-
 type Linkage struct {
-	Id               int          `codec:"-" db:"linkage_id"  json:"id"`
-	Name             string       `codec:"," db:"name"        json:"name"       binding:"required"`
-	HeadAngle        float64      `codec:"," db:"head_angle"  json:"head_angle" binding:"required"`
-	RawData          string       `codec:"-" db:"raw_lr_data" json:"data"       binding:"required"`
-	LeverageRatio    [][2]float64 `codec:","                  json:"-"`
-	ShockWheelCoeffs []float64    `codec:","                  json:"-"`
-	MaxFrontTravel   float64      `codec:","                  json:"-"`
-	MaxRearTravel    float64      `codec:","                  json:"-"`
+	Id               int          `codec:"-" db:"id"           json:"id"`
+	Name             string       `codec:"," db:"name"         json:"name"         binding:"required"`
+	HeadAngle        float64      `codec:"," db:"head_angle"   json:"head_angle"   binding:"required"`
+	RawData          string       `codec:"-" db:"raw_lr_data"  json:"data"         binding:"required"`
+	MaxFrontStroke   float64      `codec:"," db:"front_stroke" json:"front_stroke" binding:"required"`
+	MaxRearStroke    float64      `codec:"," db:"rear_stroke"  json:"rear_stroke"  binding:"required"`
+	MaxFrontTravel   float64      `codec:","                   json:"-"`
+	MaxRearTravel    float64      `codec:","                   json:"-"`
+	LeverageRatio    [][2]float64 `codec:","                   json:"-"`
+	ShockWheelCoeffs []float64    `codec:","                   json:"-"`
+	polynomial       *polygo.RealPolynomial
 }
 
 type suspension struct {
@@ -83,22 +77,6 @@ type processed struct {
 	Airtimes   []*airtime
 }
 
-func NewCalibration(armLength, maxDistance, maxStroke float64, useLegoModule bool) *Calibration {
-	if useLegoModule {
-		// 1M = 5/16 inch = 7.9375 mm
-		armLength = armLength * 7.9375
-		maxDistance = maxDistance * 7.9375
-	}
-	a := math.Acos(maxDistance / 2.0 / armLength)
-	return &Calibration{
-		Name:        "",
-		ArmLength:   armLength,
-		MaxDistance: maxDistance,
-		MaxStroke:   maxStroke,
-		StartAngle:  a,
-	}
-}
-
 func (this *Linkage) Process() error {
 	var wtlr [][2]float64
 	var ilr []float64
@@ -123,16 +101,10 @@ func (this *Linkage) Process() error {
 	this.LeverageRatio = wtlr
 	this.ShockWheelCoeffs = f.Solve()
 
+	this.polynomial, _ = polygo.NewRealPolynomial(this.ShockWheelCoeffs)
+	this.MaxRearTravel = this.polynomial.At(this.MaxRearStroke)
+	this.MaxFrontTravel = math.Sin(this.HeadAngle*math.Pi/180.0) * this.MaxFrontStroke
 	return nil
-}
-
-func angleToStroke(angle uint16, calibration Calibration) float64 {
-	if angle > 1024 { // XXX: Rotated backwards past the set 0 angle. Maybe we should report occurances like this.
-		angle = 0
-	}
-	a := 2.0 * math.Pi / 4096.0 * float64(angle)
-	d := 2.0 * calibration.ArmLength * math.Cos(a+calibration.StartAngle)
-	return calibration.MaxDistance - d
 }
 
 func linspace(min, max float64, num int) []float64 {
@@ -149,10 +121,6 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 	pd.Name = name
 	pd.Front.Calibration = fcal
 	pd.Rear.Calibration = rcal
-
-	p, _ := polygo.NewRealPolynomial(lnk.ShockWheelCoeffs)
-	lnk.MaxRearTravel = p.At(pd.Rear.Calibration.MaxStroke)
-	lnk.MaxFrontTravel = math.Sin(lnk.HeadAngle*math.Pi/180.0) * pd.Front.Calibration.MaxStroke
 	pd.Linkage = lnk
 
 	f := bytes.NewReader(sst)
@@ -221,7 +189,8 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			// connection due to vibration), so we don't error out, just cap
 			// travel. Errors like these will be obvious on the graphs, and
 			// the affected regions can be filtered by hand.
-			x := angleToStroke(value.ForkAngle-frontError, pd.Front.Calibration) * front_coeff
+			out, _ := fcal.Evaluate(float64(value.ForkAngle - frontError))
+			x := out * front_coeff
 			x = math.Max(0, x)
 			x = math.Min(x, lnk.MaxFrontTravel)
 			pd.Front.Travel[index] = x
@@ -231,7 +200,8 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			//  a) inaccurately measured leverage ratio
 			//  b) inaccuracies introduced by polynomial fitting
 			// So we just cap it at calculated maximum.
-			x := p.At(angleToStroke(value.ShockAngle-rearError, pd.Rear.Calibration))
+			out, _ := rcal.Evaluate(float64(value.ShockAngle - rearError))
+			x := pd.Linkage.polynomial.At(out)
 			x = math.Max(0, x)
 			x = math.Min(x, lnk.MaxRearTravel)
 			pd.Rear.Travel[index] = x

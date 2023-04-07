@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import logging
 import msgpack
 import numpy as np
@@ -38,24 +39,17 @@ def _setup_figure(conn: Connection, session_id: int) -> figure:
     if not setup:
         raise Exception("Missing setup data")
 
-    calibration_table = '''
-    <table style="width: 100%;">
-    <tbody>
-    <tr>
-    <th>Max. stroke</th>
-    <td>{} mm</td>
-    </tr>
-    <tr>
-    <th>Max. distance</th>
-    <td>{} mm</td>
-    </tr>
-    <tr>
-    <th>Arm length</th>
-    <td>{} mm</td>
-    </tr>
-    </tbody>
-    </table>
-    '''
+    setup_name = setup[0]
+    linkage_name = setup[1]
+    fcal_name = setup[3]
+    rcal_name = setup[7]
+    fcal_inputs = json.loads(setup[5])
+    rcal_inputs = json.loads(setup[9])
+
+    fcal_input_rows = [f'<tr><th>{k}</th><td>{v}</td></tr>' for
+                       k, v in fcal_inputs.items()]
+    rcal_input_rows = [f'<tr><th>{k}</th><td>{v}</td></tr>' for
+                       k, v in rcal_inputs.items()]
 
     return Div(
         name='setup',
@@ -81,12 +75,20 @@ def _setup_figure(conn: Connection, session_id: int) -> figure:
               text-align: center;
             }'''],
         text=f'''
-            <b>Setup:</b>{setup[0]}<br />
-            <b>Linkage:</b> {setup[1]}<hr />
-            <b>Front calibration:</b>{setup[3]}<br />
-            {calibration_table.format(setup[6], setup[5], setup[4])}
-            <br /><b>Rear calibration:</b>{setup[9]}<br />
-            {calibration_table.format(setup[12], setup[11], setup[10])}
+            <b>Setup:</b>{setup_name}<br />
+            <b>Linkage:</b> {linkage_name}<hr />
+            <b>Front calibration:</b>{fcal_name}<br />
+            <table style="width: 100%;">
+            <tbody>
+            {''.join(fcal_input_rows)}
+            </tbody>
+            </table>
+            <br /><b>Rear calibration:</b>{rcal_name}<br />
+            <table style="width: 100%;">
+            <tbody>
+            {''.join(rcal_input_rows)}
+            </tbody>
+            </table>
             ''')
 
 
@@ -169,7 +171,7 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
     p_lr = leverage_ratio_figure(
         np.array(telemetry.Linkage.LeverageRatio), Spectral11[5])
     p_sw = shock_wheel_figure(telemetry.Linkage.ShockWheelCoeffs,
-                              telemetry.Rear.Calibration.MaxStroke,
+                              telemetry.Linkage.MaxRearStroke,
                               Spectral11[5])
 
     '''
