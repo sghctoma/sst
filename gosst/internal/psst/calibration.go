@@ -40,6 +40,7 @@ var stdenv = map[string]interface{}{
 	"asin":   math.Asin,
 	"acos":   math.Acos,
 	"atan":   math.Atan,
+	"sqrt":   math.Sqrt,
 	"sample": 0,
 }
 
