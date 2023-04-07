@@ -31,13 +31,13 @@ type session struct {
 func (this *RequestHandler) GetSessions(c *gin.Context) {
 	rows, err := this.Db.Query(queries.Sessions)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	var sessions []session
 	err = scan.RowsStrict(&sessions, rows)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -47,13 +47,13 @@ func (this *RequestHandler) GetSessions(c *gin.Context) {
 func (this *RequestHandler) GetSession(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	rows, err := this.Db.Query(queries.Session, id)
 	if err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 	var session session
@@ -65,7 +65,7 @@ func (this *RequestHandler) GetSession(c *gin.Context) {
 func (this *RequestHandler) GetSessionData(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -74,9 +74,9 @@ func (this *RequestHandler) GetSessionData(c *gin.Context) {
 	err = this.Db.QueryRow(queries.SessionData, id).Scan(&name, &data)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.AbortWithStatus(http.StatusNotFound)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		} else {
-			c.AbortWithStatus(http.StatusInternalServerError)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -88,19 +88,19 @@ func (this *RequestHandler) GetSessionData(c *gin.Context) {
 func (this *RequestHandler) PutSession(c *gin.Context) {
 	var session session
 	if err := c.ShouldBindJSON(&session); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	rows, err := this.Db.Query(queries.Setup, session.Setup)
 	if err != nil {
-		c.AbortWithStatus(http.StatusNotFound)
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 	var setup setup
 	err = scan.RowStrict(&setup, rows)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -108,28 +108,28 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	rows, err = this.Db.Query(queries.Calibration, setup.FrontCalibration)
 	err = scan.RowStrict(&frontCalibration, rows)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := frontCalibration.ProcessRawInputs(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	rows, err = this.Db.Query(queries.CalibrationMethod, frontCalibration.MethodId)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := scan.RowStrict(&frontCalibration.Method, rows); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := frontCalibration.Method.ProcessRawData(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := frontCalibration.Prepare(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -137,28 +137,28 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	rows, err = this.Db.Query(queries.Calibration, setup.RearCalibration)
 	err = scan.RowStrict(&rearCalibration, rows)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := rearCalibration.ProcessRawInputs(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	rows, err = this.Db.Query(queries.CalibrationMethod, rearCalibration.MethodId)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := scan.RowStrict(&rearCalibration.Method, rows); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := rearCalibration.Method.ProcessRawData(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if err := rearCalibration.Prepare(); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -166,23 +166,23 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	rows, err = this.Db.Query(queries.Linkage, setup.Linkage)
 	err = scan.RowStrict(&linkage, rows)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	err = linkage.Process()
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	sst, err := base64.StdEncoding.DecodeString(session.RawData)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	pd := psst.ProcessRecording(sst, session.Name, linkage, frontCalibration, rearCalibration)
 	if pd == nil {
-		c.AbortWithStatus(http.StatusUnprocessableEntity)
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -198,7 +198,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	var lastInsertedId int
 	err = this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
 		if this.Socket != nil {
 			b := make([]byte, 4)
@@ -215,12 +215,12 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 func (this *RequestHandler) DeleteSession(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if _, err := this.Db.Exec(queries.DeleteSession, id); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
 		c.Status(http.StatusNoContent)
 	}
@@ -229,7 +229,7 @@ func (this *RequestHandler) DeleteSession(c *gin.Context) {
 func (this *RequestHandler) PatchSession(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -238,12 +238,12 @@ func (this *RequestHandler) PatchSession(c *gin.Context) {
 		Description string `json:"desc"`
 	}
 	if err := c.ShouldBindJSON(&sessionMeta); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if _, err := this.Db.Exec(queries.UpdateSession, sessionMeta.Name, sessionMeta.Description, id); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
 		c.Status(http.StatusNoContent)
 	}
