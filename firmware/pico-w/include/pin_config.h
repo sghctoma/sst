@@ -10,7 +10,7 @@
 #define DISPLAY_WIDTH    128
 #define DISPLAY_HEIGHT    64
 
-#define PIO_PIN_SDA  12
+#define PIO_PIN_SDA  6
 #define PIO_PIN_SCL  (PIO_PIN_SDA + 1)
 
 #ifdef SPI_DISPLAY
