@@ -6,7 +6,6 @@ import (
 	"path"
 	"strings"
 
-	"encoding/json"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
@@ -15,10 +14,8 @@ import (
 )
 
 type calibrations struct {
-	FrontCalibration psst.Calibration       `json:"fcal"`
-	FrontMethod      psst.CalibrationMethod `json:"fmethod"`
-	RearCalibration  psst.Calibration       `json:"rcal"`
-	RearMethod       psst.CalibrationMethod `json:"rmethod"`
+	FrontCalibration psst.Calibration `json:"front"`
+	RearCalibration  psst.Calibration `json:"rear"`
 }
 
 func main() {
@@ -49,20 +46,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var calibrations calibrations
 	c, err := os.ReadFile(opts.Calibration)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if err = json.Unmarshal(c, &calibrations); err != nil {
-		log.Fatalln(err)
-	}
-	calibrations.FrontCalibration.Method = calibrations.FrontMethod
-	if err = calibrations.FrontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
-		log.Fatalln(err)
-	}
-	calibrations.RearCalibration.Method = calibrations.RearMethod
-	if err = calibrations.RearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
+	fcal, rcal, err := psst.LoadCalibrations(c, linkage)
+	if err != nil {
 		log.Fatalln(err)
 	}
 
@@ -76,7 +65,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	meta.Name = opts.TelemetryFile
-	pd, err := psst.ProcessRecording(front, rear, meta, linkage, calibrations.FrontCalibration, calibrations.RearCalibration)
+	pd, err := psst.ProcessRecording(front, rear, meta, linkage, *fcal, *rcal)
 	if err != nil {
 		log.Fatalln(err)
 	}

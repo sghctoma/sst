@@ -24,12 +24,17 @@ type CalibrationMethod struct {
 
 type Calibration struct {
 	Id        int                `codec:"-" db:"id"        json:"id"`
-	Name      string             `codec:"," db:"name"      json:"name"   binding:"required"`
-	MethodId  int                `codec:"," db:"method_id" json:"method" binding:"required"`
+	Name      string             `codec:"," db:"name"      json:"name"      binding:"required"`
+	MethodId  int                `codec:"," db:"method_id" json:"method_id" binding:"required"`
 	RawInputs string             `codec:"-" db:"inputs"    json:"-"`
-	Inputs    map[string]float64 `codec:","                json:"inputs" binding:"required"`
-	Method    CalibrationMethod  `codec:"-"                json:"-"`
+	Inputs    map[string]float64 `codec:","                json:"inputs"    binding:"required"`
+	Method    *CalibrationMethod `codec:"-"                json:"method,omitempty"`
 	env       map[string]interface{}
+}
+
+type calibrations struct {
+	FrontCalibration *Calibration `json:"front"`
+	RearCalibration  *Calibration `json:"rear"`
 }
 
 var stdenv = map[string]interface{}{
@@ -160,4 +165,23 @@ func (this *Calibration) Evaluate(sample float64) (float64, error) {
 	}
 
 	return out.(float64), nil
+}
+
+func LoadCalibrations(data []byte, linkage Linkage) (*Calibration, *Calibration, error) {
+	var cs calibrations
+	if err := json.Unmarshal(data, &cs); err != nil {
+		return nil, nil, err
+	}
+	if cs.FrontCalibration != nil {
+		if err := cs.FrontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
+			return nil, nil, err
+		}
+	}
+	if cs.RearCalibration != nil {
+		if err := cs.RearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return cs.FrontCalibration, cs.RearCalibration, nil
 }
