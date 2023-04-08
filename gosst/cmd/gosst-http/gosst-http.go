@@ -3,11 +3,11 @@ package main
 import (
 	"database/sql"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jessevdk/go-flags"
-	"github.com/pebbe/zmq4"
 
 	_ "modernc.org/sqlite"
 
@@ -15,8 +15,8 @@ import (
 )
 
 type RequestHandler struct {
-	Db     *sql.DB
-	Socket *zmq4.Socket
+	Db   *sql.DB
+	Conn net.Conn
 }
 
 func contains(list []string, e string) bool {
@@ -65,8 +65,7 @@ func main() {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
 		Host         string `short:"h" long:"host" description:"Host to bind on" default:"127.0.0.1"`
 		Port         string `short:"p" long:"port" description:"Port to bind on" default:"8080"`
-		ZmqHost      string `short:"H" long:"zhost" description:"ZMQ server host" default:"127.0.0.1"`
-		ZmqPort      string `short:"P" long:"zport" description:"ZMQ server port" default:"5555"`
+		CacheServer  string `short:"c" long:"cache" description:"cache.py server address" default:"127.0.0.1:5555"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -75,25 +74,19 @@ func main() {
 
 	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
-		log.Fatal("Could not open database")
+		log.Fatalln("Could not open database")
 	}
 	if _, err := db.Exec(queries.Schema); err != nil {
-		log.Fatal("Could not create data tables")
+		log.Fatalln("Could not create data tables")
 	}
 
-	soc, err := zmq4.NewSocket(zmq4.PUSH)
-	defer soc.Close()
+	conn, err := net.Dial("tcp", opts.CacheServer)
 	if err != nil {
-		log.Println("[WARN] could not create ZMQ socket (cache generation disabled)")
-	} else {
-		if err = soc.Connect("tcp://" + opts.ZmqHost + ":" + opts.ZmqPort); err != nil {
-			log.Println("[WARN] could not connect to ZMQ server (cache generation disabled)")
-			soc.Close()
-			soc = nil
-		}
+		log.Println("[WARN] could not connect to server (cache generation disabled)")
 	}
+	defer conn.Close()
 
-	rh := RequestHandler{Db: db, Socket: soc}
+	rh := RequestHandler{Db: db, Conn: conn}
 	//XXX gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/blockloop/scan"
 	"github.com/jessevdk/go-flags"
-	"github.com/pebbe/zmq4"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
@@ -118,7 +117,7 @@ type header struct {
 	Name    [9]byte
 }
 
-func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, soc *zmq4.Socket) {
+func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, cacheConn net.Conn) {
 	bufHeader := make([]byte, 25)
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 25 {
@@ -166,10 +165,12 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, soc *zmq4.Socket) 
 		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Println("[OK] session '", name, "' was successfully imported")
 
-		if soc != nil {
+		if cacheConn != nil {
 			b := make([]byte, 4)
 			binary.LittleEndian.PutUint32(b, uint32(id))
-			soc.SendBytes(b, 0)
+			if _, err := cacheConn.Write(b); err != nil {
+				log.Println("[WARN] could not send session id to cache server!")
+			}
 		}
 	}
 }
@@ -179,8 +180,7 @@ func main() {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
 		Host         string `short:"h" long:"host" description:"Host to bind on" default:"0.0.0.0"`
 		Port         string `short:"p" long:"port" description:"Port to bind on" default:"557"`
-		ZmqHost      string `short:"H" long:"zhost" description:"ZMQ server host" default:"127.0.0.1"`
-		ZmqPort      string `short:"P" long:"zport" description:"ZMQ server port" default:"5555"`
+		CacheServer  string `short:"c" long:"cache" description:"cache.py server address" default:"127.0.0.1:5555"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -191,10 +191,10 @@ func main() {
 
 	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
-		log.Fatal("[ERR] could not open database")
+		log.Fatalln("[ERR] could not open database")
 	}
 	if _, err := db.Exec(queries.Schema); err != nil {
-		log.Fatal("[ERR] could not create data tables")
+		log.Fatalln("[ERR] could not create data tables")
 	}
 
 	l, err := net.Listen("tcp", opts.Host+":"+opts.Port)
@@ -203,17 +203,11 @@ func main() {
 	}
 	defer l.Close()
 
-	soc, err := zmq4.NewSocket(zmq4.PUSH)
-	defer soc.Close()
+	cacheConn, err := net.Dial("tcp", opts.CacheServer)
 	if err != nil {
-		log.Println("[WARN] could not create ZMQ socket (cache generation disabled)")
-	} else {
-		if err = soc.Connect("tcp://" + opts.ZmqHost + ":" + opts.ZmqPort); err != nil {
-			log.Println("[WARN] could not connect to ZMQ server (cache generation disabled)")
-			soc.Close()
-			soc = nil
-		}
+		log.Println("[WARN] could not connect to server (cache generation disabled)")
 	}
+	defer cacheConn.Close()
 
 	for {
 		conn, err := l.Accept()
@@ -221,6 +215,6 @@ func main() {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
-		go handleRequest(conn, db, &h, soc)
+		go handleRequest(conn, db, &h, cacheConn)
 	}
 }

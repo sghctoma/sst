@@ -4,19 +4,19 @@ go 1.19
 
 require (
 	github.com/SeanJxie/polygo v1.1.2
+	github.com/antonmedv/expr v1.12.5
 	github.com/blockloop/scan v1.3.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/openacid/slimarray v0.1.3
 	github.com/pconstantinou/savitzkygolay v0.0.1
-	github.com/pebbe/zmq4 v1.2.9
 	github.com/ugorji/go/codec v1.2.11
+	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 	gonum.org/v1/gonum v0.12.0
 	modernc.org/sqlite v1.21.1
 )
 
 require (
-	github.com/antonmedv/expr v1.12.5 // indirect
 	github.com/bytedance/sonic v1.8.7 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -40,7 +40,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
 	golang.org/x/image v0.6.0 // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.8.0 // indirect

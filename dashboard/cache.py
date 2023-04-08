@@ -4,9 +4,8 @@ import argparse
 import logging
 import msgpack
 import numpy as np
-import struct
+import socket
 import sys
-import zmq
 
 from bokeh.document import Document
 from bokeh.events import DocumentReady, MouseMove
@@ -282,12 +281,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "-a", "--address",
         default='0.0.0.0',
-        help="ZMQ host")
+        help="Server host")
     parser.add_argument(
         "-p", "--port",
         type=int,
         default=5555,
-        help="ZMQ port")
+        help="Server port")
     parser.add_argument(
         "-s", "--session",
         type=int,
@@ -306,21 +305,29 @@ if __name__ == '__main__':
     engine = create_engine(f'sqlite:///{cmd_args.database}')
 
     if cmd_args.action == 'serve':
-        context = zmq.Context()
-        socket = context.socket(zmq.PULL)
-        socket.bind(f'tcp://{cmd_args.address}:{cmd_args.port}')
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((cmd_args.address, cmd_args.port))
+        server_socket.listen(1)
 
         while True:
-            try:
-                message = socket.recv()
-                session_id = struct.unpack('<i', message)[0]
-                logging.info(f"generating cache for session {session_id}")
-                create_cache(engine, session_id, cmd_args.lod, cmd_args.hst)
-                logging.info(f"finished generating cache for session {session_id}")
-            except KeyboardInterrupt:
-                sys.exit(0)
-            except BaseException:
-                logging.error(f"generating cache for session {session_id} failed")
+            conn, addr = server_socket.accept()
+            logging.info(f"connection accepted from {addr}")
+
+            while True:
+                try:
+                    data = conn.recv(4)
+                    if not data:
+                        break
+                    id = int.from_bytes(data, byteorder='little')
+                    logging.info(f"generating cache for session {id}")
+                    create_cache(engine, id, cmd_args.lod, cmd_args.hst)
+                    logging.info(f"finished generating cache for session {id}")
+                except KeyboardInterrupt:
+                    sys.exit(0)
+                except BaseException:
+                    logging.error(f"generating cache for session {id} failed")
+
+            conn.close()
     else:
         if not cmd_args.session:
             print(parser.format_help())
