@@ -104,6 +104,19 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
+	var linkage psst.Linkage
+	rows, err = this.Db.Query(queries.Linkage, setup.Linkage)
+	err = scan.RowStrict(&linkage, rows)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	err = linkage.Process()
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	var frontCalibration psst.Calibration
 	rows, err = this.Db.Query(queries.Calibration, setup.FrontCalibration)
 	err = scan.RowStrict(&frontCalibration, rows)
@@ -128,7 +141,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := frontCalibration.Prepare(); err != nil {
+	if err := frontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -157,20 +170,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := rearCalibration.Prepare(); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	var linkage psst.Linkage
-	rows, err = this.Db.Query(queries.Linkage, setup.Linkage)
-	err = scan.RowStrict(&linkage, rows)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	err = linkage.Process()
-	if err != nil {
+	if err := rearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

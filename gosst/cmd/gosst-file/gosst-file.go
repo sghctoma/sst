@@ -57,11 +57,11 @@ func main() {
 		log.Fatalln(err)
 	}
 	calibrations.FrontCalibration.Method = calibrations.FrontMethod
-	if err = calibrations.FrontCalibration.Prepare(); err != nil {
+	if err = calibrations.FrontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
 		log.Fatalln(err)
 	}
 	calibrations.RearCalibration.Method = calibrations.RearMethod
-	if err = calibrations.RearCalibration.Prepare(); err != nil {
+	if err = calibrations.RearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
 		log.Fatalln(err)
 	}
 

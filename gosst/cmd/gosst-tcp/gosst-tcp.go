@@ -60,7 +60,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 	if err = frontCalibration.Method.ProcessRawData(); err != nil {
 		return -1, err
 	}
-	if err = frontCalibration.Prepare(); err != nil {
+	if err = frontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
 		return -1, err
 	}
 
@@ -82,7 +82,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 	if err = rearCalibration.Method.ProcessRawData(); err != nil {
 		return -1, err
 	}
-	if err = rearCalibration.Prepare(); err != nil {
+	if err = rearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
 		return -1, err
 	}
 

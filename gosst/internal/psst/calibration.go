@@ -91,6 +91,8 @@ func (this *CalibrationMethod) Prepare() error {
 	for _, input := range this.Inputs {
 		env[input] = 0.0
 	}
+	env["MAX_STROKE"] = 0
+	env["MAX_TRAVEL"] = 0
 
 	if err := this.calculateIntermediates(env); err != nil {
 		return err
@@ -123,7 +125,7 @@ func (this *Calibration) DumpRawInput() error {
 	return nil
 }
 
-func (this *Calibration) Prepare() error {
+func (this *Calibration) Prepare(maxStroke, maxTravel float64) error {
 	err := this.Method.Prepare()
 	if err != nil {
 		return err
@@ -139,6 +141,8 @@ func (this *Calibration) Prepare() error {
 	for k, v := range this.Inputs {
 		this.env[k] = v
 	}
+	this.env["MAX_STROKE"] = maxStroke
+	this.env["MAX_TRAVEL"] = maxTravel
 
 	// Calculate intermediates using the inputs
 	if err = this.Method.calculateIntermediates(this.env); err != nil {

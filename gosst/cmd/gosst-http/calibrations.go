@@ -84,7 +84,9 @@ func (this *RequestHandler) PutCalibration(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err = cal.Prepare(); err != nil {
+
+	// this is only executed to check if the calibration has the necessary inputs
+	if err = cal.Prepare(0, 0); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
