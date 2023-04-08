@@ -172,22 +172,3 @@ def stmt_description(session_id: int, name: str, desc: str):
         sessions_table)
         .where(sessions_table.c.id == session_id)
         .values(name=name, description=desc))
-
-
-def stmt_setup(session_id: int):
-    fcal = calibrations_table.alias()
-    rcal = calibrations_table.alias()
-    fcalmod = calibration_methods_table.alias()
-    rcalmod = calibration_methods_table.alias()
-    return (select(
-        setups_table.c.name,
-        linkages_table.c.name,
-        fcal,
-        rcal)
-        .join(linkages_table, linkages_table.c.id == setups_table.c.linkage_id)
-        .join(fcal, fcal.c.id == setups_table.c.front_calibration_id)
-        .join(fcalmod, fcalmod.c.id == fcal.c.method_id)
-        .join(rcal, rcal.c.id == setups_table.c.rear_calibration_id)
-        .join(rcalmod, rcalmod.c.id == rcal.c.method_id)
-        .join(sessions_table, sessions_table.c.setup_id == setups_table.c.id)
-        .where(sessions_table.c.id == session_id))

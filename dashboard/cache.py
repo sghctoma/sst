@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
 import logging
 import msgpack
 import numpy as np
@@ -19,10 +18,10 @@ from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 from sqlalchemy import create_engine
-from sqlalchemy.engine.base import Connection, Engine
+from sqlalchemy.engine.base import Engine
 
 from balance import balance_figure
-from database import stmt_session, stmt_setup, stmt_cache_insert
+from database import stmt_session, stmt_cache_insert
 from description import description_figure
 from fft import fft_figure
 from leverage import leverage_ratio_figure, shock_wheel_figure
@@ -33,18 +32,13 @@ from velocity import velocity_figure
 from velocity import velocity_histogram_figure, velocity_band_stats_figure
 
 
-def _setup_figure(conn: Connection, session_id: int) -> figure:
-    res = conn.execute(stmt_setup(session_id))
-    setup = res.fetchone()
-    if not setup:
-        raise Exception("Missing setup data")
+def _setup_figure(telemetry: Telemetry) -> figure:
 
-    setup_name = setup[0]
-    linkage_name = setup[1]
-    fcal_name = setup[3]
-    rcal_name = setup[7]
-    fcal_inputs = json.loads(setup[5])
-    rcal_inputs = json.loads(setup[9])
+    linkage_name = telemetry.Linkage.Name
+    fcal_name = telemetry.Front.Calibration.Name
+    rcal_name = telemetry.Rear.Calibration.Name
+    fcal_inputs = telemetry.Front.Calibration.Inputs
+    rcal_inputs = telemetry.Rear.Calibration.Inputs
 
     fcal_input_rows = [f'<tr><th>{k}</th><td>{v}</td></tr>' for
                        k, v in fcal_inputs.items()]
@@ -75,7 +69,6 @@ def _setup_figure(conn: Connection, session_id: int) -> figure:
               text-align: center;
             }'''],
         text=f'''
-            <b>Setup:</b>{setup_name}<br />
             <b>Linkage:</b> {linkage_name}<hr />
             <b>Front calibration:</b>{fcal_name}<br />
             <table style="width: 100%;">
@@ -108,7 +101,7 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
 
     tick = 1.0 / telemetry.SampleRate  # time step length in seconds
 
-    p_setup = _setup_figure(conn, session_id)
+    p_setup = _setup_figure(telemetry)
 
     if telemetry.Front.Present:
         p_front_travel_hist = travel_histogram_figure(
