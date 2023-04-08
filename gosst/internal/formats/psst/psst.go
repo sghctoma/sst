@@ -2,8 +2,6 @@ package psst
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	"github.com/SeanJxie/polygo"
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
+	"golang.org/x/exp/constraints"
 	"gonum.org/v1/gonum/floats"
 )
 
@@ -53,6 +52,17 @@ type suspension struct {
 	VelocityBins []float64
 }
 
+type Number interface {
+	constraints.Float | constraints.Integer
+}
+
+// XXX delete this
+type record[T Number] struct {
+	ForkAngle  T
+	ShockAngle T
+}
+
+// XXX delete this
 type header struct {
 	Magic      [3]byte
 	Version    uint8
@@ -61,20 +71,19 @@ type header struct {
 	Timestamp  int64
 }
 
-type record struct {
-	ForkAngle  uint16
-	ShockAngle uint16
-}
-
-type processed struct {
+type Meta struct {
 	Name       string
 	Version    uint8
 	SampleRate uint16
 	Timestamp  int64
-	Front      suspension
-	Rear       suspension
-	Linkage    Linkage
-	Airtimes   []*airtime
+}
+
+type processed struct {
+	Meta
+	Front    suspension
+	Rear     suspension
+	Linkage  Linkage
+	Airtimes []*airtime
 }
 
 func (this *Linkage) Process() error {
@@ -116,104 +125,59 @@ func linspace(min, max float64, num int) []float64 {
 	return bins
 }
 
-func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibration) *processed {
+type MissingRecordsError struct{}
+
+func (e *MissingRecordsError) Error() string {
+	return "Front and rear record arrays are empty"
+}
+
+type RecordCountMismatchError struct{}
+
+func (e *RecordCountMismatchError) Error() string {
+	return "Front and rear record counts are not equal"
+}
+
+func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, rcal Calibration) (*processed, error) {
 	var pd processed
-	pd.Name = name
+	pd.Meta = meta
 	pd.Front.Calibration = fcal
 	pd.Rear.Calibration = rcal
 	pd.Linkage = lnk
 
-	f := bytes.NewReader(sst)
-	headers := make([]header, 1)
-	err := binary.Read(f, binary.LittleEndian, &headers)
-	if err != nil {
-		return nil
+	fc := len(front)
+	rc := len(rear)
+	pd.Front.Present = fc != 0
+	pd.Rear.Present = rc != 0
+	if !(pd.Front.Present || pd.Rear.Present) {
+		return nil, &MissingRecordsError{}
+	} else if (pd.Front.Present && pd.Rear.Present) && (fc != rc) {
+		return nil, &RecordCountMismatchError{}
 	}
-	fileHeader := headers[0]
+	record_count := max(fc, rc)
 
-	if string(fileHeader.Magic[:]) == "SST" {
-		pd.Version = fileHeader.Version
-		pd.SampleRate = fileHeader.SampleRate
-		pd.Timestamp = fileHeader.Timestamp
-	} else {
-		return nil
+	t := make([]float64, record_count)
+	for i := range t {
+		t[i] = 1.0 / float64(pd.SampleRate) * float64(i)
 	}
+	filter, _ := savitzkygolay.NewFilter(51, 1, 3)
 
-	records := make([]record, (len(sst)-16 /* sizeof(header) */)/4 /* sizeof(record) */)
-	err = binary.Read(f, binary.LittleEndian, &records)
-	if err != nil {
-		return nil
-	}
-	var hasFront = records[0].ForkAngle != 0xffff
-	pd.Front.Present = hasFront
-	var hasRear = records[0].ShockAngle != 0xffff
-	pd.Rear.Present = hasRear
+	if pd.Front.Present {
+		pd.Front.Travel = make([]float64, fc)
+		front_coeff := math.Sin(lnk.HeadAngle * math.Pi / 180.0)
 
-	// Rudimentary attempt to fix datasets where the sensor jumps to an unreasonably
-	// large number after a few tenth of seconds, but measures everything correctly
-	// from that baseline.
-	var frontError, rearError uint16
-	var frontBaseline, rearBaseline uint16
-	frontError = 0
-	frontBaseline = records[0].ForkAngle
-	for _, r := range records[1:] {
-		if r.ForkAngle > frontBaseline {
-			if r.ForkAngle > 0x0050 {
-				frontError = r.ForkAngle
-			}
-			break
-		}
-	}
-	rearError = 0
-	rearBaseline = records[0].ShockAngle
-	for _, r := range records[1:] {
-		if r.ShockAngle > rearBaseline {
-			if r.ShockAngle > 0x0050 {
-				rearError = r.ShockAngle
-			}
-			break
-		}
-	}
-
-	if hasFront {
-		pd.Front.Travel = make([]float64, len(records))
-	}
-	if hasRear {
-		pd.Rear.Travel = make([]float64, len(records))
-	}
-	front_coeff := math.Sin(lnk.HeadAngle * math.Pi / 180.0)
-	for index, value := range records {
-		if hasFront {
+		for idx, value := range front {
 			// Front travel might under/overshoot because of erronous data
 			// acqusition. Errors might occur mid-ride (e.g. broken electrical
 			// connection due to vibration), so we don't error out, just cap
 			// travel. Errors like these will be obvious on the graphs, and
 			// the affected regions can be filtered by hand.
-			out, _ := fcal.Evaluate(float64(value.ForkAngle - frontError))
+			out, _ := fcal.Evaluate(float64(value))
 			x := out * front_coeff
 			x = math.Max(0, x)
 			x = math.Min(x, lnk.MaxFrontTravel)
-			pd.Front.Travel[index] = x
+			pd.Front.Travel[idx] = x
 		}
-		if hasRear {
-			// Rear travel might also overshoot the max because of
-			//  a) inaccurately measured leverage ratio
-			//  b) inaccuracies introduced by polynomial fitting
-			// So we just cap it at calculated maximum.
-			out, _ := rcal.Evaluate(float64(value.ShockAngle - rearError))
-			x := pd.Linkage.polynomial.At(out)
-			x = math.Max(0, x)
-			x = math.Min(x, lnk.MaxRearTravel)
-			pd.Rear.Travel[index] = x
-		}
-	}
 
-	t := make([]float64, len(records))
-	for i := range t {
-		t[i] = 1.0 / float64(pd.SampleRate) * float64(i)
-	}
-	filter, _ := savitzkygolay.NewFilter(51, 1, 3)
-	if hasFront {
 		tbins := linspace(0, pd.Linkage.MaxFrontTravel, TRAVEL_HIST_BINS+1)
 		dt := digitize(pd.Front.Travel, tbins)
 		pd.Front.TravelBins = tbins
@@ -231,7 +195,20 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 			pd.Front.Strokes.digitize(dt, dv)
 		}
 	}
-	if hasRear {
+	if pd.Rear.Present {
+		pd.Rear.Travel = make([]float64, rc)
+		for idx, value := range rear {
+			// Rear travel might also overshoot the max because of
+			//  a) inaccurately measured leverage ratio
+			//  b) inaccuracies introduced by polynomial fitting
+			// So we just cap it at calculated maximum.
+			out, _ := rcal.Evaluate(float64(value))
+			x := pd.Linkage.polynomial.At(out)
+			x = math.Max(0, x)
+			x = math.Min(x, lnk.MaxRearTravel)
+			pd.Rear.Travel[idx] = x
+		}
+
 		tbins := linspace(0, pd.Linkage.MaxRearTravel, TRAVEL_HIST_BINS+1)
 		dt := digitize(pd.Rear.Travel, tbins)
 		pd.Rear.TravelBins = tbins
@@ -252,5 +229,5 @@ func ProcessRecording(sst []byte, name string, lnk Linkage, fcal, rcal Calibrati
 
 	pd.airtimes()
 
-	return &pd
+	return &pd, nil
 }

@@ -10,7 +10,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
-	psst "gosst/internal/psst"
+	psst "gosst/internal/formats/psst"
+	sst "gosst/internal/formats/sst"
 )
 
 type calibrations struct {
@@ -70,7 +71,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	pd := psst.ProcessRecording(tb, opts.TelemetryFile, linkage, *&calibrations.FrontCalibration, calibrations.RearCalibration)
+	front, rear, meta, err := sst.ProcessRaw(tb)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	meta.Name = opts.TelemetryFile
+	pd, err := psst.ProcessRecording(front, rear, meta, linkage, calibrations.FrontCalibration, calibrations.RearCalibration)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	var output = opts.OutputFile
 	if output == "" {

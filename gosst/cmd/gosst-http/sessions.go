@@ -15,7 +15,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	queries "gosst/internal/db"
-	psst "gosst/internal/psst"
+	psst "gosst/internal/formats/psst"
+	sst "gosst/internal/formats/sst"
 )
 
 type session struct {
@@ -175,13 +176,19 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
-	sst, err := base64.StdEncoding.DecodeString(session.RawData)
+	sst_data, err := base64.StdEncoding.DecodeString(session.RawData)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pd := psst.ProcessRecording(sst, session.Name, linkage, frontCalibration, rearCalibration)
-	if pd == nil {
+	front, rear, meta, err := sst.ProcessRaw(sst_data)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+	meta.Name = session.Name
+	pd, err := psst.ProcessRecording(front, rear, meta, linkage, frontCalibration, rearCalibration)
+	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}

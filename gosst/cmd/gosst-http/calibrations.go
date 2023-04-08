@@ -10,7 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	queries "gosst/internal/db"
-	psst "gosst/internal/psst"
+	psst "gosst/internal/formats/psst"
 )
 
 func (this *RequestHandler) GetCalibrations(c *gin.Context) {

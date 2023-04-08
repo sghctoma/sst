@@ -17,10 +17,11 @@ import (
 	_ "modernc.org/sqlite"
 
 	queries "gosst/internal/db"
-	psst "gosst/internal/psst"
+	psst "gosst/internal/formats/psst"
+	sst "gosst/internal/formats/sst"
 )
 
-func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int, error) {
+func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte) (int, error) {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
 	err := db.QueryRow(queries.SetupForBoard, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
@@ -86,7 +87,15 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst []byte) (int
 		return -1, err
 	}
 
-	pd := psst.ProcessRecording(sst, name, linkage, frontCalibration, rearCalibration)
+	front, rear, meta, err := sst.ProcessRaw(sst_data)
+	if err != nil {
+		return -1, err
+	}
+	meta.Name = name
+	pd, err := psst.ProcessRecording(front, rear, meta, linkage, frontCalibration, rearCalibration)
+	if err != nil {
+		return -1, err
+	}
 
 	var data []byte
 	enc := codec.NewEncoderBytes(&data, h)
