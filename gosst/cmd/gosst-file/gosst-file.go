@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"path"
@@ -20,28 +21,24 @@ type calibrations struct {
 
 func main() {
 	var opts struct {
-		TelemetryFile     string  `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
-		LeverageRatioFile string  `short:"l" long:"leverageratio" description:"Leverage ratio file" required:"true"`
-		HeadAngle         float64 `short:"a" long:"headangle" description:"Head angle" required:"true"`
-		MaxFrontStroke    float64 `short:"f" long:"frontmax" description:"Maximum stroke (front)" required:"true"`
-		MaxRearStroke     float64 `short:"r" long:"rearmax" description:"Maximum stroke (rear)" required:"true"`
-		Calibration       string  `short:"c" long:"calibration" description:"Calibration data file (JSON)" required:"true"`
-		OutputFile        string  `short:"o" long:"output" description:"Output file"`
+		TelemetryFile string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
+		Linkage       string `short:"l" long:"linkage" description:"Linkage data file (JSON)" required:"true"`
+		Calibration   string `short:"c" long:"calibration" description:"Calibration data file (JSON)" required:"true"`
+		OutputFile    string `short:"o" long:"output" description:"Output file"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		return
 	}
 
-	var linkage psst.Linkage
-	linkage.HeadAngle = opts.HeadAngle
-	linkage.MaxFrontStroke = opts.MaxFrontStroke
-	linkage.MaxRearStroke = opts.MaxRearStroke
-	lb, err := os.ReadFile(opts.LeverageRatioFile)
+	l, err := os.ReadFile(opts.Linkage)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	linkage.RawData = string(lb)
+	var linkage psst.Linkage
+	if err := json.Unmarshal(l, &linkage); err != nil {
+		log.Fatalln(err)
+	}
 	if linkage.Process() != nil {
 		log.Fatalln(err)
 	}
