@@ -24,7 +24,7 @@ type session struct {
 	Name        string `db:"name"        json:"name"           binding:"required"`
 	Timestamp   int64  `db:"timestamp"   json:"timestamp"`
 	Description string `db:"description" json:"description"    binding:"required"`
-	Setup       int    `db:"setup_id"    json:"setup"          binding:"required"`
+	Setup       int    `db:"setup_id"    json:"setup"`
 	RawData     string `                 json:"data,omitempty" binding:"required"`
 	Processed   []byte `db:"data"        json:"-"`
 }
@@ -86,6 +86,47 @@ func (this *RequestHandler) GetSessionData(c *gin.Context) {
 	c.Data(http.StatusOK, "application/octet-stream", data)
 }
 
+func (this *RequestHandler) PutProcessedSession(c *gin.Context) {
+	var session session
+	if err := c.ShouldBindJSON(&session); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	psst_data, err := base64.StdEncoding.DecodeString(session.RawData)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var h codec.MsgpackHandle
+	dec := codec.NewDecoderBytes(psst_data, &h)
+	var processed psst.Processed
+	if err := dec.Decode(&processed); err != nil {
+		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+
+	session.Processed = psst_data
+	session.Timestamp = processed.Timestamp
+	session.Setup = -1
+
+	cols := []string{"name", "timestamp", "description", "setup_id", "data"}
+	vals, _ := scan.Values(cols, &session)
+	var lastInsertedId int
+	if err := this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	} else {
+		if this.Socket != nil {
+			b := make([]byte, 4)
+			binary.LittleEndian.PutUint32(b, uint32(lastInsertedId))
+			if _, err := this.Socket.SendBytes(b, 0); err != nil {
+				log.Println("[WARN] could not send session id to cache server!")
+			}
+		}
+		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
+	}
+}
+
 func (this *RequestHandler) PutSession(c *gin.Context) {
 	var session session
 	if err := c.ShouldBindJSON(&session); err != nil {
@@ -134,7 +175,9 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := scan.RowStrict(&frontCalibration.Method, rows); err != nil {
+	frontCalibration.Method = new(psst.CalibrationMethod)
+	if err := scan.RowStrict(frontCalibration.Method, rows); err != nil {
+		log.Println(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -163,7 +206,8 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := scan.RowStrict(&rearCalibration.Method, rows); err != nil {
+	rearCalibration.Method = new(psst.CalibrationMethod)
+	if err := scan.RowStrict(rearCalibration.Method, rows); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -203,8 +247,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	cols := []string{"name", "timestamp", "description", "setup_id", "data"}
 	vals, _ := scan.Values(cols, &session)
 	var lastInsertedId int
-	err = this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId)
-	if err != nil {
+	if err = this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
 		if this.Socket != nil {

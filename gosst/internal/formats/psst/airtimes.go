@@ -4,7 +4,7 @@ import (
 	"gonum.org/v1/gonum/stat"
 )
 
-func (this *processed) airtimes() {
+func (this *Processed) airtimes() {
 	this.Airtimes = make([]*airtime, 0)
 	if this.Front.Present && this.Rear.Present {
 		for _, f := range this.Front.Strokes.idlings {

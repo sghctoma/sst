@@ -56,21 +56,6 @@ type Number interface {
 	constraints.Float | constraints.Integer
 }
 
-// XXX delete this
-type record[T Number] struct {
-	ForkAngle  T
-	ShockAngle T
-}
-
-// XXX delete this
-type header struct {
-	Magic      [3]byte
-	Version    uint8
-	SampleRate uint16
-	Padding    uint16
-	Timestamp  int64
-}
-
 type Meta struct {
 	Name       string
 	Version    uint8
@@ -78,7 +63,7 @@ type Meta struct {
 	Timestamp  int64
 }
 
-type processed struct {
+type Processed struct {
 	Meta
 	Front    suspension
 	Rear     suspension
@@ -137,8 +122,8 @@ func (e *RecordCountMismatchError) Error() string {
 	return "Front and rear record counts are not equal"
 }
 
-func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, rcal Calibration) (*processed, error) {
-	var pd processed
+func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, rcal Calibration) (*Processed, error) {
+	var pd Processed
 	pd.Meta = meta
 	pd.Front.Calibration = fcal
 	pd.Rear.Calibration = rcal

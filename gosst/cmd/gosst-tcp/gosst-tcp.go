@@ -55,7 +55,8 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte)
 	if err != nil {
 		return -1, err
 	}
-	if err = scan.RowStrict(&frontCalibration.Method, rows); err != nil {
+	frontCalibration.Method = new(psst.CalibrationMethod)
+	if err = scan.RowStrict(frontCalibration.Method, rows); err != nil {
 		return -1, err
 	}
 	if err = frontCalibration.Method.ProcessRawData(); err != nil {
@@ -77,7 +78,8 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte)
 	if err != nil {
 		return -1, err
 	}
-	if err = scan.RowStrict(&rearCalibration.Method, rows); err != nil {
+	rearCalibration.Method = new(psst.CalibrationMethod)
+	if err = scan.RowStrict(rearCalibration.Method, rows); err != nil {
 		return -1, err
 	}
 	if err = rearCalibration.Method.ProcessRawData(); err != nil {
