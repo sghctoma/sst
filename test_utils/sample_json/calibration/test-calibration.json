@@ -1,0 +1,32 @@
+{
+	"front": {
+		"name": "clash-mezzer",
+		"method": {
+			"name": "as5600-isosceles-triangle",
+			"inputs": ["arm","max"],
+			"intermediates": {
+				"start_angle": "acos(max / 2.0 / arm)"
+			},
+			"expression": "max - (2.0 * arm * cos((2.0 * pi / 4096 * (sample > 1024 ? 0 : sample)) + start_angle))"
+		},
+		"inputs": {
+			"arm": 134.9375,
+			"max":234.15625
+		}
+	},
+	"rear": {
+		"name": "clash-mara",
+		"method": {
+			"name": "as5600-isosceles-triangle",
+			"inputs": ["arm","max"],
+			"intermediates": {
+				"start_angle": "acos(max / 2.0 / arm)"
+			},
+			"expression": "max - (2.0 * arm * cos((2.0 * pi / 4096 * (sample > 1024 ? 0 : sample)) + start_angle))"
+		},
+		"inputs": {
+			"arm": 63.5,
+			"max": 119.0625
+		}
+	}
+}

@@ -1,6 +1,6 @@
 {
   "name": "as5600-triangle",
-  "description": "Finn's setup",
+  "description": "Triangle setup with the sensor between two known sides.",
   "inputs": [
     "arm1",
     "arm2",

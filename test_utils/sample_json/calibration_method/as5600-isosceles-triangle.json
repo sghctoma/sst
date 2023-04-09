@@ -1,6 +1,6 @@
 {
   "name": "as5600-isosceles-triangle",
-  "description": "test",
+  "description": "Isosceles triangle setup with the sensor between the unknown and one of the known sides.",
   "inputs": [
     "arm",
     "max"
