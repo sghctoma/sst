@@ -90,8 +90,9 @@ var SetupForBoard = `
 	SELECT S.id, S.linkage_id, S.front_calibration_id, S.rear_calibration_id
 	FROM setups S
 	JOIN boards B
+	ON S.id = B.setup_id
 	WHERE
-	    B.board_id = ?
+	    B.id = ?
 		AND S.id = B.setup_id;`
 
 var InsertBoard = `

@@ -20,11 +20,19 @@ import (
 	sst "gosst/internal/formats/sst"
 )
 
+type NoSuchBoardError struct {
+	board string
+}
+
+func (e *NoSuchBoardError) Error() string {
+	return "board with id \"" + e.board + "\" was not found"
+}
+
 func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte) (int, error) {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
 	err := db.QueryRow(queries.SetupForBoard, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
-		return -1, err
+		return -1, &NoSuchBoardError{board}
 	}
 
 	var linkage psst.Linkage
@@ -71,6 +79,9 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte)
 		return -1, err
 	}
 	if err = scan.RowStrict(&rearCalibration, rows); err != nil {
+		return -1, err
+	}
+	if err := rearCalibration.ProcessRawInputs(); err != nil {
 		return -1, err
 	}
 	rows, err = db.Query(queries.CalibrationMethod, rearCalibration.MethodId)
@@ -160,7 +171,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, cacheConn net.Conn
 
 	if id, err := putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data); err != nil {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
-		log.Println("[ERR] session '", name, "' could not be imported")
+		log.Println("[ERR] session '", name, "' could not be imported:", err)
 	} else {
 		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Println("[OK] session '", name, "' was successfully imported")
@@ -169,7 +180,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, cacheConn net.Conn
 			b := make([]byte, 4)
 			binary.LittleEndian.PutUint32(b, uint32(id))
 			if _, err := cacheConn.Write(b); err != nil {
-				log.Println("[WARN] could not send session id to cache server!")
+				log.Println("[WARN] could not send session id to cache server:", err)
 			}
 		}
 	}
