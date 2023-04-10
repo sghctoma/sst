@@ -43,7 +43,7 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte)
 	if err = scan.RowStrict(&linkage, rows); err != nil {
 		return -1, err
 	}
-	if err = linkage.Process(); err != nil {
+	if err = linkage.ProcessRawData(); err != nil {
 		return -1, err
 	}
 

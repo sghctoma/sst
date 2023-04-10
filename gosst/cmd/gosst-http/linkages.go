@@ -28,7 +28,7 @@ func (this *RequestHandler) GetLinkages(c *gin.Context) {
 	}
 
 	for i := range linkages {
-		linkages[i].Process()
+		linkages[i].ProcessRawData()
 	}
 
 	c.JSON(http.StatusOK, linkages)
@@ -53,7 +53,7 @@ func (this *RequestHandler) GetLinkage(c *gin.Context) {
 		return
 	}
 
-	if linkage.Process() != nil {
+	if linkage.ProcessRawData() != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -68,7 +68,7 @@ func (this *RequestHandler) PutLinkage(c *gin.Context) {
 		return
 	}
 
-	if err := linkage.Process(); err != nil {
+	if err := linkage.ProcessRawData(); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

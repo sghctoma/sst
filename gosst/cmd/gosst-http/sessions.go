@@ -153,7 +153,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = linkage.Process()
+	err = linkage.ProcessRawData()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

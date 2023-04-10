@@ -39,7 +39,7 @@ func main() {
 	if err := json.Unmarshal(l, &linkage); err != nil {
 		log.Fatalln(err)
 	}
-	if linkage.Process() != nil {
+	if linkage.ProcessRawData() != nil {
 		log.Fatalln(err)
 	}
 
