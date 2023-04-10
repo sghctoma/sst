@@ -155,8 +155,8 @@ def stmt_session_tracks(session_id: int, track_id: int,
     s1 = sessions_table.alias()
     s2 = sessions_table.alias()
     stmt_select = (select(
-        s1.c.id)
-        .join(s2, s1.c.id == s2.c.id)
+        s2.c.id)
+        .join(s2, s1.c.setup_id == s2.c.setup_id)
         .where(s1.c.id == session_id)
         .where(s2.c.timestamp >= start_time)
         .where(s2.c.timestamp <= end_time))
