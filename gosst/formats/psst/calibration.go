@@ -7,7 +7,7 @@ import (
 	"math"
 )
 
-type calibrationModeParams struct {
+type calibrationMethodParams struct {
 	Inputs        []string          `codec:"," json:"inputs"        binding:"required"`
 	Intermediates map[string]string `codec:"," json:"intermediates" binding:"required"`
 	Expression    string            `codec:"," json:"expression"    binding:"required"`
@@ -18,7 +18,7 @@ type CalibrationMethod struct {
 	Name        string `codec:"," db:"name"          json:"name"          binding:"required"`
 	Description string `codec:"," db:"description"   json:"description"`
 	RawData     string `codec:"-" db:"data"          json:"-"`
-	calibrationModeParams
+	calibrationMethodParams
 	program *vm.Program
 }
 
@@ -68,7 +68,7 @@ func (this *CalibrationMethod) calculateIntermediates(env map[string]interface{}
 }
 
 func (this *CalibrationMethod) ProcessRawData() error {
-	if err := json.Unmarshal([]byte(this.RawData), &this.calibrationModeParams); err != nil {
+	if err := json.Unmarshal([]byte(this.RawData), &this.calibrationMethodParams); err != nil {
 		return err
 	}
 
@@ -76,7 +76,7 @@ func (this *CalibrationMethod) ProcessRawData() error {
 }
 
 func (this *CalibrationMethod) DumpRawData() error {
-	rd, err := json.Marshal(this.calibrationModeParams)
+	rd, err := json.Marshal(this.calibrationMethodParams)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	psst "gosst/internal/formats/psst"
+	psst "gosst/formats/psst"
 )
 
 type header struct {

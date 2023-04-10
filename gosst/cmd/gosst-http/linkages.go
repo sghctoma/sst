@@ -9,8 +9,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	psst "gosst/formats/psst"
 	queries "gosst/internal/db"
-	psst "gosst/internal/formats/psst"
 )
 
 func (this *RequestHandler) GetLinkages(c *gin.Context) {

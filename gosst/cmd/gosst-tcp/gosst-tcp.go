@@ -15,9 +15,9 @@ import (
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
+	psst "gosst/formats/psst"
+	sst "gosst/formats/sst"
 	queries "gosst/internal/db"
-	psst "gosst/internal/formats/psst"
-	sst "gosst/internal/formats/sst"
 )
 
 type NoSuchBoardError struct {

@@ -10,7 +10,6 @@ import (
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
 	"golang.org/x/exp/constraints"
-	"gonum.org/v1/gonum/floats"
 )
 
 const (
@@ -27,6 +26,12 @@ const (
 	VELOCITY_HIST_STEP                  = 100.0 // (mm/s) step between velocity histogram bins
 	BOTTOMOUT_THRESHOLD                 = 3     // (mm) bottomouts are regions where travel > max_travel - this value
 )
+
+type LinkageRecord struct {
+	ShockTravel   float64
+	WheelTravel   float64
+	LeverageRatio float64
+}
 
 type Linkage struct {
 	Id               int          `codec:"-" db:"id"           json:"id"`
@@ -71,26 +76,39 @@ type Processed struct {
 	Airtimes []*airtime
 }
 
-func (this *Linkage) Process() error {
-	var wtlr [][2]float64
-	var ilr []float64
-	var wt []float64
+func (this *Linkage) ProcessRawData() error {
+	var records []LinkageRecord
 	scanner := bufio.NewScanner(strings.NewReader(this.RawData))
+	s := 0.0
 	for scanner.Scan() {
 		var w, l float64
 		_, err := fmt.Sscanf(scanner.Text(), "%f,%f", &w, &l)
 		if err == nil {
-			ilr = append(ilr, 1.0/l)
-			wtlr = append(wtlr, [2]float64{w, l})
-			wt = append(wt, w)
+			records = append(records, LinkageRecord{
+				ShockTravel:   s,
+				WheelTravel:   w,
+				LeverageRatio: l,
+			})
+			s += 1.0 / l
 		}
 	}
 
-	s := make([]float64, len(ilr))
-	floats.CumSum(s, ilr)
-	s = append([]float64{0.0}, s[:len(s)-1]...)
+	this.Process(records)
+	return nil
+}
 
-	f := polyfit.NewFit(s, wt, 3)
+func (this *Linkage) Process(records []LinkageRecord) {
+	var st []float64
+	var wt []float64
+	var wtlr [][2]float64
+
+	for _, record := range records {
+		st = append(st, record.ShockTravel)
+		wt = append(wt, record.WheelTravel)
+		wtlr = append(wtlr, [2]float64{record.WheelTravel, record.LeverageRatio})
+	}
+
+	f := polyfit.NewFit(st, wt, 3)
 
 	this.LeverageRatio = wtlr
 	this.ShockWheelCoeffs = f.Solve()
@@ -98,7 +116,6 @@ func (this *Linkage) Process() error {
 	this.polynomial, _ = polygo.NewRealPolynomial(this.ShockWheelCoeffs)
 	this.MaxRearTravel = this.polynomial.At(this.MaxRearStroke)
 	this.MaxFrontTravel = math.Sin(this.HeadAngle*math.Pi/180.0) * this.MaxFrontStroke
-	return nil
 }
 
 func linspace(min, max float64, num int) []float64 {

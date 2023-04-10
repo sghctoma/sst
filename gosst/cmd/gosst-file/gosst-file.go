@@ -10,8 +10,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
-	psst "gosst/internal/formats/psst"
-	sst "gosst/internal/formats/sst"
+	psst "gosst/formats/psst"
+	sst "gosst/formats/sst"
 )
 
 type calibrations struct {
