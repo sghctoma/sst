@@ -7,7 +7,7 @@
     "max"
   ],
   "intermediates": {
-    "start_angle": "acos(arm1^2 + arm2^2 - max^2 / 2 * arm1 * arm2)"
+    "start_angle": "acos((arm1^2 + arm2^2 - max^2) / (2 * arm1 * arm2))"
   },
   "expression": "max - sqrt(arm1^2 + arm2^2 - 2 * arm1 * arm2 * cos(start_angle - (2.0 * pi / 4096 * sample)))"
 }
