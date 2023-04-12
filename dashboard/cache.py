@@ -34,6 +34,9 @@ from velocity import velocity_histogram_figure, velocity_band_stats_figure
 def _setup_figure(telemetry: Telemetry) -> figure:
 
     linkage_name = telemetry.Linkage.Name
+    fork_stroke = telemetry.Linkage.MaxFrontStroke
+    shock_stroke = telemetry.Linkage.MaxRearStroke
+    head_angle = telemetry.Linkage.HeadAngle
     fcal_name = telemetry.Front.Calibration.Name
     rcal_name = telemetry.Rear.Calibration.Name
     fcal_inputs = telemetry.Front.Calibration.Inputs
@@ -62,14 +65,25 @@ def _setup_figure(telemetry: Telemetry) -> figure:
               background-color: transparent;
               border-style: none none dashed;
             }
+            th, td {
+              max-width: 50%;
+            }
             table, th, td {
               border: 1px dashed #d0d0d0;
               border-collapse: collapse;
               text-align: center;
+              table-layout: fixed;
             }'''],
         text=f'''
-            <b>Linkage:</b> {linkage_name}<hr />
-            <b>Front calibration:</b>{fcal_name}<br />
+            <b>Linkage:</b> {linkage_name}
+            <table style="width: 100%;">
+            <tbody>
+            <tr><th>Head angle</th><td>{head_angle}</td></tr>
+            <tr><th>Fork stroke</th><td>{fork_stroke}</td></tr>
+            <tr><th>Shock stroke</th><td>{shock_stroke}</td></tr>
+            </tbody>
+            </table>
+            <br /><b>Front calibration:</b>{fcal_name}<br />
             <table style="width: 100%;">
             <tbody>
             {''.join(fcal_input_rows)}
