@@ -215,3 +215,14 @@ var UpdateSession = `
 	UPDATE sessions
 	SET (name, description) = (?, ?)
 	WHERE id = ?`
+
+var InsertTrack = `
+	INSERT
+	INTO tracks (track)
+	VALUES (?)
+	RETURNING id`
+
+var SetTrackForSession = `
+	UPDATE sessions
+	SET track_id = ?
+	WHERE id = ?`

@@ -121,6 +121,7 @@ func main() {
 	router.DELETE("/session/:id", rh.TokenAuthMiddleware(), rh.DeleteSession)
 	router.PATCH("/session/:id", rh.TokenAuthMiddleware(), rh.PatchSession)
 	router.PUT("/session/psst", rh.TokenAuthMiddleware(), rh.PutProcessedSession)
+	router.PUT("/session/:id/track", rh.TokenAuthMiddleware(), rh.PutTrack)
 
 	router.Run(opts.Host + ":" + opts.Port)
 }
