@@ -4,9 +4,11 @@ import argparse
 import logging
 import msgpack
 import numpy as np
+import queue
 import select
 import socket
 import sys
+import threading
 
 from bokeh.document import Document
 from bokeh.events import DocumentReady, MouseMove
@@ -279,6 +281,18 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
 
 
 def serve(address: str, port: int):
+    id_queue = queue.Queue()
+
+    def generator():
+        while True:
+            id = id_queue.get()
+            logging.info(f"generating cache for session {id}")
+            create_cache(engine, id, cmd_args.lod, cmd_args.hst)
+            logging.info(f"cache ready for session {id}")
+
+    gt = threading.Thread(target=generator)
+    gt.start()
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind((address, port))
@@ -297,12 +311,10 @@ def serve(address: str, port: int):
                     data = sock.recv(4)
                     if data:
                         id = int.from_bytes(data, byteorder='little')
+                        id_queue.put(id)
                         # Send something back, so the client knows if we have
                         # really received the session id.
                         sock.send(data)
-                        logging.info(f"generating cache for session {id}")
-                        create_cache(engine, id, cmd_args.lod, cmd_args.hst)
-                        logging.info(f"cache ready for session {id}")
                     else:
                         inputs.remove(sock)
                         sock.close()
