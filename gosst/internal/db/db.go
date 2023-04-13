@@ -65,14 +65,14 @@ var Schema = `
 		sw TEXT NOT NULL,
 		setup TEXT NOT NULL,
 		desc TEXT NOT NULL,
-		f_thist TEXT NOT NULL,
-		f_fft TEXT NOT NULL,
-		f_vhist TEXT NOT NULL,
-		r_thist TEXT NOT NULL,
-		r_fft TEXT NOT NULL,
-		r_vhist TEXT NOT NULL,
-		cbalance TEXT NOT NULL,
-		rbalance TEXT NOT NULL,
+		f_thist TEXT,
+		f_fft TEXT,
+		f_vhist TEXT,
+		r_thist TEXT,
+		r_fft TEXT,
+		r_vhist TEXT,
+		cbalance TEXT,
+		rbalance TEXT,
 		FOREIGN KEY (session_id) REFERENCES sessions (id)
 	);`
 

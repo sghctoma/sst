@@ -26,14 +26,14 @@ bokeh_components_table = Table(
     Column('sw', String, nullable=False),
     Column('setup', String, nullable=False),
     Column('desc', String, nullable=False),
-    Column('f_thist', String, nullable=False),
-    Column('f_fft', String, nullable=False),
-    Column('f_vhist', String, nullable=False),
-    Column('r_thist', String, nullable=False),
-    Column('r_fft', String, nullable=False),
-    Column('r_vhist', String, nullable=False),
-    Column('cbalance', String, nullable=False),
-    Column('rbalance', String, nullable=False),
+    Column('f_thist', String),
+    Column('f_fft', String),
+    Column('f_vhist', String),
+    Column('r_thist', String),
+    Column('r_fft', String),
+    Column('r_vhist', String),
+    Column('cbalance', String),
+    Column('rbalance', String),
 )
 
 tracks_table = Table(
