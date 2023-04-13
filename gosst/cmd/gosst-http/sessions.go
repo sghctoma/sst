@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/base64"
-	"encoding/binary"
 	"log"
 	"net/http"
 	"strconv"
@@ -116,13 +115,7 @@ func (this *RequestHandler) PutProcessedSession(c *gin.Context) {
 	if err := this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
-		if this.Conn != nil {
-			b := make([]byte, 4)
-			binary.LittleEndian.PutUint32(b, uint32(lastInsertedId))
-			if _, err := this.Conn.Write(b); err != nil {
-				log.Println("[WARN] could not send session id to cache server!")
-			}
-		}
+		this.Channel <- lastInsertedId
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }
@@ -250,13 +243,7 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 	if err = this.Db.QueryRow(queries.InsertSession, vals...).Scan(&lastInsertedId); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	} else {
-		if this.Conn != nil {
-			b := make([]byte, 4)
-			binary.LittleEndian.PutUint32(b, uint32(lastInsertedId))
-			if _, err := this.Conn.Write(b); err != nil {
-				log.Println("[WARN] could not send session id to cache server!")
-			}
-		}
+		this.Channel <- lastInsertedId
 		c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
 	}
 }

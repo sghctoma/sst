@@ -297,6 +297,9 @@ def serve(address: str, port: int):
                     data = sock.recv(4)
                     if data:
                         id = int.from_bytes(data, byteorder='little')
+                        # Send something back, so the client knows if we have
+                        # really received the session id.
+                        sock.send(data)
                         logging.info(f"generating cache for session {id}")
                         create_cache(engine, id, cmd_args.lod, cmd_args.hst)
                         logging.info(f"cache ready for session {id}")

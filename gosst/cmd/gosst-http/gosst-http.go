@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jessevdk/go-flags"
@@ -15,8 +16,8 @@ import (
 )
 
 type RequestHandler struct {
-	Db   *sql.DB
-	Conn net.Conn
+	Db      *sql.DB
+	Channel chan int
 }
 
 func contains(list []string, e string) bool {
@@ -80,13 +81,37 @@ func main() {
 		log.Fatalln("Could not create data tables")
 	}
 
-	conn, err := net.Dial("tcp", opts.CacheServer)
-	if err != nil {
-		log.Println("[WARN] could not connect to server (cache generation disabled)")
-	}
-	defer conn.Close()
+	channel := make(chan int, 100)
+	go func() {
+		for {
+			conn, err := net.Dial("tcp", opts.CacheServer)
+			if err != nil {
+				log.Println("[WARN] could not connect to server (retry in 5s)")
+				time.Sleep(5 * time.Second)
+				continue
+			}
 
-	rh := RequestHandler{Db: db, Conn: conn}
+			for {
+				id := <-channel
+				b := make([]byte, 4)
+				b[0] = byte(id)
+				b[1] = byte(id >> 8)
+				b[2] = byte(id >> 16)
+				b[3] = byte(id >> 24)
+				conn.Write(b)
+				conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+				if _, err := conn.Read(b); err != nil {
+					log.Println("[WARN] could not send session id to cache server!")
+					channel <- id
+					break
+				}
+			}
+
+			conn.Close()
+		}
+	}()
+
+	rh := RequestHandler{Db: db, Channel: channel}
 	//XXX gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	router.SetTrustedProxies(nil)

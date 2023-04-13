@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"regexp"
+	"time"
 
 	"github.com/blockloop/scan"
 	"github.com/jessevdk/go-flags"
@@ -128,7 +129,7 @@ type header struct {
 	Name    [9]byte
 }
 
-func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, cacheConn net.Conn) {
+func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, channel chan int) {
 	bufHeader := make([]byte, 25)
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 25 {
@@ -175,14 +176,7 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, cacheConn net.Conn
 	} else {
 		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Println("[OK] session '", name, "' was successfully imported")
-
-		if cacheConn != nil {
-			b := make([]byte, 4)
-			binary.LittleEndian.PutUint32(b, uint32(id))
-			if _, err := cacheConn.Write(b); err != nil {
-				log.Println("[WARN] could not send session id to cache server:", err)
-			}
-		}
+		channel <- id
 	}
 }
 
@@ -208,17 +202,41 @@ func main() {
 		log.Fatalln("[ERR] could not create data tables")
 	}
 
+	channel := make(chan int, 100)
+	go func() {
+		for {
+			conn, err := net.Dial("tcp", opts.CacheServer)
+			if err != nil {
+				log.Println("[WARN] could not connect to server (retry in 5s)")
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			for {
+				id := <-channel
+				b := make([]byte, 4)
+				b[0] = byte(id)
+				b[1] = byte(id >> 8)
+				b[2] = byte(id >> 16)
+				b[3] = byte(id >> 24)
+				conn.Write(b)
+				conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+				if _, err := conn.Read(b); err != nil {
+					log.Println("[WARN] could not send session id to cache server!")
+					channel <- id
+					break
+				}
+			}
+
+			conn.Close()
+		}
+	}()
+
 	l, err := net.Listen("tcp", opts.Host+":"+opts.Port)
 	if err != nil {
 		log.Fatal("[ERR]", err.Error())
 	}
 	defer l.Close()
-
-	cacheConn, err := net.Dial("tcp", opts.CacheServer)
-	if err != nil {
-		log.Println("[WARN] could not connect to server (cache generation disabled)")
-	}
-	defer cacheConn.Close()
 
 	for {
 		conn, err := l.Accept()
@@ -226,6 +244,6 @@ func main() {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
-		go handleRequest(conn, db, &h, cacheConn)
+		go handleRequest(conn, db, &h, channel)
 	}
 }
