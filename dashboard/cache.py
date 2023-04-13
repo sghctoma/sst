@@ -4,6 +4,7 @@ import argparse
 import logging
 import msgpack
 import numpy as np
+import select
 import socket
 import sys
 
@@ -277,6 +278,35 @@ def create_cache(engine: Engine, session_id: int, lod: int, hst: int):
     conn.close()
 
 
+def serve(address: str, port: int):
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind((address, port))
+    server_socket.listen()
+    inputs = [server_socket]
+
+    while True:
+        readable, _, _ = select.select(inputs, [], [])
+        for sock in readable:
+            if sock == server_socket:
+                client_socket, client_address = server_socket.accept()
+                logging.info(f"connection accepted from {client_address}")
+                inputs.append(client_socket)
+            else:
+                try:
+                    data = sock.recv(4)
+                    if data:
+                        id = int.from_bytes(data, byteorder='little')
+                        logging.info(f"generating cache for session {id}")
+                        create_cache(engine, id, cmd_args.lod, cmd_args.hst)
+                        logging.info(f"cache ready for session {id}")
+                    else:
+                        inputs.remove(sock)
+                        sock.close()
+                except BaseException as e:
+                    logging.error(f"cache failed for session {id}: ", e)
+
+
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
@@ -319,29 +349,10 @@ if __name__ == '__main__':
     engine = create_engine(f'sqlite:///{cmd_args.database}')
 
     if cmd_args.action == 'serve':
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((cmd_args.address, cmd_args.port))
-        server_socket.listen(1)
-
-        while True:
-            conn, addr = server_socket.accept()
-            logging.info(f"connection accepted from {addr}")
-
-            while True:
-                try:
-                    data = conn.recv(4)
-                    if not data:
-                        break
-                    id = int.from_bytes(data, byteorder='little')
-                    logging.info(f"generating cache for session {id}")
-                    create_cache(engine, id, cmd_args.lod, cmd_args.hst)
-                    logging.info(f"finished generating cache for session {id}")
-                except KeyboardInterrupt:
-                    sys.exit(0)
-                except BaseException:
-                    logging.error(f"generating cache for session {id} failed")
-
-            conn.close()
+        try:
+            serve(cmd_args.address, cmd_args.port)
+        except KeyboardInterrupt:
+            sys.exit(0)
     else:
         if not cmd_args.session:
             print(parser.format_help())
