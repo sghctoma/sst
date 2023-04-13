@@ -73,7 +73,7 @@ func (this *RequestHandler) PutLinkage(c *gin.Context) {
 		return
 	}
 
-	cols := []string{"name", "head_angle", "raw_lr_data"}
+	cols := []string{"name", "head_angle", "raw_lr_data", "front_stroke", "rear_stroke"}
 	vals, _ := scan.Values(cols, &linkage)
 	var lastInsertedId int
 	err := this.Db.QueryRow(queries.InsertLinkage, vals...).Scan(&lastInsertedId)
