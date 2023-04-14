@@ -285,10 +285,13 @@ def serve(address: str, port: int):
 
     def generator():
         while True:
-            id = id_queue.get()
-            logging.info(f"generating cache for session {id}")
-            create_cache(engine, id, cmd_args.lod, cmd_args.hst)
-            logging.info(f"cache ready for session {id}")
+            try:
+                id = id_queue.get()
+                logging.info(f"generating cache for session {id}")
+                create_cache(engine, id, cmd_args.lod, cmd_args.hst)
+                logging.info(f"cache ready for session {id}")
+            except BaseException as e:
+                logging.error(f"cache failed for session {id}: ", e)
 
     gt = threading.Thread(target=generator)
     gt.start()
