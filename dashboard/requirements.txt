@@ -1,3 +1,4 @@
+argon2-cffi==21.3.0
 bokeh==3.1.0
 gpxpy==1.5.0
 msgpack==1.0.4
@@ -6,6 +7,6 @@ requests==2.28.2
 SciPy==1.8.1
 xyzservices==2022.9.0
 Flask==2.2.3
-Flask-Session==0.4.0
-SQLAlchemy==2.0.7
+Flask-SQLAlchemy==3.0.3
+Flask-JWT-Extended==4.4.4
 gunicorn==20.1.0
