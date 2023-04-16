@@ -37,7 +37,7 @@ def delete(id: str):
 @jwt_required()
 def put():
     entity = dataclass_from_dict(CalibrationMethod, request.json)
-    if not entity:
+    if not entity or not entity.validate():
         return jsonify(msg="Invalid data for Method"), status.BAD_REQUEST
     db.session.merge(entity)
     db.session.commit()

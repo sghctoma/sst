@@ -1,7 +1,24 @@
 import json
+import math
 
 from dataclasses import dataclass
 from app.extensions import db
+from app.utils.expr import ExpressionParser
+
+
+_std_env = dict(
+    pi=math.pi,
+    sin=math.sin,
+    cos=math.cos,
+    tan=math.tan,
+    asin=math.asin,
+    acos=math.acos,
+    atan=math.atan,
+    sqrt=math.sqrt,
+    sample=0,
+    MAX_STROKE=0,
+    MAX_TRAVEL=0,
+)
 
 
 @dataclass
@@ -20,6 +37,16 @@ class CalibrationMethod(db.Model):
     @properties.setter
     def properties(self, value: dict):
         self.properties_raw = json.dumps(value)
+
+    def validate(self) -> float:
+        env = dict(_std_env)
+        for input in self.properties['inputs']:
+            env[input] = 0
+        parser = ExpressionParser(env)
+        for k, v in self.properties['intermediates'].items():
+            env[k] = parser.validate(v)
+        parser = ExpressionParser(env)
+        return parser.validate(self.properties['expression'])
 
 
 @dataclass
@@ -41,5 +68,12 @@ class Calibration(db.Model):
     def inputs(self, value: dict[str: float]):
         self.inputs_raw = json.dumps(value)
 
-    def validate() -> bool:
+    def validate(self) -> bool:
+        cm = db.session.execute(db.select(CalibrationMethod).filter_by(
+            id=self.method_id)).scalar_one_or_none()
+        if not cm:
+            return False
+        for k in cm.properties['inputs']:
+            if k not in self.inputs:
+                return False
         return True
