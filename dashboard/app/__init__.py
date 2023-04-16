@@ -1,5 +1,9 @@
+from http import HTTPStatus as status
 from datetime import timedelta
-from flask import Flask
+
+from flask import jsonify, Flask
+from werkzeug.exceptions import HTTPException
+
 from app.extensions import db, jwt
 
 
@@ -14,6 +18,10 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config.from_prefixed_env()
+
+    @app.errorhandler(HTTPException)
+    def handle_exception(e):
+        return jsonify(status=e.code, msg=e.name), status.INTERNAL_SERVER_ERROR
 
     # Initialize Flask extensions here
     db.init_app(app)

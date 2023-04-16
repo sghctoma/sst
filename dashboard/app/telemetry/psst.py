@@ -81,11 +81,16 @@ class Telemetry:
         self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]
 
 
-def dataclass_from_dict(klass: type, d: dict):
+def _dataclass_from_dict(klass: type, d: dict):
     # source: https://stackoverflow.com/a/54769644
     try:
         fieldtypes = {f.name: f.type for f in datafields(klass)}
         return klass(
-            **{f: dataclass_from_dict(fieldtypes[f], d[f]) for f in d})
+            **{f: _dataclass_from_dict(fieldtypes[f], d[f]) for f in d})
     except BaseException:
         return d  # Not a dataclass field
+
+
+def dataclass_from_dict(klass: type, d: dict):
+    o = _dataclass_from_dict(klass, d)
+    return o if type(o) == klass else None
