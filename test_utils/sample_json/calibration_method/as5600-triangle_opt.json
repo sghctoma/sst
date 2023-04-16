@@ -1,16 +1,18 @@
 {
   "name": "as5600-triangle",
   "description": "Triangle setup with the sensor between two known sides (optimized version).",
-  "inputs": [
-    "arm1",
-    "arm2",
-    "max"
-  ],
-  "intermediates": {
-    "start_angle": "acos((arm1^2 + arm2^2 - max^2) / (2 * arm1 * arm2))",
-    "to_rad_factor": "2.0 * pi / 4096",
-    "arms_sqr_sum": "arm1^2 + arm2^2",
-    "dbl_arm1_arm2": "2 * arm1 * arm2"
-  },
-  "expression": "max - sqrt(arms_sqr_sum - dbl_arm1_arm2 * cos(start_angle - (to_rad_factor * sample)))"
+  "properties": {
+    "inputs": [
+      "arm1",
+      "arm2",
+      "max"
+    ],
+    "intermediates": {
+      "start_angle": "acos((arm1^2 + arm2^2 - max^2) / (2 * arm1 * arm2))",
+      "to_rad_factor": "2.0 * pi / 4096",
+      "arms_sqr_sum": "arm1^2 + arm2^2",
+      "dbl_arm1_arm2": "2 * arm1 * arm2"
+    },
+    "expression": "max - sqrt(arms_sqr_sum - dbl_arm1_arm2 * cos(start_angle - (to_rad_factor * sample)))"
+  }
 }

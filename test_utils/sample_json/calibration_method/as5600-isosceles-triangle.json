@@ -1,12 +1,14 @@
 {
   "name": "as5600-isosceles-triangle",
   "description": "Isosceles triangle setup with the sensor between the unknown and one of the known sides.",
-  "inputs": [
-    "arm",
-    "max"
-  ],
-  "intermediates": {
-    "start_angle": "acos(max / 2.0 / arm)"
-  },
-  "expression": "max - (2.0 * arm * cos((2.0 * pi / 4096 * (sample > 1024 ? 0 : sample)) + start_angle))"
+  "properties": {
+    "inputs": [
+      "arm",
+      "max"
+    ],
+    "intermediates": {
+      "start_angle": "acos(max / 2.0 / arm)"
+    },
+    "expression": "max - (2.0 * arm * cos((2.0 * pi / 4096 * (sample > 1024 ? 0 : sample)) + start_angle))"
+  }
 }

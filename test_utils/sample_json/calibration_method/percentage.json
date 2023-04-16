@@ -1,9 +1,11 @@
 {
   "name": "percentage",
   "description": "Measurement is in percentage of maximum suspension stroke.",
-  "inputs": [],
-  "intermediates": {
-    "factor": "MAX_STROKE / 100.0"
-  },
-  "expression": "sample * factor"
+  "properties": {
+    "inputs": [],
+    "intermediates": {
+      "factor": "MAX_STROKE / 100.0"
+    },
+    "expression": "sample * factor"
+  }
 }

@@ -1,7 +1,9 @@
 {
   "name": "fraction",
   "description": "Measurement is in fraction of maximum suspension stroke.",
-  "inputs": [],
-  "intermediates": {},
-  "expression": "sample * MAX_STROKE"
+  "properties": {
+    "inputs": [],
+    "intermediates": {},
+    "expression": "sample * MAX_STROKE"
+  }
 }

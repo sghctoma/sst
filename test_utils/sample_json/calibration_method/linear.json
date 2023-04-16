@@ -1,9 +1,11 @@
 {
   "name": "linear",
   "description": "Measurement is linearly distributed within a given range.",
-  "inputs": ["min_measurement", "max_measurement"],
-  "intermediates": {
-    "factor": "MAX_STROKE / (max_measurement - min_measurement)"
-  },
-  "expression": "(sample - min_measurement) * factor"
+  "properties": {
+    "inputs": ["min_measurement", "max_measurement"],
+    "intermediates": {
+      "factor": "MAX_STROKE / (max_measurement - min_measurement)"
+    },
+    "expression": "(sample - min_measurement) * factor"
+  }
 }
