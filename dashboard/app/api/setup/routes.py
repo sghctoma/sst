@@ -38,6 +38,6 @@ def put():
     entity = dataclass_from_dict(Setup, request.json)
     if not entity:
         return jsonify(msg="Invalid data for Setup"), status.BAD_REQUEST
-    db.session.merge(entity)
+    entity = db.session.merge(entity)
     db.session.commit()
-    return '', status.CREATED
+    return jsonify(id=entity.id), status.CREATED

@@ -39,6 +39,6 @@ def put():
     entity = dataclass_from_dict(Calibration, request.json)
     if not entity or not entity.validate():
         return jsonify(msg="Invalid data for Calibration"), status.BAD_REQUEST
-    db.session.merge(entity)
+    entity = db.session.merge(entity)
     db.session.commit()
-    return '', status.CREATED
+    return jsonify(id=entity.id), status.CREATED

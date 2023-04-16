@@ -41,9 +41,9 @@ def put():
     entity = dataclass_from_dict(Session, request.json)
     if not entity:
         return jsonify(msg="Invalid data for Session"), status.BAD_REQUEST
-    db.session.merge(entity)
+    entity = db.session.merge(entity)
     db.session.commit()
-    return '', status.CREATED
+    return jsonify(id=entity.id), status.CREATED
 
 
 @bp.route('/<int:id>', methods=['PATCH'])
@@ -55,4 +55,4 @@ def patch(id: int):
         description=data['desc']
     ))
     db.session.commit()
-    return '', 204
+    return '', status.NO_CONTENT
