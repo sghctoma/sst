@@ -33,7 +33,7 @@ with open(cmd_args.sst_file, 'rb') as f:
 sst_name = os.path.basename(cmd_args.sst_file).encode()
 
 # send the header
-header = (bytes.fromhex(cmd_args.board_id) +
+header = (b'ID' + bytes.fromhex(cmd_args.board_id) +
           sst_size.to_bytes(8, 'little', signed=False) +
           sst_name)
 client_socket.send(header)
@@ -50,5 +50,9 @@ response = client_socket.recv(1)[0]
 if response != 6:
     print("session could not be imported!")
     sys.exit(-1)
+
+response = client_socket.recv(4)
+id = int.from_bytes(response, 'little')
+print(id)
 
 client_socket.close()

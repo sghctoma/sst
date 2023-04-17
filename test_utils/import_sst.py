@@ -2,6 +2,7 @@
 
 import argparse
 import base64
+import getpass
 import os
 import requests
 
@@ -12,17 +13,28 @@ if __name__ == '__main__':
         "sst_file",
         help="SST file path")
     parser.add_argument(
+        "user",
+        help="Username")
+    parser.add_argument(
         "setup",
         type=int,
         help="Setup ID")
     parser.add_argument(
-        "token",
-        help="API token")
-    parser.add_argument(
-        "-a", "--gosst-api",
-        default='http://localhost:8080',
-        help="gosst HTTP API URL")
+        "-s", "--server",
+        default='http://localhost:5000/',
+        help="HTTP server URL")
     cmd_args = parser.parse_args()
+
+    login_data = dict(
+        username=cmd_args.user,
+        password=getpass.getpass('password: ')
+    )
+    resp = requests.post(f'{cmd_args.server}/auth/login', json=login_data)
+    rj = resp.json()
+    if 'access_token' not in rj:
+        print("[ERR] login failed")
+        os.exit(-1)
+    token = resp.json()['access_token']
 
     with open(cmd_args.sst_file, 'br') as f:
         sst_data = f.read()
@@ -35,7 +47,7 @@ if __name__ == '__main__':
     )
 
     resp = requests.put(
-        cmd_args.gosst_api + '/session',
-        headers={'X-Token': cmd_args.token},
+        cmd_args.server + '/api/session',
+        headers={'Authorization': f'Bearer {token}'},
         json=session)
     print(resp.json())
