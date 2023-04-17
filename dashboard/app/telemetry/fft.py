@@ -6,7 +6,7 @@ from bokeh.models.tools import HoverTool, WheelZoomTool
 from bokeh.plotting import figure
 from scipy.fft import rfft, rfftfreq
 
-from psst import Strokes
+from app.telemetry.psst import Strokes
 
 
 def _fft_data(strokes: Strokes, travel: list[float], tick: float) -> (

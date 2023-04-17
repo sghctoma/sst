@@ -6,12 +6,11 @@ from bokeh.models.annotations import BoxAnnotation, Label, Span
 from bokeh.models.axes import LinearAxis
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.ranges import Range1d
-from bokeh.models.tickers import FixedTicker
 from bokeh.models.tools import BoxSelectTool, CrosshairTool, WheelZoomTool
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
-from psst import Airtime, Strokes, Telemetry
+from app.telemetry.psst import Airtime, Strokes, Telemetry
 
 
 HISTOGRAM_RANGE_MULTIPLIER = 1.3

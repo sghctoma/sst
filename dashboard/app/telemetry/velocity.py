@@ -15,7 +15,7 @@ from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
 
-from psst import Strokes, Telemetry
+from app.telemetry.psst import Strokes, Telemetry
 
 
 TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM = 10

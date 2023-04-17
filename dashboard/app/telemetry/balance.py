@@ -3,11 +3,10 @@ import numpy as np
 from typing import Any
 
 from bokeh.models import ColumnDataSource
-from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker
 from bokeh.plotting import figure
 
-from psst import Stroke
+from app.telemetry.psst import Stroke
 
 
 def _travel_velocity(strokes: list[Stroke], travel_max) -> (
