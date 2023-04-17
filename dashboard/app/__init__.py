@@ -17,6 +17,8 @@ def create_app():
     app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(hours=8)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['GOSST_HOST'] = 'localhost'
+    app.config['GOSST_PORT'] = 557
     app.config.from_prefixed_env()
 
     @app.errorhandler(HTTPException)
