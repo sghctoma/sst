@@ -180,6 +180,7 @@ bool send_file(const char *filename) {
     }
 
     conn->data_len =
+        2 + // the constant string "ID"
         PICO_UNIQUE_BOARD_ID_SIZE_BYTES +
         sizeof(FSIZE_t) +
         (FILENAME_LENGTH - 1) + // we don't send the terminating null byte
@@ -187,6 +188,7 @@ bool send_file(const char *filename) {
 
     //cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
     cyw43_arch_lwip_begin();
+    tcp_write(conn->pcb, "ID", 2, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, &finfo.fsize, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, filename, FILENAME_LENGTH - 1, TCP_WRITE_FLAG_COPY); 
