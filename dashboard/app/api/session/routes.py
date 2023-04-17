@@ -7,6 +7,7 @@ from http import HTTPStatus as status
 from flask import current_app, jsonify, request, send_file
 from flask_jwt_extended import jwt_required
 
+from app import id_queue
 from app.api.session import bp
 from app.extensions import db
 from app.models.session import Session
@@ -90,6 +91,7 @@ def put():
 
     response = client_socket.recv(4)
     id = int.from_bytes(response, 'little')
+    client_socket.close()
 
     if 'desc' in data:
         db.session.execute(db.update(Session).filter_by(id=id).values(
@@ -97,7 +99,6 @@ def put():
         ))
         db.session.commit()
 
-    client_socket.close()
     return jsonify(id=id), status.CREATED
 
 
@@ -125,3 +126,19 @@ def patch(id: int):
     ))
     db.session.commit()
     return '', status.NO_CONTENT
+
+
+@bp.route('/<int:id>/bokeh', methods=['PUT'])
+def generate_bokeh(id: int):
+    s = db.session.execute(
+        db.select(Session.id).filter_by(id=id)).scalar_one_or_none()
+    if not s:
+        return jsonify(msg=f"session #{id} does not exist"), status.BAD_REQUEST
+
+    sh = db.session.execute(
+        db.select(SessionHtml).filter_by(session_id=id)).scalar_one_or_none()
+    if not sh:
+        id_queue.put(id)
+        return '', status.NO_CONTENT
+
+    return jsonify(msg=f"already generated (session {id})"), status.BAD_REQUEST

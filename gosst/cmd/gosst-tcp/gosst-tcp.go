@@ -8,8 +8,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"regexp"
-	"time"
+	"strconv"
 
 	"github.com/blockloop/scan"
 	"github.com/jessevdk/go-flags"
@@ -33,6 +34,29 @@ type InvalidBoardError struct{}
 
 func (e *InvalidBoardError) Error() string {
 	return "received malformed board id"
+}
+
+type BokehFailedError struct{}
+
+func (e *BokehFailedError) Error() string {
+	return "Bokeh generator failed"
+}
+
+func initiateBokehGeneration(url string) error {
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte{}))
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 204 {
+		return &BokehFailedError{}
+	}
+	return nil
 }
 
 func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
@@ -137,6 +161,11 @@ func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_dat
 		return -1, err
 	}
 
+	url := "http://localhost:5000/api/session/" + strconv.Itoa(lastInsertedId) + "/bokeh"
+	if err := initiateBokehGeneration(url); err != nil {
+		log.Println("[WARN] could not initiate Bokeh component generation", err)
+	}
+
 	return lastInsertedId, nil
 }
 
@@ -146,7 +175,7 @@ type header struct {
 	Name    [9]byte
 }
 
-func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, channel chan int) {
+func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 	bufHeader := make([]byte, 27)
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 27 {
@@ -201,8 +230,6 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, channel chan int) 
 		b[2] = byte(id >> 16)
 		b[3] = byte(id >> 24)
 		conn.Write(b)
-
-		channel <- id
 	}
 }
 
@@ -211,7 +238,6 @@ func main() {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
 		Host         string `short:"h" long:"host" description:"Host to bind on" default:"0.0.0.0"`
 		Port         string `short:"p" long:"port" description:"Port to bind on" default:"557"`
-		CacheServer  string `short:"c" long:"cache" description:"cache.py server address" default:"127.0.0.1:5555"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -225,36 +251,6 @@ func main() {
 		log.Fatalln("[ERR] could not open database")
 	}
 
-	channel := make(chan int, 100)
-	go func() {
-		for {
-			conn, err := net.Dial("tcp", opts.CacheServer)
-			if err != nil {
-				log.Println("[WARN] could not connect to server (retry in 5s)")
-				time.Sleep(5 * time.Second)
-				continue
-			}
-
-			for {
-				id := <-channel
-				b := make([]byte, 4)
-				b[0] = byte(id)
-				b[1] = byte(id >> 8)
-				b[2] = byte(id >> 16)
-				b[3] = byte(id >> 24)
-				conn.Write(b)
-				conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-				if _, err := conn.Read(b); err != nil {
-					log.Println("[WARN] could not send session id to cache server!")
-					channel <- id
-					break
-				}
-			}
-
-			conn.Close()
-		}
-	}()
-
 	l, err := net.Listen("tcp", opts.Host+":"+opts.Port)
 	if err != nil {
 		log.Fatal("[ERR]", err.Error())
@@ -267,6 +263,6 @@ func main() {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
-		go handleRequest(conn, db, &h, channel)
+		go handleRequest(conn, db, &h)
 	}
 }
