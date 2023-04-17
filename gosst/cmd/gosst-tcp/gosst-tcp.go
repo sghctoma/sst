@@ -29,11 +29,28 @@ func (e *NoSuchBoardError) Error() string {
 	return "board with id \"" + e.board + "\" was not found"
 }
 
-func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte) (int, error) {
+type InvalidBoardError struct{}
+
+func (e *InvalidBoardError) Error() string {
+	return "received malformed board id"
+}
+
+func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
-	err := db.QueryRow(queries.SetupForBoard, board).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
-	if err != nil {
-		return -1, &NoSuchBoardError{board}
+	if string(board[:2]) == "ID" {
+		boardId := hex.EncodeToString(board[2:])
+		err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
+		if err != nil {
+			return -1, &NoSuchBoardError{boardId}
+		}
+	} else if string(board[:6]) == "SETUP_" {
+		setupId = int(binary.LittleEndian.Uint32(board[6:]))
+		err := db.QueryRow(queries.Setup, setupId).Scan(&linkageId, &frontCalibrationId, &rearCalibrationId)
+		if err != nil {
+			return -1, err
+		}
+	} else {
+		return -1, &InvalidBoardError{}
 	}
 
 	var linkage psst.Linkage
@@ -124,15 +141,15 @@ func putSession(db *sql.DB, h codec.Handle, board, name string, sst_data []byte)
 }
 
 type header struct {
-	BoardId [8]byte
+	BoardId [10]byte
 	Size    uint64
 	Name    [9]byte
 }
 
 func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, channel chan int) {
-	bufHeader := make([]byte, 25)
+	bufHeader := make([]byte, 27)
 	l, err := conn.Read(bufHeader)
-	if err != nil || l != 25 {
+	if err != nil || l != 27 {
 		log.Println("[ERR] Could not fetch header")
 		conn.Write([]byte{0xf1 /* ERR_CLSD from LwIP */})
 		return
@@ -170,12 +187,21 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle, channel chan int) 
 		return
 	}
 
-	if id, err := putSession(db, h, hex.EncodeToString(header.BoardId[:]), name, data); err != nil {
+	if id, err := putSession(db, h, header.BoardId, name, data); err != nil {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		log.Println("[ERR] session '", name, "' could not be imported:", err)
 	} else {
 		conn.Write([]byte{6 /* STATUS_SUCCESS */})
 		log.Println("[OK] session '", name, "' was successfully imported")
+		// send back the id for the new session
+		// XXX check to see if DAQ unit not reading it is a problem
+		b := make([]byte, 4)
+		b[0] = byte(id)
+		b[1] = byte(id >> 8)
+		b[2] = byte(id >> 16)
+		b[3] = byte(id >> 24)
+		conn.Write(b)
+
 		channel <- id
 	}
 }
@@ -197,9 +223,6 @@ func main() {
 	db, err := sql.Open("sqlite", opts.DatabaseFile)
 	if err != nil {
 		log.Fatalln("[ERR] could not open database")
-	}
-	if _, err := db.Exec(queries.Schema); err != nil {
-		log.Fatalln("[ERR] could not create data tables")
 	}
 
 	channel := make(chan int, 100)
