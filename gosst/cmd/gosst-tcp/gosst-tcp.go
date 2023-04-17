@@ -161,11 +161,6 @@ func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_dat
 		return -1, err
 	}
 
-	url := "http://localhost:5000/api/session/" + strconv.Itoa(lastInsertedId) + "/bokeh"
-	if err := initiateBokehGeneration(url); err != nil {
-		log.Println("[WARN] could not initiate Bokeh component generation", err)
-	}
-
 	return lastInsertedId, nil
 }
 
@@ -175,7 +170,7 @@ type header struct {
 	Name    [9]byte
 }
 
-func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
+func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 	bufHeader := make([]byte, 27)
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 27 {
@@ -230,6 +225,11 @@ func handleRequest(conn net.Conn, db *sql.DB, h codec.Handle) {
 		b[2] = byte(id >> 16)
 		b[3] = byte(id >> 24)
 		conn.Write(b)
+
+		url := server + "/api/session/" + strconv.Itoa(id) + "/bokeh"
+		if err := initiateBokehGeneration(url); err != nil {
+			log.Println("[WARN] could not initiate Bokeh component generation", err)
+		}
 	}
 }
 
@@ -238,6 +238,7 @@ func main() {
 		DatabaseFile string `short:"d" long:"database" description:"SQLite3 database file path" required:"true"`
 		Host         string `short:"h" long:"host" description:"Host to bind on" default:"0.0.0.0"`
 		Port         string `short:"p" long:"port" description:"Port to bind on" default:"557"`
+		ApiServer    string `short:"s" long:"server" description:"HTTP API server" default:"http://localhost:5000"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -263,6 +264,6 @@ func main() {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
-		go handleRequest(conn, db, &h)
+		go handleRequest(conn, db, opts.ApiServer, &h)
 	}
 }
