@@ -11,13 +11,13 @@ from app.telemetry.psst import dataclass_from_dict
 
 @bp.route('', methods=['GET'])
 @jwt_required()
-def get():
+def get_all():
     entities = db.session.execute(db.select(Board)).scalars()
     return jsonify(list(entities)), status.OK
 
 
 @bp.route('/<string:id>', methods=['GET'])
-def get_all(id: str):
+def get(id: str):
     entity = db.session.execute(
         db.select(Board).filter_by(id=id)).scalar_one_or_none()
     if not entity:

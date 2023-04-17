@@ -10,14 +10,13 @@ from app.telemetry.psst import dataclass_from_dict
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
-def get():
+def get_all():
     entities = db.session.execute(db.select(Linkage)).scalars()
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<string:id>', methods=['GET'])
-def get_all(id: str):
+@bp.route('/<int:id>', methods=['GET'])
+def get(id: int):
     entity = db.session.execute(
         db.select(Linkage).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -25,9 +24,9 @@ def get_all(id: str):
     return jsonify(entity), status.OK
 
 
-@bp.route('/<string:id>', methods=['DELETE'])
+@bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: str):
+def delete(id: int):
     db.session.execute(db.delete(Linkage).filter_by(id=id))
     db.session.commit()
     return '', status.NO_CONTENT
