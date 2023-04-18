@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from app.extensions import db
 
@@ -23,3 +23,13 @@ class SessionHtml(db.Model):
     r_vhist: str = db.Column(db.String)
     cbalance: str = db.Column(db.String)
     rbalance: str = db.Column(db.String)
+
+    def _get_divs(self) -> list[str]:
+        d = asdict(self)
+        d.pop('session_id')
+        d.pop('script')
+        return d.values()
+
+    divs = property(fget=_get_divs)
+
+    del _get_divs

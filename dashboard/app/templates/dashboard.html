@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="static/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="static/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="static/favicon_io/favicon-16x16.png">
+    <link rel="manifest" href="static/favicon_io/site.webmanifest">
+    <link href="static/common.css" rel="stylesheet"/>
+    <link href="static/tabs.css" rel="stylesheet"/>
+    {{ resources }}
+    <script>
+    const init_models = function() {
+      // Description box
+      {% if full_access -%}
+      const desc = Bokeh.documents[0].get_model_by_name("description");
+      desc.children[1].disabled = false;           // name input
+      desc.children[2].disabled = false;           // description textarea
+      {% endif %}
+
+      // Map
+      const map = Bokeh.documents[0].get_model_by_name("map");
+      {% if session_track is not none -%}
+      const full_track = {{ full_track }};
+      const session_track = {{ session_track }};
+      update_map(map, full_track, session_track);
+      {%- else %}
+      map.visible = false;
+      {% endif %}
+
+      // Disable tools on mobile
+      if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+        const disable_tools = function(item) {
+          if (item.toolbar) {
+            if (item.toolbar.active_drag) { item.toolbar.active_drag = null; }
+            if (item.active_scroll) { item.active_scroll = null; }
+            if (item.active_inspect) { item.active_inspect = null; }
+          }
+        };
+        Bokeh.documents[0].roots().forEach(item => {
+          disable_tools(item);
+          if (item.children) {
+            item.children.forEach(child => disable_tools(child));
+          }
+        });
+      }
+    }
+    </script>
+    <script src="static/update.js"></script>
+    {% if suspension_count == 1 -%}
+    <link href="static/layout-single.css" rel="stylesheet"/>
+    <script>
+      const process_update_json = function(update_json) {
+        const u = JSON.parse(update_json); 
+        const fft = Bokeh.documents[0].get_model_by_name("fft");
+        const thist = Bokeh.documents[0].get_model_by_name("travel_hist");
+        const vhist = Bokeh.documents[0].get_model_by_name("velocity_hist");
+
+        if (u.front !== null) {
+          update_fft(fft, u.front.fft);
+          update_thist(thist, u.front.thist);
+          update_vhist(vhist.children[0], u.front.vhist);
+          update_vbands(vhist.children[1], u.front.vbands);
+        } else {
+          update_fft(fft, u.rear.fft);
+          update_thist(thist, u.rear.thist);
+          update_vhist(vhist.children[0], u.rear.vhist);
+          update_vbands(vhist.children[1], u.rear.vbands);
+        }
+      };
+    </script>
+    {%- elif suspension_count == 2 %}
+    <link href="static/layout-double.css" rel="stylesheet"/>
+    <script>      
+      const process_update_json = function(u) {
+        const f_fft = Bokeh.documents[0].get_model_by_name("front_fft");
+        const r_fft = Bokeh.documents[0].get_model_by_name("rear_fft");
+        const f_thist = Bokeh.documents[0].get_model_by_name("front_travel_hist");
+        const r_thist = Bokeh.documents[0].get_model_by_name("rear_travel_hist");
+        const f_vhist = Bokeh.documents[0].get_model_by_name("front_velocity_hist");
+        const r_vhist = Bokeh.documents[0].get_model_by_name("rear_velocity_hist");
+        const cbalance = Bokeh.documents[0].get_model_by_name("balance_compression");
+        const rbalance = Bokeh.documents[0].get_model_by_name("balance_rebound");
+
+        update_fft(f_fft, u.front.fft);
+        update_fft(r_fft, u.rear.fft);
+        update_thist(f_thist, u.front.thist);
+        update_thist(r_thist, u.rear.thist);
+        update_vhist(f_vhist.children[0], u.front.vhist);
+        update_vhist(r_vhist.children[0], u.rear.vhist);
+        update_vbands(f_vhist.children[1], u.front.vbands);
+        update_vbands(r_vhist.children[1], u.rear.vbands);
+        update_balance(cbalance, u.balance.compression);
+        update_balance(rbalance, u.balance.rebound);
+      };
+    </script>
+    {% endif %}
+    {{ components_script }}
+  </head>
+  <body>
+    <input type="checkbox" id="drawer-toggle" name="drawer-toggle"/>
+    <label for="drawer-toggle" id="drawer-toggle-label"></label>
+    <header>sufni suspension telemetry <div style="float: right;"><span id="sname">{{ name }}</span> ({{ date }} UTC)</div></header>
+    <nav id="drawer">
+      {% include 'sessions.html' %}
+    </nav>
+
+    <div id="page-content" class="container">
+      <div class="travel">{{ components_divs[0] }}</div>
+      <div class="velocity">{{ components_divs[1] }}</div>
+      <div class="lr">{{ components_divs[3] }}</div>
+      <div class="sw">{{ components_divs[4] }}</div>
+      <div class="setup">{{ components_divs[5] }}</div>
+      <div class="description">{{ components_divs[6] }}</div>
+
+      <div class="map" style="height: 400px">
+      {{ components_divs[2] }}
+      {% if session_track is none -%}
+      {%if full_access %}
+        <div id="nomap" style="min-height: 400px; background: #15191c;">
+          <label for="track-selector" class="drop-container">
+            <span class="drop-title">Upload GPX track</span>
+            <input type="file" id="track-selector" accept=".gpx" required>
+          </label>
+          <script>
+          const track_selector = document.getElementById('track-selector');
+          const get_gpx = async function(event) {
+            const file = event.target.files[0];
+            const gpx = await file.text();
+            const params = {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/octet-stream",
+              },
+              body: gpx
+            }
+            fetch("/gpx", params)
+              .then((response) => {
+                if (response.ok) {
+                  return response.json();
+                } else {
+                  alert("GPX track is not applicable!");
+                };
+              })
+              .then((data) => {
+                if (data !== undefined) {
+                  document.getElementById("nomap").remove();
+                  const map = Bokeh.documents[0].get_model_by_name("map");
+                  map.visible = true;
+                  update_map(map, data.full_track, data.session_track);
+                }
+              })
+          }
+          track_selector.addEventListener('change', get_gpx);
+          </script>
+        </div>
+      {%- else %}
+        <div id="nomap" style="min-height: 400px; background: #15191c;">
+          <span class="static-label">No GPX track</span>
+        </div>
+      {% endif %}
+      {% endif %}
+      </div>
+
+      <div class="tabs">
+        <input class="radiotab" name="tabs" tabindex="1" type="radio" id="tabone" checked="checked">
+        <label class="label" style="grid-column: 1" for="tabone">Spring rate</label>
+        <div class="panel springrate" tabindex="1">
+          {% if suspension_count == 1 -%}
+          <div class="travel-hist">
+            {% if components_divs[7] -%}
+            {{ components_divs[7] }}
+            {%- else %}
+            {{ components_divs[10] }}
+            {% endif %}
+          </div>
+          <div class="fft">
+            {% if components_divs[8] -%}
+            {{ components_divs[8] }}
+            {%- else %}
+            {{ components_divs[11] }}
+            {% endif %}
+          </div>
+          {%- elif suspension_count == 2 %}
+          <div class="front-travel-hist">{{ components_divs[7] }}</div>
+          <div class="rear-travel-hist">{{ components_divs[10] }}</div>
+          <div class="front-fft">{{ components_divs[8] }}</div>
+          <div class="rear-fft">{{ components_divs[11] }}</div>
+          {% endif %}
+        </div>
+
+        <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabtwo">
+        <label class="label" style="grid-column: 2" for="tabtwo">Damping</label>
+        <div class="panel damping" tabindex="1">
+          {% if suspension_count == 1 -%}
+          <div class="velocity-hist">
+            {% if components_divs[9] -%}
+            {{ components_divs[9] }}
+            {%- else %}
+            {{ components_divs[12] }}
+            {% endif %}
+          </div>
+          {%- elif suspension_count == 2 %}
+          <div class="front-velocity-hist">{{ components_divs[9] }}</div>
+          <div class="rear-velocity-hist">{{ components_divs[12] }}</div>
+          {% endif %}
+        </div>
+
+    
+        {% if suspension_count == 2 -%}
+        <input class="radiotab" tabindex="1" name="tabs" type="radio" id="tabthree">
+        <label class="label" style="grid-column: 3" for="tabthree" >Balance</label>
+        <div class="panel balance" tabindex="1">
+          <div class="balance-compression">{{ components_divs[13] }}</div>
+          <div class="balance-rebound">{{ components_divs[14] }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div id="open-modal" class="modal-window">
+      <div>
+          <a href="#" title="Close" class="modal-close">Close</a>
+          <h1>Import sessions</h1>
+          <div id="session-dialog"></div>
+          <!-- TODO: create session upload dialog... -->
+      </div>
+    </div>
+  </body>
+</html>

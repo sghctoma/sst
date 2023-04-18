@@ -31,10 +31,3 @@ class Session(db.Model):
         self.data = psst_data
         self.timestamp = telemetry.Timestamp
         self.setup_id = -1
-
-    def _set_sst(self, data: bytes):
-        pass
-
-    sst = property(fset=_set_sst)
-
-    del _set_sst
