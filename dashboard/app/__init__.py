@@ -2,9 +2,15 @@ import queue
 import threading
 
 from http import HTTPStatus as status
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import jsonify, Flask
+from flask_jwt_extended import (
+    create_access_token,
+    get_jwt,
+    get_jwt_identity,
+    set_access_cookies
+)
 from werkzeug.exceptions import HTTPException
 
 from app.extensions import db, jwt
@@ -16,17 +22,30 @@ id_queue = queue.Queue()
 
 def create_app():
     app = Flask(__name__)
-    app.config['JWT_SECRET_KEY'] = 'super-secret'
-    app.config['JWT_ALGORITHM'] = 'HS256'
-    app.config['JWT_PRIVATE_KEY'] = None
-    app.config['JWT_PUBLIC_KEY'] = None
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=10)
-    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(hours=8)
+    app.config["JWT_TOKEN_LOCATION"] = ["cookies", "headers"]
+    app.config['JWT_ALGORITHM'] = 'RS256'
+    app.config['JWT_PRIVATE_KEY'] = open('rs256.pem').read()
+    app.config['JWT_PUBLIC_KEY'] = open('rs256.pub').read()
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=20)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['GOSST_HOST'] = 'localhost'
     app.config['GOSST_PORT'] = 557
     app.config.from_prefixed_env()
+
+    @app.after_request
+    def refresh_expiring_jwts(response):
+        try:
+            exp_timestamp = get_jwt()["exp"]
+            now = datetime.now(timezone.utc)
+            target_timestamp = datetime.timestamp(now + timedelta(minutes=1.5))
+            if target_timestamp > exp_timestamp:
+                access_token = create_access_token(identity=get_jwt_identity())
+                set_access_cookies(response, access_token)
+            return response
+        except (RuntimeError, KeyError):
+            # If there is not a valid JWT, just return the original response
+            return response
 
     @app.errorhandler(HTTPException)
     def handle_exception(e):

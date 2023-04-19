@@ -1,6 +1,6 @@
 const update_plots = function(start, end) {
-  const args = "?start=" + start + "&end=" + end
-  fetch('/updates' + args)
+  const args = "?start=" + start + "&end=" + end;
+  fetch('/api/session/' + session_id + '/filter' + args)
     .then((response) => { return response.json(); })
     .then((update) => { process_update_json(update); })
 }

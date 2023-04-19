@@ -4,9 +4,11 @@ import pytz
 from datetime import datetime
 
 from bokeh.resources import CDN
-from flask import render_template, Markup
-from flask_jwt_extended import get_jwt_identity, jwt_required
-
+from flask import render_template, make_response, Markup
+from flask_jwt_extended import (
+    verify_jwt_in_request,
+    unset_jwt_cookies
+)
 from app.main import bp
 from app.extensions import db
 from app.models.session import Session
@@ -33,9 +35,16 @@ def _sessions_list(sessions: list) -> dict[str, tuple[int, str, str]]:
 
 @bp.route('/', defaults={'session_id': None})
 @bp.route('/<int:session_id>')
-@jwt_required(optional=True)
 def dashboard(session_id):
-    full_access = get_jwt_identity() is not None
+    # Not using @jwt_required(optional=True), because we want to be able to
+    # load the dashboard even with an invalid token.
+    response = make_response()
+    try:
+        verify_jwt_in_request()
+        full_access = True
+    except BaseException:
+        unset_jwt_cookies(response)
+        full_access = False
 
     sessions = db.session.execute(db.select(Session)).scalars()
     session_list = _sessions_list(list(sessions))
@@ -85,20 +94,18 @@ def dashboard(session_id):
     utc_str = datetime.fromtimestamp(t.Timestamp,
                                      pytz.UTC).strftime('%Y.%m.%d %H:%M')
 
-    return render_template(
+    response.data = render_template(
         'dashboard.html',
+        session_id=session.id,
+        name=session.name,
+        description=session.description,
         sessions=session_list,
         resources=Markup(CDN.render()),
         suspension_count=suspension_count,
-        name=session.name,
         date=utc_str,
         full_access=full_access,
-        full_track=full_track,
-        session_track=session_track,
+        full_track=Markup(full_track),
+        session_track=Markup(session_track),
         components_script=Markup(components_script),
         components_divs=components_divs)
-
-
-@bp.route('/')
-def index():
-    return render_template('index.html')
+    return response

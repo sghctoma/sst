@@ -67,7 +67,14 @@ delete-button:active {
 
 <script>
 const remove_session = function(id) {
-	fetch("/" + id, { method: 'DELETE' }).then((response) => {
+  const params = {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers: {
+      "X-CSRF-TOKEN": getCookie("csrf_access_token"),
+    },
+  }
+	fetch("/api/session/" + id, params).then((response) => {
     if (!response.ok) {
       throw new Error("Network response was not OK");
     }

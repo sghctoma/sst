@@ -83,10 +83,11 @@ def description_figure(session_id: int, name: str, desc: str) -> figure:
             credentials: "same-origin",
             headers: {
                 "Content-Type": "application/json",
+                "X-CSRF-TOKEN": getCookie("csrf_access_token"),
             },
             body: JSON.stringify({"name": nn, "desc": nd}),
         };
-        fetch("/" + id, params)
+        fetch("/api/session/" + id, params)
             .then((response) => {
                 if (response.ok) {
                     cb_obj.origin.disabled = true;
