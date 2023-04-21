@@ -24,14 +24,17 @@ def create_app():
     app = Flask(__name__)
     app.config["JWT_TOKEN_LOCATION"] = ["cookies", "headers"]
     app.config['JWT_ALGORITHM'] = 'RS256'
-    app.config['JWT_PRIVATE_KEY'] = open('rs256.pem').read()
-    app.config['JWT_PUBLIC_KEY'] = open('rs256.pub').read()
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=20)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['GOSST_HOST'] = 'localhost'
     app.config['GOSST_PORT'] = 557
     app.config.from_prefixed_env()
+
+    app.config['JWT_PRIVATE_KEY'] = open(
+        app.config['JWT_PRIVATE_KEY_FILE']).read()
+    app.config['JWT_PUBLIC_KEY'] = open(
+        app.config['JWT_PUBLIC_KEY_FILE']).read()
 
     @app.after_request
     def refresh_expiring_jwts(response):
