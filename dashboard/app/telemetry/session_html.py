@@ -261,7 +261,7 @@ def create_cache(session_id: int, lod: int, hst: int):
     # Some Bokeh models (like the description box or the map) need to be
     # dynamically initialized based on values in a particular Flask session.
     document.js_on_event(DocumentReady, CustomJS(
-        args=dict(), code='init_models();'))
+        args=dict(), code='SST.init_models();'))
 
     script, divs = components(document.roots, theme=dark_minimal_theme)
     components_data = dict(zip(columns, [session_id, script] + list(divs)))

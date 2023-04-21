@@ -78,26 +78,7 @@ def description_figure(session_id: int, name: str, desc: str) -> figure:
         if (!nd) {
             nd = d.value;
         }
-        const params = {
-            method: "PATCH",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": getCookie("csrf_access_token"),
-            },
-            body: JSON.stringify({"name": nn, "desc": nd}),
-        };
-        fetch("/api/session/" + id, params)
-            .then((response) => {
-                if (response.ok) {
-                    cb_obj.origin.disabled = true;
-                    document.getElementById("sname").innerHTML = nn;
-                    document.getElementById("session_a_" + id).innerHTML = nn;
-                } else {
-                    alert("Could not update session data!");
-                };
-            })
-        '''))
+        SST.update.patch_session(nn, nd)'''))
 
     desc_input.js_on_change('value_input', CustomJS(
         args=dict(btn=savebutton, n=name_input), code='''

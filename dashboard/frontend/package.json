@@ -1,0 +1,26 @@
+{
+  "name": "sst-frontend",
+  "version": "1.0.0",
+  "description": "Sufni Suspension Telemetry web dashboard",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --config webpack.prod.js",
+    "start": "webpack --config webpack.dev.js --progress"
+  },
+  "keywords": [
+    "MTB",
+    "suspension",
+    "telemetry"
+  ],
+  "author": "sghctoma",
+  "license": "MIT",
+  "dependencies": {
+    "mithril": "^2.2.2"
+  },
+  "devDependencies": {
+    "@types/mithril": "^2.0.12",
+    "webpack": "^5.79.0",
+    "webpack-cli": "^5.0.1"
+  }
+}

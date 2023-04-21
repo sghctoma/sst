@@ -83,7 +83,8 @@ def _update_data(strokes: Strokes, suspension: Suspension, sample_rate: int):
 
 @bp.route('', methods=['GET'])
 def get_all():
-    entities = db.session.execute(db.select(Session)).scalars()
+    entities = db.session.execute(db.select(Session).order_by(
+        Session.timestamp.desc())).scalars()
     return jsonify(list(entities)), status.OK
 
 
@@ -100,6 +101,15 @@ def get_psst(id: int):
         download_name=f"{entity.name}.psst",
         mimetype="application/octet-stream",
     )
+
+
+@bp.route('/last', methods=['GET'])
+def get_last():
+    entity = db.session.execute(db.select(Session).order_by(
+        Session.timestamp.desc()).limit(1)).scalar_one_or_none()
+    if not entity:
+        return jsonify(msg="Session does not exist!"), status.NOT_FOUND
+    return jsonify(entity), status.OK
 
 
 @bp.route('/<int:id>', methods=['GET'])

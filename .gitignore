@@ -73,3 +73,10 @@ tools/
 
 # Flask-Session directory
 dashboard/flask_session
+
+# Frontend dependency directories
+node_modules
+
+# Fronted packaged JavaScript
+dashboard/app/static/main.js
+dashboard/app/static/main.js.map
