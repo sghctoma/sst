@@ -1,7 +1,17 @@
+# -- build image
+
+FROM node:18.16.0-bullseye as build
+
+WORKDIR /usr/src/app
+COPY frontend/ /usr/src/app/
+RUN npm install && npm run build
+
+# -- prod image
+
 FROM python:3.9-bullseye AS dashboard
 
 WORKDIR /dashboard
-EXPOSE 5100/tcp
+EXPOSE 5000/tcp
 
 COPY requirements.txt ./
 RUN pip install \
@@ -11,8 +21,14 @@ RUN apt-get update && apt-get -y install \
 	libatlas-base-dev \
 	libjpeg62-turbo \
 	libopenjp2-7
-COPY ./*.py ./
-COPY ./templates ./templates/
-COPY ./static ./static/
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5100", "server:create_app(database='/data/gosst.db')"]
+COPY ./app ./app
+COPY --from=build /usr/src/app/static/main.js ./app/static/
+
+ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////data/sst.db
+ENV FLASK_GOSST_HOST=gosst
+ENV FLASK_GOSST_PORT=557
+ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
+ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:create_app()"]

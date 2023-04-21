@@ -1,43 +1,27 @@
 version: "3.7"
 services:
-  cache:
+  init:
     build:
-      target: cache
+      target: init
+      context: ./init
+    volumes:
+      - data:/data/
+  dashboard:
+    build:
+      target: dashboard
       context: ./dashboard
-      dockerfile: cache.Dockerfile
     volumes:
       - data:/data/
     restart: unless-stopped
-  gosst-http:
+  gosst:
     build:
-      target: gosst-http
-      context: ./gosst
-    volumes:
-      - data:/data/
-    restart: unless-stopped
-    depends_on:
-      - cache
-  gosst-tcp:
-    build:
-      target: gosst-tcp
+      target: gosst
       context: ./gosst
     ports:
       - "557:557"
     volumes:
       - data:/data/
     restart: unless-stopped
-    depends_on:
-      - cache
-  dashboard:
-    build:
-      target: dashboard
-      context: ./dashboard
-      dockerfile: dashboard.Dockerfile
-    volumes:
-      - data:/data/
-    restart: unless-stopped
-    depends_on:
-      - gosst-http
   caddy:
     image: caddy:2.6.4
     restart: unless-stopped
