@@ -55,8 +55,11 @@ def create_app():
         return jsonify(status=e.code, msg=e.name), status.INTERNAL_SERVER_ERROR
 
     # Initialize Flask extensions here
-    db.init_app(app)
     jwt.init_app(app)
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
 
     # Register blueprints here
     from app.frontend import bp as frontend_bp
