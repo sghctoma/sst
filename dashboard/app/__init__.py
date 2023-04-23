@@ -1,5 +1,9 @@
+import logging
 import queue
 import threading
+import sys
+
+import click
 
 from http import HTTPStatus as status
 from datetime import datetime, timedelta, timezone
@@ -15,6 +19,7 @@ from werkzeug.exceptions import HTTPException
 
 from app.extensions import db, jwt
 from app.telemetry.session_html import create_cache
+from app.utils.first_init import first_init
 
 
 id_queue = queue.Queue()
@@ -31,10 +36,19 @@ def create_app():
     app.config['GOSST_PORT'] = 557
     app.config.from_prefixed_env()
 
-    app.config['JWT_PRIVATE_KEY'] = open(
-        app.config['JWT_PRIVATE_KEY_FILE']).read()
-    app.config['JWT_PUBLIC_KEY'] = open(
-        app.config['JWT_PUBLIC_KEY_FILE']).read()
+    app.logger.addHandler(logging.StreamHandler(sys.stdout))
+    app.logger.setLevel(logging.INFO)
+
+    ctx = click.get_current_context(silent=True)
+    if not ctx:
+        app.config['JWT_PRIVATE_KEY'] = open(
+            app.config['JWT_PRIVATE_KEY_FILE']).read()
+        app.config['JWT_PUBLIC_KEY'] = open(
+            app.config['JWT_PUBLIC_KEY_FILE']).read()
+
+    @app.cli.command("init")
+    def init_command():
+        first_init()
 
     @app.after_request
     def refresh_expiring_jwts(response):
@@ -58,9 +72,6 @@ def create_app():
     jwt.init_app(app)
     db.init_app(app)
 
-    with app.app_context():
-        db.create_all()
-
     # Register blueprints here
     from app.frontend import bp as frontend_bp
     app.register_blueprint(frontend_bp)
@@ -71,7 +82,7 @@ def create_app():
     from app.api import bp as api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
-    def generator():
+    def html_generator():
         with app.app_context():
             app.logger.info("Bokeh HTML generator thread started")
             while True:
@@ -83,13 +94,10 @@ def create_app():
                 except BaseException as e:
                     app.logger.error(f"cache failed for session {id}: {e}")
 
-    def start_generator():
-        gt = threading.Thread(target=generator)
+    @app.before_first_request
+    def before_first_request():
+        gt = threading.Thread(target=html_generator)
         gt.daemon = True
         gt.start()
-
-    @app.before_first_request
-    def beforefirst_request():
-        start_generator()
 
     return app

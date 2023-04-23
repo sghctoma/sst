@@ -1,11 +1,5 @@
 version: "3.7"
 services:
-  init:
-    build:
-      target: init
-      context: ./init
-    volumes:
-      - data:/data/
   dashboard:
     build:
       target: dashboard

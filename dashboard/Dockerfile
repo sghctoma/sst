@@ -25,10 +25,12 @@ RUN apt-get update && apt-get -y install \
 COPY ./app ./app
 COPY --from=build /usr/src/app/static/main.js ./app/static/
 
+ENV FLASK_APP=app
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////data/sst.db
 ENV FLASK_GOSST_HOST=gosst
 ENV FLASK_GOSST_PORT=557
 ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
 ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
+ENV PYTHONUNBUFFERED=1
 
-CMD ["gunicorn", "--access-logfile", "-", "--bind", "0.0.0.0:5000", "app:create_app()"]
+CMD flask init && gunicorn "app:create_app()" --bind 0.0.0.0:5000 --access-logfile - --error-logfile -
