@@ -5,7 +5,7 @@ var SessionDayItem = {
  view: function(vnode) {
     return m("div", {style: "display: block; margin: 5px;"}, [
       m("p", {style: "font-size: 14px; color: #d0d0d0; margin-top: 10px;"}, vnode.children[0]),
-      m("hr", {style: "margin-top: 5px;"}),
+      m("hr", {style: "margin-top: 3px; width: 95px;"}),
     ])
   } 
 }

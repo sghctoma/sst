@@ -41,6 +41,15 @@ h4 {
   color: #d0d0d0;
 }
 
+hr {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.input-error {
+  background-color: #ee8080;
+}
+
 .drop-container {
   position: relative;
   top: 200px;

@@ -2,33 +2,6 @@ var m = require("mithril")
 var Session = require("./Session")
 
 var SST = {
-  login: async function (username, password) {
-  	const params = {
-  		method: "POST",
-  		headers: {
-        "Content-Type": "application/json",
-  		},
-  		body: JSON.stringify({username: username, password: password}),
-  	}
-    const response = await fetch("/auth/login", params);
-    const result = await response.json();
-    if (result.access_token) {
-      const desc = Bokeh.documents[0].get_model_by_name("description");
-      desc.children[1].disabled = false;           // name input
-      desc.children[2].disabled = false;           // description textarea
-      Session.current.full_access = true;
-      m.redraw();
-    }
-  },
-  logout: async function () {
-    await fetch("/auth/logout", {method: "POST"});
-    
-    const desc = Bokeh.documents[0].get_model_by_name("description");
-    desc.children[1].disabled = true;           // name input
-    desc.children[2].disabled = true;           // description textarea
-    Session.current.full_access = false;
-    m.redraw();
-  },
   getCookie: function (name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);

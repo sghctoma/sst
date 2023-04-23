@@ -1,6 +1,7 @@
 var m = require("mithril")
 var Session = require("../models/Session")
 var SessionList = require("./SessionList")
+var Login = require("./Login.js")
 
 module.exports = {
   view: function(vnode) {
@@ -14,7 +15,12 @@ module.exports = {
           " (" + Session.current.start_time + " UTC)",
         ]),
       ]),
-      m("nav.drawer", {id: "drawer"}, [m("h4", "Sessions"), m(SessionList)]),
+      m("nav.drawer", {id: "drawer"}, [
+        m("h4", "User"),
+        m(Login),
+        m("hr"),
+        m("h4", "Sessions"),
+        m(SessionList)]),
       vnode.children,
     ])
   }

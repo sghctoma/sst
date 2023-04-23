@@ -38,7 +38,7 @@ def logout():
 
 @bp.route("/user", methods=["GET"])
 @jwt_required()
-def protected():
+def get_user():
     return jsonify(
         id=current_user.id,
         username=current_user.username,
