@@ -1,4 +1,4 @@
-FROM golang:1.20 AS build
+FROM golang:1.20-alpine AS build
 
 WORKDIR /go/src/gosst
 
@@ -9,7 +9,7 @@ RUN go mod download
 COPY . .
 RUN go install -v ./cmd/...
 
-FROM debian:bookworm-slim as gosst
+FROM alpine:3.17 as gosst
 WORKDIR /app
 COPY --from=build /go/bin/gosst-tcp gosst-tcp
 CMD ["./gosst-tcp", \

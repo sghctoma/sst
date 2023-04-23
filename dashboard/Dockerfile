@@ -1,6 +1,6 @@
 # -- build image
 
-FROM node:18.16.0-bullseye as build
+FROM node:20.0-bullseye-slim as build
 
 WORKDIR /usr/src/app
 COPY frontend/ /usr/src/app/
@@ -8,7 +8,7 @@ RUN npm install && npm run build
 
 # -- prod image
 
-FROM python:3.9-bullseye AS dashboard
+FROM python:3.9-slim-bullseye AS dashboard
 
 WORKDIR /dashboard
 EXPOSE 5000/tcp
