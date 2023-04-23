@@ -31,4 +31,4 @@ ENV FLASK_GOSST_PORT=557
 ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
 ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:create_app()"]
+CMD ["gunicorn", "--access-logfile", "-", "--bind", "0.0.0.0:5000", "app:create_app()"]
