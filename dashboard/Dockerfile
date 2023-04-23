@@ -33,4 +33,4 @@ ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
 ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
 ENV PYTHONUNBUFFERED=1
 
-CMD flask init && gunicorn "app:create_app()" --bind 0.0.0.0:5000 --access-logfile - --error-logfile -
+CMD flask init && gunicorn "app:create_app()" --bind 0.0.0.0:5000
