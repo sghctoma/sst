@@ -1,8 +1,12 @@
-:80 {
+{
+	admin off
+	default_sni sst.caddy.local
+}
+:443, sst.caddy.local {
+	tls internal
 	handle {
 		reverse_proxy dashboard:5000
 	}
-
 	log {
 		output file /data/caddy-access.log
 		format json

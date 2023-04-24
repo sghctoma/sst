@@ -27,9 +27,10 @@ id_queue = queue.Queue()
 
 def create_app():
     app = Flask(__name__)
-    app.config["JWT_TOKEN_LOCATION"] = ["cookies", "headers"]
+    app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_ALGORITHM'] = 'RS256'
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=20)
+    app.config['JWT_COOKIE_SECURE'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['GOSST_HOST'] = 'localhost'
