@@ -120,13 +120,6 @@ function waitForDivs(divIds, callback) {
 
 module.exports = {
   oncreate: async function(vnode) {
-    // Clean up previous Bokeh document
-    if (Bokeh.documents.length != 0) {
-      Bokeh.documents[0].clear()
-      delete Bokeh.documents[0]
-      Bokeh.documents.splice(0)
-    }
-
     // Load new session and update dashboard
     await Session.load(vnode.attrs.key)
     document.getElementById("layout-stylesheet").setAttribute("href",
@@ -134,6 +127,17 @@ module.exports = {
     document.title = `Sufni Suspenion Telemetry (${Session.current.name})`
     m.redraw()
     waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
+  },
+  onremove: function() {
+    if (Bokeh.documents.length != 0) {
+      Bokeh.documents[0].clear()
+      delete Bokeh.documents[0]
+      Bokeh.documents.splice(0)
+    }
+    Session.current = {loaded: false}
+    document.getElementById("layout-stylesheet").setAttribute("href", "")
+    document.title = "Sufni Suspenion Telemetry"
+    m.redraw()
   },
   view: function() {
     return Session.current.loaded ? m(".container", {id: "page-content"}, [
