@@ -75,6 +75,9 @@ var Session = {
     .then(function(result) {
       Session.current = result
       Session.current.loaded = true
+      Session.current.divIds = Session.current.divs.filter(e => e !== null).map(div => {
+        return div.split("\"")[1]
+      })
     })
   }
 }

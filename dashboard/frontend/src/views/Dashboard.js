@@ -100,6 +100,24 @@ var NoMapWithUpload = {
   }
 }
 
+function waitForDivs(divIds, callback) {
+  const observedDivs = new Set();
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE && divIds.includes(node.id)) {
+          observedDivs.add(node.id);
+          if (observedDivs.size === divIds.length) {
+            callback();
+            observer.disconnect();
+          }
+        }
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 module.exports = {
   oncreate: async function(vnode) {
     // Clean up previous Bokeh document
@@ -113,9 +131,9 @@ module.exports = {
     await Session.load(vnode.attrs.key)
     document.getElementById("layout-stylesheet").setAttribute("href",
       Session.current.suspension_count == 1 ? "static/layout-single.css" : "static/layout-double.css")
-    m.redraw()
     document.title = `Sufni Suspenion Telemetry (${Session.current.name})`
-    eval(Session.current.script)
+    m.redraw()
+    waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
   },
   view: function() {
     return Session.current.loaded ? m(".container", {id: "page-content"}, [
