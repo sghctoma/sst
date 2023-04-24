@@ -5,12 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"golang.org/x/term"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jessevdk/go-flags"
@@ -23,11 +26,6 @@ type session struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	RawData     string `json:"data"`
-}
-
-type response struct {
-	Id    int    `json:"id"`
-	Error string `json:"error"`
 }
 
 type ApiError struct {
@@ -134,17 +132,55 @@ func createCalibrations(linkage *psst.Linkage) (*psst.Calibration, *psst.Calibra
 	return &fcal, &rcal, nil
 }
 
+func login(server, user, password string) (string, error) {
+	u := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: user,
+		Password: password,
+	}
+	userJson, err := json.Marshal(u)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequest("POST", server+"/auth/login", bytes.NewBuffer([]byte(userJson)))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	response := struct {
+		Token   string `json:"access_token"`
+		Message string `json:"msg"`
+	}{}
+	if err := decoder.Decode(&response); err != nil {
+		return "", err
+	}
+	if response.Message != "" {
+		return "", &ApiError{ErrorMessage: response.Message}
+	}
+	return response.Token, nil
+}
+
 func putSession(session session, url string, token string) error {
 	sessionJson, err := json.Marshal(session)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("PUT", url+"/session/psst", bytes.NewBuffer(sessionJson))
+	req, err := http.NewRequest("PUT", url+"/api/session/psst", bytes.NewBuffer(sessionJson))
 	if err != nil {
 		log.Fatalln(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Token", token)
+	req.Header.Set("Authorization", "Bearer "+token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -152,12 +188,16 @@ func putSession(session session, url string, token string) error {
 	}
 	defer resp.Body.Close()
 
-	var r response
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+	decoder := json.NewDecoder(resp.Body)
+	response := struct {
+		Id      int    `json:"id"`
+		Message string `json:"msg"`
+	}{}
+	if err := decoder.Decode(&response); err != nil {
 		return err
 	}
-	if r.Error != "" {
-		return &ApiError{ErrorMessage: r.Error}
+	if response.Message != "" {
+		return &ApiError{ErrorMessage: response.Message}
 	}
 	return nil
 }
@@ -170,12 +210,27 @@ func main() {
 		HeadAngle      float64 `short:"a" long:"headangle" description:"Head tube angle (deg)" required:"true"`
 		MaxFrontStroke float64 `short:"f" long:"frontstroke" description:"Maximum front stroke (mm)" required:"true"`
 		MaxRearStroke  float64 `short:"r" long:"rearstroke" description:"Maximum rear stroke (mm)" required:"true"`
-		ApiUrl         string  `short:"g" long:"gosstapi" description:"GoSST HTTP API URL" default:"http://localhost:8080"`
-		ApiToken       string  `short:"t" long:"token" description:"GoSST HTTP API token" required:"true"`
+		ApiServer      string  `short:"s" long:"server" description:"HTTP API server URL" default:"http://localhost:5000"`
+		ApiUser        string  `short:"u" long:"user" description:"HTTP API user" required:"true"`
+		ApiPassword    string  `short:"p" long:"password" description:"HTTP API password"`
 	}
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		return
+	}
+
+	password := opts.ApiPassword
+	if password == "" {
+		fmt.Print("Password: ")
+		pw, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatalln(err)
+		}
+		password = string(pw)
+	}
+	token, err := login(opts.ApiServer, opts.ApiUser, password)
+	if err != nil {
+		log.Fatalln(err)
 	}
 
 	linkage, err := createLinkage(opts.LeverageFile, opts.HeadAngle, opts.MaxFrontStroke, opts.MaxRearStroke)
@@ -221,7 +276,7 @@ func main() {
 		Description: "imported from " + opts.BybFile,
 		RawData:     base64.StdEncoding.EncodeToString(psstBytes),
 	}
-	if err := putSession(session, opts.ApiUrl, opts.ApiToken); err != nil {
+	if err := putSession(session, opts.ApiServer, token); err != nil {
 		log.Fatalln(err)
 	}
 }
