@@ -5,7 +5,7 @@ var SessionDayItem = {
  view: function(vnode) {
     return m("div", {style: "display: block; margin: 5px;"}, [
       m("p", {style: "font-size: 14px; color: #d0d0d0; margin-top: 10px;"}, vnode.children[0]),
-      m("hr", {style: "margin-top: 3px; width: 95px;"}),
+      m("hr", {style: "margin-top: 3px;"}),
     ])
   } 
 }
@@ -16,7 +16,7 @@ var SessionListItem = {
       m(".tooltip", {style: "display: inline-block; margin: 5px; margin-left: 15px;"}, [
         m(m.route.Link, {
               style: "display: inline-block;",
-              class: "session-list-item",
+              class: "route-link",
               onclick: () => {document.getElementById('drawer-toggle').checked = false;},
               href: "/dashboard/" + vnode.children[0].id
             }, vnode.children[0].name),

@@ -46,6 +46,16 @@ hr {
   margin-bottom: 10px;
 }
 
+.route-link {
+  font-size: 14px;
+  color: #d0d0d0;
+  text-decoration: none;
+}
+
+.route-link:hover {
+  color:white;
+}
+
 .input-error {
   background-color: #ee8080;
 }

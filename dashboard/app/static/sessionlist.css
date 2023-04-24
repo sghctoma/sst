@@ -25,16 +25,6 @@
 		font-size: 12px;
 }
 
-.tooltip a {
-  font-size: 14px;
-  color: #d0d0d0;
-  text-decoration: none;
-}
-
-.tooltip a:hover {
-  color:white;
-}
-
 .delete-btn {
 	color: #d0d0d0;
 	
