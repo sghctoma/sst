@@ -225,11 +225,12 @@ def put_processed():
     session_dict = request.json
     session_data = session_dict.pop('data')
     entity = dataclass_from_dict(Session, session_dict)
-    if not entity or not entity.validate():
+    if not entity:
         return jsonify(msg="Invalid data for Session"), status.BAD_REQUEST
     entity.psst = session_data
     entity = db.session.merge(entity)
     db.session.commit()
+    generate_bokeh(entity.id)
     return jsonify(id=entity.id), status.CREATED
 
 

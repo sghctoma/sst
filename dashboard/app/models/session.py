@@ -25,7 +25,6 @@ class Session(db.Model):
     def psst(self, data: str):
         psst_data = base64.b64decode(data)
         psst_dict = msgpack.unpackb(psst_data,
-                                    max_buffer_size=32*1024*1024,
                                     strict_map_key=True)
         telemetry = dataclass_from_dict(Telemetry, psst_dict)
         self.data = psst_data
