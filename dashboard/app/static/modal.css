@@ -30,12 +30,12 @@
 
 /* Modal Content */
 .modal-content {
+  display: inline-block;
   color: #d0d0d0;
   background-color: #15191C;
-  margin: auto;
+  margin-left: 80px;
   padding: 20px;
   border: 1px solid #888;
-  width: 80%;
   border-radius: 6px;
 }
 
@@ -48,6 +48,7 @@
   position: relative;
   width: 70px;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .modal-close:hover {

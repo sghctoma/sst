@@ -69,15 +69,15 @@ var Login = {
         }}, 'Log Out')
       ]) :
       m('form', {onsubmit: Login.onsubmit}, [
-        m('input[type=text][name=username][placeholder=Username]', {style: "width: 100%"}),
+        m('input[type=text][name=username][placeholder=Username]', {style: "margin: 2px; width: 100%"}),
         m('input[type=password][name=password][placeholder=Password]', {
-          style: "width: 100%",
+          style: "margin: 2px; width: 100%",
           class: Login.loginError ? "input-error" : "",
           oninput: function() {
             Login.loginError = false;
           }
         }),
-        m('button.button[type=submit]', {style: "width: 100%"}, 'Log In')
+        m('button.button[type=submit]', {style: "margin: 2px; width: 100%"}, 'Log In')
       ])
   }
 }

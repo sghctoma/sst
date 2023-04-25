@@ -2,15 +2,6 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
-.container {
-  display: grid;
-  position: relative;
-  top: 0px;
-  left: 0px;
-  gap: 2px;
-  background-color: rgb(64,64,64);
-}
-
 .springrate {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

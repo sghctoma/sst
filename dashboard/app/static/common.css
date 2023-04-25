@@ -22,7 +22,9 @@
 html,body,.layout { 
   height: 100%;
   overflow: hidden; 
-  background-color: rgb(10, 10, 10);
+  color: #d0d0d0;
+  background-color: #0a0a0a;
+  /* background-color: rgb(10, 10, 10); */
 }
 
 header { 
@@ -34,7 +36,8 @@ header {
   padding: 13px 10px 10px 50px;
   font-size: 24px; 
   line-height: 24px; 
-  z-index: 0; 
+  z-index: 0;
+  white-space: nowrap;
 }
 
 h4 {
@@ -46,18 +49,45 @@ hr {
   margin-bottom: 10px;
 }
 
+input, textarea, select, button {
+  color: #d0d0d0;
+  background-color: #20262B;
+  font-size: 15px;
+  padding: 2px;
+  border: 1px solid #ccc;
+}
+
+option {
+  background-color: #20262B;
+}
+
+button:hover {
+  background: #40464B;
+}
+
+.container {
+  display: grid;
+  position: relative;
+  top: 0px;
+  left: 0px;
+  gap: 2px;
+  background-color: rgb(64,64,64);
+}
+
 .route-link {
   font-size: 14px;
   color: #d0d0d0;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .route-link:hover {
-  color:white;
+  color: #a0a0a0;
 }
 
 .input-error {
-  background-color: #ee8080;
+  color: #0a0a0a !important;
+  background-color: #ee8080 !important;
 }
 
 .drop-container {
@@ -110,4 +140,57 @@ hr {
 
 input[type=file] {
   display: none;
+}
+
+.wizard {
+  max-width: 700px;
+  margin: 2px;
+  padding: 15px;
+  background-color: #15191C;
+}
+
+.wizard-header {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.wizard-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-page {
+  border: 1px dashed #ccc;
+  margin: 10px;
+}
+
+.setup-page-header {
+  display: inline-block;
+  top: 0;
+  left: 0;
+  padding: 5px;
+  font-size: 16px;
+  border-bottom: 1px dashed #ccc;
+  border-right: 1px dashed #ccc;
+}
+
+.params {
+  display: grid;
+  grid-gap: 5px;
+  grid-template-columns: 1fr 2fr;
+  margin: 15px;
+}
+
+.params label {
+  grid-column: 1 / 2;
+  font-size: 15px;
+}
+
+.params input, .method {
+  grid-column: 2 / 3;
+}
+
+.method-description {
+  font-size: 14px;
+  margin-top: 3px;
 }
