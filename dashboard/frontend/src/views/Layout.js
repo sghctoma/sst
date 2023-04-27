@@ -35,7 +35,7 @@ module.exports = {
           m(SessionList)
         ]),
       ]),
-      m(Dialog, {}, m(SetupWizard)),
+      m(Dialog, {onclose: SetupWizard.reset}, m(SetupWizard)),
       vnode.children,
     ])
   }

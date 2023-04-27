@@ -86,8 +86,7 @@ button:hover {
 }
 
 .input-error {
-  color: #0a0a0a !important;
-  background-color: #ee8080 !important;
+  background-color: #6f312d !important;
 }
 
 .drop-container {
@@ -174,20 +173,23 @@ input[type=file] {
   border-right: 1px dashed #ccc;
 }
 
-.params {
+
+.input-field {
   display: grid;
   grid-gap: 5px;
   grid-template-columns: 1fr 2fr;
   margin: 15px;
 }
 
-.params label {
-  grid-column: 1 / 2;
-  font-size: 15px;
+.error-message {
+  font-size: 14px;
+  color: #ff594e;
+  text-align: right;
+  grid-column: 2 / 3;
 }
 
-.params input, .method {
-  grid-column: 2 / 3;
+.ok-message {
+  color: #4caf50;
 }
 
 .method-description {

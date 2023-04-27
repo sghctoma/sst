@@ -26,6 +26,20 @@ var Setup = {
       return result.id
     })
   },
+  putCombined: function(combined) {
+    return m.request({
+      method: "PUT",
+      url: "/api/setup/combined",
+      headers: {
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
+      withCredentials: true,
+      body: combined,
+    })
+    .then(function(result) {
+      return result.id
+    })
+  },
 }
 
 module.exports = Setup

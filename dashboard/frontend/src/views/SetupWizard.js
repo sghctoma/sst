@@ -1,176 +1,278 @@
 var m = require("mithril")
+var Dialog = require("./Dialog")
 var CalibrationMethodList = require("./CalibrationMethodList")
 var CalibrationMethod = require("../models/CalibrationMethod")
-var Calibration = require("../models/Calibration")
-var Linkage = require("../models/Linkage")
 var Setup = require("../models/Setup")
 
+const InputField = {
+  view: (vnode) => {
+    const { name, type, value, oninput, validate } = vnode.attrs
+    const error = validate(value)
+    return m(".input-field", [
+      m("label", { for: name }, name),
+      m("input", {
+        type,
+        name,
+        value,
+        oninput,
+        class: error && "input-error",
+      }),
+      error && m(".error-message", error),
+    ]);
+  },
+}
 
-var misc = {
+const Textarea = {
+  view: (vnode) => {
+    const { name, value, oninput, validate } = vnode.attrs
+    const error = validate(value)
+    return m(".input-field", [
+      m("label", { for: name }, name),
+      m("textarea", {
+        name,
+        value,
+        oninput,
+        rows: 10,
+        class: error && "input-error",
+      }),
+      error && m(".error-message", error),
+    ]);
+  },
+}
+
+var GeneralForm = {
   name: null,
-  board_id: null,
+  boardId: null,
+  validateName: (value) => {
+    return value ? "" : "Required"
+  },
+  validate: () => (GeneralForm.name !== null && GeneralForm.name !== ""),
+  reset: () => {
+    GeneralForm.name = null
+    GeneralForm.boardId = null
+  },
   view: function() {
     return m(".setup-page", [
-      m(".setup-page-header", "Miscellaneous"),
-      m(".params", [
-        m("label", {for: "name"}, "Name"),
-        m("input", {type: "text", id: "name", onchange: function(event) {
-          misc.name = event.target.value
-        }}),
-        m("label", {for: "daq-identifier"}, "Associate with DAQ unit"),
-        m("input", {type: "text", id: "daq-identifier", onchange: function(event) {
-          misc.board_id = event.target.value
-        }}),
-      ]),
+      m(".setup-page-header", "General"),
+      m(InputField, {
+        name: "Name",
+        type: "text",
+        value: GeneralForm.name,
+        oninput: (e) => (GeneralForm.name = e.target.value),
+        validate: GeneralForm.validateName,
+      }),
+      m(InputField, {
+        name: "Associate with DAQ unit",
+        type: "text",
+        value: GeneralForm.boardId,
+        oninput: (e) => (GeneralForm.boardId = e.target.value),
+        validate: (value) => (""),
+      }),
     ]);
   }
 }
 
-var linkage = {
-  params: new Map(),
+var LinkageForm = {
+  params: {
+    head_angle: null,
+    front_stroke: null,
+    rear_stroke: null,
+    data: null
+  },
+  validateRange: (value, min, max) => {
+    if (!value) {
+      return "Required"
+    }
+    if (value < min || value > max) {
+      return `Must be between ${min} and ${max}.`
+    }
+    return ""
+  },
+  validateLeverageRatio: (value) => {
+    return value ? "" : "Required"
+  },
+  validate: () => {
+    return LinkageForm.validateRange(LinkageForm.params.head_angle, 45, 90) === "" &&
+           LinkageForm.validateRange(LinkageForm.params.front_stroke, 0, 300) === "" &&
+           LinkageForm.validateRange(LinkageForm.params.rear_stroke, 0, 200) === "" &&
+           LinkageForm.validateRange(LinkageForm.params.head_angle, 45, 90) === "" &&
+           LinkageForm.validateLeverageRatio(LinkageForm.params.data) === ""
+  },
+  reset: () => {
+    LinkageForm.params.head_angle = null
+    LinkageForm.params.front_stroke = null
+    LinkageForm.params.rear_stroke = null
+    LinkageForm.params.data = null
+  },
   view: function(vnode) {
     return m(".setup-page", [
       m(".setup-page-header", "Linkage"),
-      m(".params", [
-        m("label", {for: "head-angle"}, "Head angle"),
-        m("input", {type: "number", id: "head-angle", min: 0, max: 90, onchange: function(event) {
-          linkage.params.set("head_angle", event.target.value)
-        }}),
-        m("label", {for: "front-stroke"}, "Front stroke"),
-        m("input", {type: "number", id: "front-stroke", min: 0, max: 300, onchange: function(event) {
-          linkage.params.set("front_stroke", event.target.value)
-        }}),
-        m("label", {for: "rear-stroke"}, "Rear stroke"),
-        m("input", {type: "number", id: "rear-stroke", min: 0, max: 300, onchange: function(event) {
-          linkage.params.set("rear_stroke", event.target.value)
-        }}),
-        m("label", {for: "leverage-ratio"}, "Leverage ratio"),
-        m("textarea", {id: "leverage-ratio", rows: 10, onchange: function(event) {
-          linkage.params.set("data", event.target.value)
-        }}),
-      ]),
+      m(InputField, {
+        name: "Head angle",
+        type: "number",
+        value: LinkageForm.params.head_angle,
+        oninput: (e) => (LinkageForm.params.head_angle = e.target.value),
+        validate: (value) => LinkageForm.validateRange(value, 45, 90),
+      }),
+      m(InputField, {
+        name: "Front stroke",
+        type: "number",
+        value: LinkageForm.params.front_stroke,
+        oninput: (e) => (LinkageForm.params.front_stroke = e.target.value),
+        validate: (value) => LinkageForm.validateRange(value, 0, 300),
+      }),
+      m(InputField, {
+        name: "Rear stroke",
+        type: "number",
+        value: LinkageForm.params.rear_stroke,
+        oninput: (e) => (LinkageForm.params.rear_stroke = e.target.value),
+        validate: (value) => LinkageForm.validateRange(value, 0, 200),
+      }),
+      m(Textarea, {
+        name: "Leverage ratio",
+        value: LinkageForm.params.data,
+        oninput: (e) => (LinkageForm.params.data = e.target.value),
+        validate: LinkageForm.validateLeverageRatio,
+      }),
     ]);
   }
 }
 
-class CalibrationView {
+class CalibrationForm {
   constructor(label) {
-    this.selected = null
     this.label = label
-    this.params = new Map()
+    this.params = {}
+
+    this.selected = 0
+    this.onselect = this.onselect.bind(this);
+  }
+  onselect(value) {
+    this.selected = value;
+    const cm = CalibrationMethod.list.get(this.selected)
+    this.params = {}
+    if (cm !== undefined) {
+      cm.properties.inputs.forEach((input) => {
+        this.params[input] = null
+      })
+    }
+    m.redraw();
+  }
+  validateValue(value) {
+    return !value ? "Required" : ""
+  }
+  validate() {
+    var isValid = true
+    Object.entries(this.params).forEach((e) => {
+      isValid = isValid && this.validateValue(e[1]) === ""
+    })
+    return isValid
+  }
+  reset() {
+    this.selected = 0
+    m.redraw()
   }
   view(vnode) {
+    const cm = CalibrationMethod.list.get(this.selected)
     return m(".setup-page", [
       m(".setup-page-header", this.label),
-      m(".params", [
+      m(".input-field", [
         m("label", {for: "method"}, "Method"),
         m(".method", [
-          m(CalibrationMethodList, {component: this}),
-          this.selected ? m(".method-description", this.selected.description) : null,
+          m(CalibrationMethodList, {selected: this.selected, onselect: this.onselect}),
+          cm !== undefined ? m(".method-description", cm.description) : null,
         ])
-      ].concat(this.selected ? this.selected.properties.inputs.flatMap(input => [
-        m("label", {for: input}, input),
-        m("input", {type: "number", id: input, oninput: (event) => {
-            this.params.set(input, event.target.value)
-          }}),
-      ]) : null))
-    ])
+      ]),
+    ].concat(cm !== undefined ? cm.properties.inputs.flatMap(input => [
+        m(InputField, {
+          name: input,
+          type: "number",
+          value: this.params[input],
+          oninput: (e) => (this.params[input] = e.target.value),
+          validate: (value) => this.validateValue(value),
+        }),
+      ]) : null)
+    )
   }
 }
 
-var frontCalibration = new CalibrationView("Front calibration")
-var rearCalibration = new CalibrationView("Rear calibration")
+var frontCalibrationForm = new CalibrationForm("Front calibration")
+var rearCalibrationForm = new CalibrationForm("Rear calibration")
 
 var SetupWizard = {
-  errors: [],
+  error: "",
+  submitted: false,
+  validate: function() {
+    return GeneralForm.validate() &&
+           LinkageForm.validate() &&
+           (frontCalibrationForm.selected !== 0 || rearCalibrationForm.selected !== 0) &&
+           frontCalibrationForm.validate() &&
+           rearCalibrationForm.validate()
+  },
+  reset: function() {
+    SetupWizard.error = ""
+    SetupWizard.submitted = false
+    GeneralForm.reset()
+    LinkageForm.reset()
+    frontCalibrationForm.reset()
+    rearCalibrationForm.reset()
+  },
+  submit: async function() {
+    if (!SetupWizard.validate()) {
+      SetupWizard.error = "There are missing or invalid values!"
+    }
+
+    const linkageBody = LinkageForm.params
+    linkageBody.name = "Linkage for " + GeneralForm.name
+
+    const frontCalibrationBody = frontCalibrationForm.selected ? {
+      name: "Front calibration for " + GeneralForm.name,
+      method_id: frontCalibrationForm.selected,
+      inputs: frontCalibrationForm.params,
+    } : null
+
+    const rearCalibrationBody = rearCalibrationForm.selected ? {
+      name: "Rear calibration for " + GeneralForm.name,
+      method_id: rearCalibrationForm.selected,
+      inputs: rearCalibrationForm.params,
+    } : null
+
+    var combined = {
+      name: GeneralForm.name,
+      linkage: linkageBody,
+      front_calibration: frontCalibrationBody,
+      rear_calibration: rearCalibrationBody,
+      board: {
+        id: GeneralForm.boardId,
+      }
+    }
+    Setup.putCombined(combined)
+    .then((id) => {
+      SetupWizard.submitted = true
+      setTimeout(() => {
+        SetupWizard.reset()
+        Dialog.state.closeDialog()
+      }, 1000)
+    })
+    .catch((error) => {
+      SetupWizard.error = error.response.msg
+    })
+  },
   view: function() {
     return m(".wizard", [
       m(".wizard-header", "New bike setup"),
       m(".wizard-body", [
-        m(misc),
-        m(frontCalibration),
-        m(rearCalibration),
-        m(linkage),
-        
-        m("button", {style: "margin: 0px 9px;", onclick: async () => {
-          SetupWizard.errors = []
-
-          const linkageBody = Object.fromEntries(linkage.params)
-          linkageBody.name = "Linkage for " + misc.name
-
-          const frontCalibrationBody = frontCalibration.selected ? {
-            name: "Front calibration for " + misc.name,
-            method_id: frontCalibration.selected.id,
-            inputs: Object.fromEntries(frontCalibration.params),
-          } : null
-
-          const rearCalibrationBody = rearCalibration.selected ? {
-            name: "Rear calibration for " + misc.name,
-            method_id: rearCalibration.selected.id,
-            inputs: Object.fromEntries(rearCalibration.params),
-          } : null
-
-          // Validate Setup
-          if (misc.name === null) {
-            SetupWizard.errors.push("Setup name is required.")
-          }
-
-          // Validate Calibrations
-          if (frontCalibrationBody === null && rearCalibrationBody === null) {
-            SetupWizard.errors.push("At least one calibration is required.")
-          }
-
-          const unset = (element) => element === null;
-          if (frontCalibrationBody !== null && Object.values(frontCalibrationBody.inputs).some(unset)) {
-            SetupWizard.errors.push("All of front calibration's inputs are required.")
-          }
-          if (rearCalibrationBody !== null && Object.values(rearCalibrationBody.inputs).some(unset)) {
-            SetupWizard.errors.push("All of rear calibration's inputs are required.")
-          }
-
-          // Validate Linkage
-          // TODO: see if making these values nullable on the DB side causes any problems
-          // if (frontCalibrationBody !== null && !Object.hasOwnProperty(linkageBody, "head_angle")) {
-          if (!linkageBody.hasOwnProperty("head_angle")) {
-            SetupWizard.errors.push("Head angle is required.")
-          }
-          // if (frontCalibrationBody !== null && !linkageBody.hasOwnProperty("front_stroke")) {
-          if (!linkageBody.hasOwnProperty("front_stroke")) {
-            SetupWizard.errors.push("Front stroke is required.")
-          }
-          // if (rearCalibrationBody !== null && !linkageBody.hasOwnProperty("rear_stroke")) {
-          if (!linkageBody.hasOwnProperty("rear_stroke")) {
-            SetupWizard.errors.push("Rear stroke is required.")
-          }
-          // if (rearCalibrationBody !== null && !linkageBody.hasOwnProperty("data")) {
-          if (!linkageBody.hasOwnProperty("data")) {
-            SetupWizard.errors.push("Leverage ratio data is required.")
-          }
-
-          if (SetupWizard.errors.length !== 0) {
-            console.log(SetupWizard.errors)
-            return
-          }
-          // ----
-
-          const linkageId = await Linkage.put(linkageBody)
-          var frontCalibrationId = null
-          if (frontCalibrationBody) {
-            frontCalibrationId = await Calibration.put(frontCalibrationBody)
-          }
-          var rearCalibrationId = null
-          if (rearCalibrationBody) {
-            rearCalibrationId = await Calibration.put(rearCalibrationBody)
-          }
-          const setupBody = {
-            name: misc.name,
-            linkage_id: linkageId,
-            front_calibration_id: frontCalibrationId,
-            rear_calibration_id: rearCalibrationId,
-          }
-          const setupId = await Setup.put(setupBody)
-          console.log(setupId)
-        }}, "Submit"),
+        m(GeneralForm),
+        m(frontCalibrationForm),
+        m(rearCalibrationForm),
+        m(LinkageForm),
+        SetupWizard.error && m(".error-message", SetupWizard.error),
+        m("button", {
+            style: "margin: 0px 9px;",
+            onclick: SetupWizard.submit,
+            disabled: SetupWizard.submitted,
+            class: SetupWizard.submitted ? "ok-message" : ""
+          },
+          SetupWizard.submitted ? "Setup was created successfully." : "Submit"),
       ]),
     ]);
   }

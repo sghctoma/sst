@@ -9,6 +9,9 @@ var Dialog = {
   oncreate : function(vnode) {
     window.onclick = function(event) {
       if (event.target == vnode.dom) {
+        if (vnode.attrs.onclose) {
+          vnode.attrs.onclose()
+        }
         Dialog.state.closeDialog();
         m.redraw();
       }
@@ -17,7 +20,14 @@ var Dialog = {
   view: function(vnode) {
     return m("div", {class: Dialog.state.isOpen ? "modal modal-shown" : "modal modal-hidden"}, [
       m("div.modal-content", [
-        m(".modal-close", {onclick: Dialog.state.closeDialog}, "Close"),
+        m(".modal-close", {
+          onclick: () => {
+            if (vnode.attrs.onclose) {
+              vnode.attrs.onclose()
+            }
+            Dialog.state.closeDialog()
+          }
+        }, "Close"),
         vnode.children,
       ])
     ])
