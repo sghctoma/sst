@@ -12,8 +12,8 @@ from flask import jsonify, Flask
 from flask_jwt_extended import (
     create_access_token,
     get_jwt,
-    get_jwt_identity,
-    set_access_cookies
+    set_access_cookies,
+    get_current_user
 )
 from werkzeug.exceptions import HTTPException
 
@@ -58,7 +58,7 @@ def create_app():
             now = datetime.now(timezone.utc)
             target_timestamp = datetime.timestamp(now + timedelta(minutes=1.5))
             if target_timestamp > exp_timestamp:
-                access_token = create_access_token(identity=get_jwt_identity())
+                access_token = create_access_token(identity=get_current_user())
                 set_access_cookies(response, access_token)
             return response
         except (RuntimeError, KeyError):
