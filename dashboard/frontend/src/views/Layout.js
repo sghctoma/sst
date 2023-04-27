@@ -22,20 +22,20 @@ module.exports = {
           m("h4", "User"),
           m(Login),
         ]),
-        m("div", {style: "margin-bottom: 15px;"}, [
+        Session.current.full_access ? m("div", {style: "margin-bottom: 15px;"}, [
           m("h4", "Manage"),
           m("div", {
               style: "display: inline-block;",
               class: "route-link",
               onclick: Dialog.state.openDialog,
             }, "Create new bike setup"),
-        ]),
+        ]) : null,
         m("div", {style: "margin-bottom: 15px;"}, [
           m("h4", "Sessions"),
           m(SessionList)
         ]),
       ]),
-      m(Dialog, {onclose: SetupWizard.reset}, m(SetupWizard)),
+      Session.current.full_access ? m(Dialog, {onclose: SetupWizard.reset}, m(SetupWizard)) : null,
       vnode.children,
     ])
   }
