@@ -192,7 +192,8 @@ input[type=file] {
   color: #4caf50;
 }
 
-.method-description {
+.list-description {
   font-size: 14px;
   margin-top: 3px;
+  width: 100%;
 }

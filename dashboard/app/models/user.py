@@ -6,6 +6,7 @@ from app.extensions import jwt, db
 
 @jwt.user_identity_loader
 def user_identity_lookup(user):
+    print(user)
     return user.id
 
 

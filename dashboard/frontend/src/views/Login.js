@@ -18,6 +18,7 @@ var Login = {
     .catch(function(e) {
       Login.isLoggedIn = false
       Login.username = ''
+      m.request({method: "POST", url: "/auth/logout"})
     })
   },
   onsubmit: function(event) {
@@ -41,7 +42,6 @@ var Login = {
       const desc = Bokeh.documents[0].get_model_by_name("description");
       desc.children[1].disabled = false;  // name input
       desc.children[2].disabled = false;  // description textarea
-      // document.getElementById('drawer-toggle').checked = false
     })
     .catch(function(e) {
       Login.loginError = true

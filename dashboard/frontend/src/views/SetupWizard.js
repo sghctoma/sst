@@ -1,4 +1,6 @@
 var m = require("mithril")
+var Board = require("../models/Board")
+var BoardList = require("./BoardList")
 var Dialog = require("./Dialog")
 var CalibrationMethodList = require("./CalibrationMethodList")
 var CalibrationMethod = require("../models/CalibrationMethod")
@@ -43,6 +45,8 @@ const Textarea = {
 var GeneralForm = {
   name: null,
   boardId: null,
+  description: null,
+  oninit: Setup.loadList,
   validateName: (value) => {
     return value ? "" : "Required"
   },
@@ -50,6 +54,20 @@ var GeneralForm = {
   reset: () => {
     GeneralForm.name = null
     GeneralForm.boardId = null
+  },
+  onselect: (value) => {
+    GeneralForm.boardId = value
+    const present = Board.list.has(value)
+    if (!present) {
+      GeneralForm.description = "Not yet seen"
+      return
+    }
+    
+    const setupId = present ? Board.list.get(value).setup_id : null
+    const setupName = setupId && Setup.list.has(setupId) ? Setup.list.get(setupId).name : null
+    GeneralForm.description = setupName ?
+      `Currently associated with ${setupName}` : 
+      "Seen, but not associated with any setup"
   },
   view: function() {
     return m(".setup-page", [
@@ -61,13 +79,13 @@ var GeneralForm = {
         oninput: (e) => (GeneralForm.name = e.target.value),
         validate: GeneralForm.validateName,
       }),
-      m(InputField, {
-        name: "Associate with DAQ unit",
-        type: "text",
-        value: GeneralForm.boardId,
-        oninput: (e) => (GeneralForm.boardId = e.target.value),
-        validate: (value) => (""),
-      }),
+      m(".input-field", [
+        m("label", {for: "board"}, "DAQ unit"),
+        m(".board", [
+          m(BoardList, {selected: GeneralForm.boardId, onselect: GeneralForm.onselect}),
+          GeneralForm.description ? m(".list-description", GeneralForm.description) : null,
+        ]),
+      ]),
     ]);
   }
 }
@@ -179,7 +197,7 @@ class CalibrationForm {
         m("label", {for: "method"}, "Method"),
         m(".method", [
           m(CalibrationMethodList, {selected: this.selected, onselect: this.onselect}),
-          cm !== undefined ? m(".method-description", cm.description) : null,
+          cm !== undefined ? m(".list-description", cm.description) : null,
         ])
       ]),
     ].concat(cm !== undefined ? cm.properties.inputs.flatMap(input => [
