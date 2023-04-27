@@ -9,6 +9,11 @@ var SetupForBoard = `
 	    B.id = ?
 		AND S.id = B.setup_id;`
 
+var InsertBoard = `
+	INSERT OR IGNORE
+	INTO board (id, setup_id)
+	VALUES (?, ?)`
+
 var Setup = `
 	SELECT linkage_id, front_calibration_id, rear_calibration_id
 	FROM setup

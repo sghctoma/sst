@@ -65,6 +65,8 @@ func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_dat
 		boardId := hex.EncodeToString(board[2:])
 		err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 		if err != nil {
+			// Store unknown ID, so that it can be picked up from the UI
+			db.QueryRow(queries.InsertBoard, boardId, nil)
 			return -1, &NoSuchBoardError{boardId}
 		}
 	} else if string(board[:6]) == "SETUP_" {
