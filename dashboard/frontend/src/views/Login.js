@@ -1,43 +1,22 @@
 var m = require("mithril")
 var Session = require("../models/Session")
+var User = require("../models/User")
 var SST = require("../models/Global")
 
 var Login = {
-  isLoggedIn: false,
   loginError: false,
-  username: '',
   oninit: function() {
-    m.request({
-      method: 'GET',
-      url: '/auth/user'
-    })
-    .then(function(user) {
-      Login.isLoggedIn = true
-      Login.username = user.username
-    })
-    .catch(function(e) {
-      Login.isLoggedIn = false
-      Login.username = ''
-      m.request({method: "POST", url: "/auth/logout"})
-    })
+    User.check()
+    .catch(function(e) {})
   },
   onsubmit: function(event) {
     event.preventDefault();
     const formData = new FormData(event.target);   
     const username = formData.get('username')
     const password = formData.get('password')
-    m.request({
-      method: 'POST',
-      url: '/auth/login',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: {username, password},
-    })
+    User.login(username, password)
     .then(function(result) {
-      Login.isLoggedIn = true
       Login.loginError = false
-      Login.username = username
       Session.current.full_access = true
       const desc = Bokeh.documents[0].get_model_by_name("description");
       desc.children[1].disabled = false;  // name input
@@ -49,17 +28,12 @@ var Login = {
     m.redraw();
   },
   view: function() {
-    return Login.isLoggedIn ?
+    return User.current ?
       m('div', [
-        m('span', {style: "font-size: 14px; color: #d0d0d0;"}, `Logged in as ${Login.username}`),
+        m('span', {style: "font-size: 14px; color: #d0d0d0;"}, `Logged in as ${User.current}`),
         m('button.button[type=button]', {style: "width: 100%", onclick: () => {
-          m.request({
-            method: 'POST',
-            url: '/auth/logout',
-          })
+          User.logout()
           .then(function() {
-            Login.isLoggedIn = false
-            Login.username = ''
             Session.current.full_access = false
             const desc = Bokeh.documents[0].get_model_by_name("description");
             desc.children[1].disabled = true;  // name input
