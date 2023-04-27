@@ -35,7 +35,10 @@ module.exports = {
           m(SessionList)
         ]),
       ]),
-      Session.current.full_access ? m(Dialog, {onclose: SetupWizard.reset}, m(SetupWizard)) : null,
+      Session.current.full_access ? m(Dialog, {
+        onopen: SetupWizard.onopen,
+        onclose: SetupWizard.onclose,
+      }, m(SetupWizard)) : null,
       vnode.children,
     ])
   }

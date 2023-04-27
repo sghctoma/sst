@@ -3,15 +3,26 @@ var m = require("mithril")
 var Dialog = {
   state: {
     isOpen: false,
-    openDialog: function() { Dialog.state.isOpen = true; },
-    closeDialog: function() { Dialog.state.isOpen = false; }
+    onopen: null,
+    onclose: null,
+    openDialog: function() {
+      if (Dialog.state.onopen) {
+        Dialog.state.onopen()
+      }
+      Dialog.state.isOpen = true;
+    },
+    closeDialog: function(vnode) {
+      if (Dialog.state.onclose) {
+        Dialog.state.onclose()
+      }
+      Dialog.state.isOpen = false;
+    }
   },
   oncreate : function(vnode) {
+    Dialog.state.onopen = vnode.attrs.onopen
+    Dialog.state.onclose = vnode.attrs.onclose
     window.onclick = function(event) {
       if (event.target == vnode.dom) {
-        if (vnode.attrs.onclose) {
-          vnode.attrs.onclose()
-        }
         Dialog.state.closeDialog();
         m.redraw();
       }
@@ -22,9 +33,6 @@ var Dialog = {
       m("div.modal-content", [
         m(".modal-close", {
           onclick: () => {
-            if (vnode.attrs.onclose) {
-              vnode.attrs.onclose()
-            }
             Dialog.state.closeDialog()
           }
         }, "Close"),

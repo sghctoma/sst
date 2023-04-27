@@ -161,6 +161,7 @@ input[type=file] {
 .setup-page {
   border: 1px dashed #ccc;
   margin: 10px;
+  width: 480px;
 }
 
 .setup-page-header {

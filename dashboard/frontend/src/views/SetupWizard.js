@@ -226,7 +226,12 @@ var SetupWizard = {
            frontCalibrationForm.validate() &&
            rearCalibrationForm.validate()
   },
-  reset: function() {
+  onopen: function() {
+    Setup.loadList()
+    Board.loadList()
+    CalibrationMethod.loadList()
+  },
+  onclose: function() {
     SetupWizard.error = ""
     SetupWizard.submitted = false
     GeneralForm.reset()
@@ -267,7 +272,7 @@ var SetupWizard = {
     .then((id) => {
       SetupWizard.submitted = true
       setTimeout(() => {
-        SetupWizard.reset()
+        SetupWizard.onclose()
         Dialog.state.closeDialog()
       }, 1000)
     })
