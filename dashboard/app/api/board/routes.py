@@ -16,15 +16,6 @@ def get_all():
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<string:id>', methods=['GET'])
-def get(id: str):
-    entity = db.session.execute(
-        db.select(Board).filter_by(id=id)).scalar_one_or_none()
-    if not entity:
-        return jsonify(msg="Board does not exist!"), status.NOT_FOUND
-    return jsonify(entity), status.OK
-
-
 @bp.route('/<string:id>', methods=['DELETE'])
 @jwt_required()
 def delete(id: str):
