@@ -1,5 +1,6 @@
 var m = require("mithril")
 var Session = require("./Session")
+var Login = require("../views/Login")
 
 var SST = {
   getCookie: function (name) {
@@ -200,11 +201,16 @@ var SST = {
       fetch("/api/session/" + Session.current.id, params)
       .then((response) => {
         if (response.ok) {
+          Session.current.name = name
+          Session.current.description = description
           const desc = Bokeh.documents[0].get_model_by_name("description");
           desc.children[0].children[1].disabled = true
           Session.change(name, description)
-        } else {
-          alert("Could not update session data!");
+        } else if (response.status == 401) {
+          const desc = Bokeh.documents[0].get_model_by_name("description");
+          desc.children[1].value = Session.current.name;         // name input
+          desc.children[2].value = Session.current.description;  // description textarea
+          Login.logout()
         };
       })
     }

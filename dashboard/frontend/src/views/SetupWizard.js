@@ -2,6 +2,7 @@ var m = require("mithril")
 var Board = require("../models/Board")
 var BoardList = require("./BoardList")
 var Dialog = require("./Dialog")
+var Login = require("./Login")
 var CalibrationMethodList = require("./CalibrationMethodList")
 var CalibrationMethod = require("../models/CalibrationMethod")
 var Setup = require("../models/Setup")
@@ -227,8 +228,13 @@ var SetupWizard = {
            rearCalibrationForm.validate()
   },
   onopen: function() {
-    Setup.loadList()
     Board.loadList()
+    .catch((e) => {
+      if (e.code == 401) {
+        Login.logout()
+      }
+    })
+    Setup.loadList()
     CalibrationMethod.loadList()
   },
   onclose: function() {
@@ -277,6 +283,9 @@ var SetupWizard = {
       }, 1000)
     })
     .catch((error) => {
+      if (error.code == 401) {
+        Login.logout()
+      }
       SetupWizard.error = error.response.msg
     })
   },

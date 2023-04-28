@@ -18,5 +18,3 @@ var Board = {
 }
 
 module.exports = Board
-
-

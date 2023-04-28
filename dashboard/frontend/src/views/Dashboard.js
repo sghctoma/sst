@@ -1,5 +1,6 @@
 var m = require("mithril")
 var Session = require("../models/Session")
+var Login = require("./Login")
 
 var SingleSuspensionTabs = {
   view: function() {
@@ -81,6 +82,8 @@ var NoMapWithUpload = {
             .then((response) => {
               if (response.ok) {
                 return response.json();
+              } else if (response.status == 401) {
+                Login.logout()
               } else {
                 alert("GPX track is not applicable!");
               };

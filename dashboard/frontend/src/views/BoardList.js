@@ -1,8 +1,16 @@
 var m = require("mithril")
 var Board = require("../models/Board")
+var Login = require("./Login")
 
 module.exports = {
-  oninit: Board.loadList,
+  oninit: () => {
+    Board.loadList()
+    .catch((e) => {
+      if (e.code == 401) {
+        Login.logout()
+      }
+    })
+  },
   view: function(vnode) {
     return m(".board-list", [
       m("input", {
