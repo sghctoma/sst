@@ -270,9 +270,9 @@ var SetupWizard = {
       linkage: linkageBody,
       front_calibration: frontCalibrationBody,
       rear_calibration: rearCalibrationBody,
-      board: {
-        id: GeneralForm.boardId,
-      }
+    }
+    if (GeneralForm.boardId) {
+      combined.board = {id: GeneralForm.boardId}
     }
     Setup.putCombined(combined)
     .then((id) => {
