@@ -130,21 +130,21 @@ var LinkageForm = {
         name: "Head angle",
         type: "number",
         value: LinkageForm.params.head_angle,
-        oninput: (e) => (LinkageForm.params.head_angle = e.target.value),
+        oninput: (e) => (LinkageForm.params.head_angle = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 45, 90),
       }),
       m(InputField, {
         name: "Front stroke",
         type: "number",
         value: LinkageForm.params.front_stroke,
-        oninput: (e) => (LinkageForm.params.front_stroke = e.target.value),
+        oninput: (e) => (LinkageForm.params.front_stroke = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 0, 300),
       }),
       m(InputField, {
         name: "Rear stroke",
         type: "number",
         value: LinkageForm.params.rear_stroke,
-        oninput: (e) => (LinkageForm.params.rear_stroke = e.target.value),
+        oninput: (e) => (LinkageForm.params.rear_stroke = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 0, 200),
       }),
       m(Textarea, {
@@ -206,7 +206,7 @@ class CalibrationForm {
           name: input,
           type: "number",
           value: this.params[input],
-          oninput: (e) => (this.params[input] = e.target.value),
+          oninput: (e) => (this.params[input] = parseFloat(e.target.value)),
           validate: (value) => this.validateValue(value),
         }),
       ]) : null)
