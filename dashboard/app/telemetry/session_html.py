@@ -15,7 +15,6 @@ from app.extensions import db
 from app.models.session import Session
 from app.models.session_html import SessionHtml
 from app.telemetry.balance import balance_figure
-from app.telemetry.description import description_figure
 from app.telemetry.fft import fft_figure
 from app.telemetry.leverage import leverage_ratio_figure, shock_wheel_figure
 from app.telemetry.map import map_figure
@@ -199,7 +198,6 @@ def create_cache(session_id: int, lod: int, hst: int):
             'balance_rebound',
             "Rebound velocity balance")
 
-    p_desc = description_figure(session_id, session.name, session.description)
     p_map, on_mousemove = map_figure()
     p_travel.js_on_event(MouseMove, on_mousemove)
 
@@ -221,9 +219,8 @@ def create_cache(session_id: int, lod: int, hst: int):
     document.add_root(p_lr)
     document.add_root(p_sw)
     document.add_root(p_setup)
-    document.add_root(p_desc)
     columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw',
-               'setup', 'desc']
+               'setup']
 
     if telemetry.Front.Present:
         prefix = 'front_' if suspension_count == 2 else ''
@@ -258,8 +255,8 @@ def create_cache(session_id: int, lod: int, hst: int):
         document.add_root(p_balance_rebound)
         columns.extend(['cbalance', 'rbalance'])
 
-    # Some Bokeh models (like the description box or the map) need to be
-    # dynamically initialized based on values in a particular Flask session.
+    # Some Bokeh models (like the map) need to be dynamically initialized based
+    # on values in a particular Flask session.
     document.js_on_event(DocumentReady, CustomJS(
         args=dict(), code='SST.init_models();'))
 

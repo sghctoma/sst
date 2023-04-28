@@ -17,9 +17,6 @@ var Login = {
     .then(function(result) {
       Login.loginError = false
       Session.current.full_access = true
-      const desc = Bokeh.documents[0].get_model_by_name("description");
-      desc.children[1].disabled = false;  // name input
-      desc.children[2].disabled = false;  // description textarea
     })
     .catch(function(e) {
       Login.loginError = true
@@ -30,10 +27,6 @@ var Login = {
     User.logout()
     .then(function() {
       Session.current.full_access = false
-      const desc = Bokeh.documents[0].get_model_by_name("description");
-      desc.children[0].children[1].disabled = true // save button
-      desc.children[1].disabled = true;            // name input
-      desc.children[2].disabled = true;            // description textarea
       m.redraw();
     })
   },

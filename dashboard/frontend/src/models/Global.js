@@ -9,15 +9,6 @@ var SST = {
     if (parts.length === 2) return parts.pop().split(';').shift();
   },
   init_models: function() {
-    // Description box
-    const desc = Bokeh.documents[0].get_model_by_name("description");
-    desc.children[1].value = Session.current.name;        // name input
-    desc.children[2].value = Session.current.description; // description textarea
-    if (Session.current.full_access) {
-      desc.children[1].disabled = false; // name input
-      desc.children[2].disabled = false; // description textarea
-    }
-
     // Map
     const map = Bokeh.documents[0].get_model_by_name("map");
     if (Session.current.session_track) {
@@ -188,32 +179,6 @@ var SST = {
       end_point.x = full_track["lon"].slice(-1)[0];
       end_point.y = full_track["lat"].slice(-1)[0];
     },
-    patch_session: function(name, description) {
-      const params = {
-          method: "PATCH",
-          credentials: "same-origin",
-          headers: {
-              "Content-Type": "application/json",
-              "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
-          },
-          body: JSON.stringify({"name": name, "desc": description}),
-      };
-      fetch("/api/session/" + Session.current.id, params)
-      .then((response) => {
-        if (response.ok) {
-          Session.current.name = name
-          Session.current.description = description
-          const desc = Bokeh.documents[0].get_model_by_name("description");
-          desc.children[0].children[1].disabled = true
-          Session.change(name, description)
-        } else if (response.status == 401) {
-          const desc = Bokeh.documents[0].get_model_by_name("description");
-          desc.children[1].value = Session.current.name;         // name input
-          desc.children[2].value = Session.current.description;  // description textarea
-          Login.logout()
-        };
-      })
-    }
   }
 }
 

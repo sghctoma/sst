@@ -79,7 +79,21 @@ var Session = {
         return div.split("\"")[1]
       })
     })
-  }
+  },
+  patch: function(name, description) {
+    return m.request({
+      method: "PATCH",
+      url: "/api/session/" + Session.current.id,
+      headers: {
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
+      withCredentials: true,
+      body: {"name": name, "desc": description},
+    })
+    .then(function(result) {
+      Session.change(name, description)
+    })
+  },
 }
 
 module.exports = Session

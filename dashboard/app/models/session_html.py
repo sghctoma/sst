@@ -14,7 +14,6 @@ class SessionHtml(db.Model):
     lr: str = db.Column(db.String, nullable=False)
     sw: str = db.Column(db.String, nullable=False)
     setup: str = db.Column(db.String, nullable=False)
-    desc: str = db.Column(db.String, nullable=False)
     f_thist: str = db.Column(db.String)
     f_fft: str = db.Column(db.String)
     f_vhist: str = db.Column(db.String)

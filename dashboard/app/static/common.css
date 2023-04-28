@@ -141,6 +141,37 @@ input[type=file] {
   display: none;
 }
 
+/* session list tooltips */
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 200px;
+  background-color: #0a0a0a;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 1;
+  top: 20px;
+  left: 40px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+		font-size: 12px;
+}
+
+/* setup wizard */
+
 .wizard {
   max-width: 700px;
   margin: 2px;
@@ -197,4 +228,96 @@ input[type=file] {
   font-size: 14px;
   margin-top: 3px;
   width: 100%;
+}
+
+.delete-button {
+  display: inline-block;
+	float: right;
+  font-size: 14px;
+  padding: 0.1em 0.3em;
+  border: transparent;
+  background: #d43f3a;
+  color: #d0d0d0;
+  border-radius: 2px;
+	margin: 5px;
+	cursor: pointer;
+  width: 32px;
+}
+
+.delete-button:hover {
+  background: #d9534f;
+}
+
+.delete-button:active {
+  transform: translate(0em, 0.2em);
+}
+
+.save-button {
+  display: inline-block;
+	float: right;
+  font-size: 14px;
+  padding: 0.1em 0.3em;
+  border: transparent;
+  background: #4caf50;
+  color: #f0f0f0;
+  border-radius: 2px;
+	margin: 8px 8px 5px 0px;
+	cursor: pointer;
+}
+
+.save-button:disabled {
+  background: #4e7b4e;
+  color: #c0c0c0;
+	cursor: default;
+}
+
+.save-button:hover:not([disabled]) {
+  background: #66b169;
+}
+
+.save-button:active {
+  transform: translate(0em, 0.2em);
+}
+
+/* notes box */
+
+.description-box {
+  flex-direction: column;
+  gap: 0px;
+  display: flex;
+  min-height: 275px;
+  background: #15191c;
+  padding-bottom: 25px;
+}
+
+.description-title {
+  display: flex;
+  flex-direction: row;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.description-label {
+  margin: 8px 0px 0px 8px;
+  flex: 1 0 0px;
+}
+
+.notes-name {
+  font-size: 14px;
+  flex: 0 0 auto;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin: 5px;
+  margin-bottom: 2px;
+}
+
+.notes-desc {
+  font-size: 14px;
+  padding: 12px;
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin: 5px;
+  margin-top: 2px;
 }
