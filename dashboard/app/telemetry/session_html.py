@@ -6,9 +6,7 @@ from bokeh.events import DocumentReady, MouseMove
 from bokeh.embed import components
 from bokeh.layouts import row
 from bokeh.models.callbacks import CustomJS
-from bokeh.models.widgets.markups import Div
 from bokeh.palettes import Spectral11
-from bokeh.plotting import figure
 from bokeh.themes import built_in_themes, DARK_MINIMAL
 
 from app.extensions import db
@@ -27,73 +25,6 @@ from app.telemetry.velocity import (
 )
 
 
-def _setup_figure(telemetry: Telemetry) -> figure:
-
-    linkage_name = telemetry.Linkage.Name
-    fork_stroke = telemetry.Linkage.MaxFrontStroke
-    shock_stroke = telemetry.Linkage.MaxRearStroke
-    head_angle = telemetry.Linkage.HeadAngle
-    fcal_name = telemetry.Front.Calibration.Name
-    rcal_name = telemetry.Rear.Calibration.Name
-    fcal_inputs = telemetry.Front.Calibration.Inputs
-    rcal_inputs = telemetry.Rear.Calibration.Inputs
-
-    fcal_input_rows = [f'<tr><th>{k}</th><td>{v}</td></tr>' for
-                       k, v in fcal_inputs.items()]
-    rcal_input_rows = [f'<tr><th>{k}</th><td>{v}</td></tr>' for
-                       k, v in rcal_inputs.items()]
-
-    return Div(
-        name='setup',
-        sizing_mode='stretch_width',
-        height=300,
-        stylesheets=['''
-            div {
-              width: 100%;
-              height: 100%;
-              padding: 15px;
-              background: #15191c;
-              font-size: 14px;
-              color: #d0d0d0;
-            }
-            hr {
-              border-top:1px dashed #d0d0d0;
-              background-color: transparent;
-              border-style: none none dashed;
-            }
-            th, td {
-              max-width: 50%;
-            }
-            table, th, td {
-              border: 1px dashed #d0d0d0;
-              border-collapse: collapse;
-              text-align: center;
-              table-layout: fixed;
-            }'''],
-        text=f'''
-            <b>Linkage:</b> {linkage_name}
-            <table style="width: 100%;">
-            <tbody>
-            <tr><th>Head angle</th><td>{head_angle}</td></tr>
-            <tr><th>Fork stroke</th><td>{fork_stroke}</td></tr>
-            <tr><th>Shock stroke</th><td>{shock_stroke}</td></tr>
-            </tbody>
-            </table>
-            <br /><b>Front calibration:</b>{fcal_name}<br />
-            <table style="width: 100%;">
-            <tbody>
-            {''.join(fcal_input_rows)}
-            </tbody>
-            </table>
-            <br /><b>Rear calibration:</b>{rcal_name}<br />
-            <table style="width: 100%;">
-            <tbody>
-            {''.join(rcal_input_rows)}
-            </tbody>
-            </table>
-            ''')
-
-
 def create_cache(session_id: int, lod: int, hst: int):
     front_color, rear_color = Spectral11[1], Spectral11[2]
 
@@ -106,8 +37,6 @@ def create_cache(session_id: int, lod: int, hst: int):
     telemetry = dataclass_from_dict(Telemetry, d)
 
     tick = 1.0 / telemetry.SampleRate  # time step length in seconds
-
-    p_setup = _setup_figure(telemetry)
 
     if telemetry.Front.Present:
         p_front_travel_hist = travel_histogram_figure(
@@ -218,9 +147,7 @@ def create_cache(session_id: int, lod: int, hst: int):
     document.add_root(p_map)
     document.add_root(p_lr)
     document.add_root(p_sw)
-    document.add_root(p_setup)
-    columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw',
-               'setup']
+    columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw']
 
     if telemetry.Front.Present:
         prefix = 'front_' if suspension_count == 2 else ''

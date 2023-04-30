@@ -9,13 +9,13 @@ var SingleSuspensionTabs = {
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone", checked: "checked"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
-        m(".travel-hist", m.trust(Session.current.divs[6] ? Session.current.divs[6] : Session.current.divs[9])),
-        m(".fft", m.trust(Session.current.divs[7] ? Session.current.divs[7] : Session.current.divs[10])),
+        m(".travel-hist", m.trust(Session.current.divs[6] ? Session.current.divs[5] : Session.current.divs[8])),
+        m(".fft", m.trust(Session.current.divs[6] ? Session.current.divs[7] : Session.current.divs[9])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabtwo"}),
       m("label.label", {style: "grid-column: 2", for: "tabtwo"}, "Damping"),
       m(".panel damping", {tabindex: "1"}, [
-        m(".velocity-hist", m.trust(Session.current.divs[8] ? Session.current.divs[8] : Session.current.divs[11])),
+        m(".velocity-hist", m.trust(Session.current.divs[7] ? Session.current.divs[7] : Session.current.divs[10])),
       ]),
     ])
   }
@@ -27,22 +27,22 @@ var DualSuspensionTabs = {
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone", checked: "checked"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
-        m(".front-travel-hist", m.trust(Session.current.divs[6])),
-        m(".rear-travel-hist", m.trust(Session.current.divs[9])),
-        m(".front-fft", m.trust(Session.current.divs[7])),
-        m(".rear-fft", m.trust(Session.current.divs[10])),
+        m(".front-travel-hist", m.trust(Session.current.divs[5])),
+        m(".rear-travel-hist", m.trust(Session.current.divs[8])),
+        m(".front-fft", m.trust(Session.current.divs[6])),
+        m(".rear-fft", m.trust(Session.current.divs[9])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabtwo"}),
       m("label.label", {style: "grid-column: 2", for: "tabtwo"}, "Damping"),
       m(".panel damping", {tabindex: "1"}, [
-        m(".front-velocity-hist", m.trust(Session.current.divs[8])),
-        m(".rear-velocity-hist", m.trust(Session.current.divs[11])),
+        m(".front-velocity-hist", m.trust(Session.current.divs[7])),
+        m(".rear-velocity-hist", m.trust(Session.current.divs[10])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabthree"}),
       m("label.label", {style: "grid-column: 3", for: "tabthree"}, "Balance"),
       m(".panel balance", {tabindex: "1"}, [
-        m(".balance-compression", m.trust(Session.current.divs[12])),
-        m(".balance-rebound", m.trust(Session.current.divs[13])),
+        m(".balance-compression", m.trust(Session.current.divs[11])),
+        m(".balance-rebound", m.trust(Session.current.divs[12])),
       ]),
     ])
   }
@@ -149,7 +149,6 @@ module.exports = {
       m(".velocity", m.trust(Session.current.divs[1])),
       m(".lr", m.trust(Session.current.divs[3])),
       m(".sw", m.trust(Session.current.divs[4])),
-      m(".setup", m.trust(Session.current.divs[5])),
       m(".description", m(Notes)),
       m(".map", {style: "height: 400px;"}, m.trust(Session.current.divs[2])),
       Session.current.session_track == 'undefined' ? null : (Session.current.full_access ? m(NoMapWithUpload) : m(NoMap)),

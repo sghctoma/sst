@@ -35,7 +35,6 @@
   .description { grid-column: 1; grid-row: 5; }
   .lr          { grid-column: 1; grid-row: 6; }
   .sw          { grid-column: 1; grid-row: 7; }
-  .setup       { grid-column: 1; grid-row: 8; }
 }
 
 /* Medium and big screen */
@@ -54,5 +53,4 @@
   .tabs        { grid-column: 1 / 7; grid-row: 3 / 5; }
   .lr          { grid-column:     7; grid-row:     3; }
   .sw          { grid-column:     8; grid-row:     3; }
-  .setup       { grid-column: 7 / 9; grid-row:     4; }
 }
