@@ -5,6 +5,18 @@ var Login = require("./Login.js")
 var Dialog = require("./Dialog")
 var SetupWizard = require("./SetupWizard")
 
+var timestampToString = function(timestamp) {
+  return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
+
 module.exports = {
   view: function(vnode) {
     return m("main.layout", [
@@ -14,7 +26,7 @@ module.exports = {
         m(".sst-title", "sufni suspension telemetry"),
         Session.current.loaded ? m("div", [
           m("span", {id: "sname"}, Session.current.name),
-          " (" + Session.current.start_time + " UTC)",
+          " (" + timestampToString(Session.current.start_time) + " UTC)",
         ]) : null,
       ]),
       m("nav.drawer", {id: "drawer"}, [

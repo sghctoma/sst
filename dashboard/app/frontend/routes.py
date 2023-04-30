@@ -74,14 +74,11 @@ def session_html(session_id):
     full_track, session_track = track_data(track.track if track else None,
                                            start_time, end_time)
 
-    utc_str = datetime.fromtimestamp(t.Timestamp,
-                                     pytz.UTC).strftime('%Y.%m.%d %H:%M')
-
     response = jsonify(
         id=session.id,
         name=session.name,
         description=session.description,
-        start_time=utc_str,
+        start_time=t.Timestamp,
         suspension_count=suspension_count,
         full_track=full_track,
         session_track=session_track,

@@ -1,5 +1,14 @@
 var m = require("mithril")
 
+var timestampToString = function(timestamp) {
+  return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
+
 var Session = {
   list: {},
   loadList: function() {
@@ -11,8 +20,7 @@ var Session = {
     .then(function(result) {
       let lastDate = "";
       result.forEach(function(item, index) {
-        const options = {month: "2-digit", day: "2-digit", year: "numeric" }
-        const d = new Date(item.timestamp * 1e3).toLocaleString("hu-HU", options)
+        const d = timestampToString(item.timestamp)
         if (d != lastDate) {
           Session.list[d] = [item];
           lastDate = d;
