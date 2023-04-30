@@ -23,9 +23,13 @@ var SingleSuspensionTabs = {
 }
 
 var DualSuspensionTabs = {
+  oncreate: function(vnode) {
+    const tabOne = vnode.dom.querySelector('#tabone');
+    tabOne.checked = true;
+  },
   view: function() {
     return m(".tabs", [
-      m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone", checked: "checked"}),
+      m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
         m(".front-travel-hist", m.trust(Session.current.divs[5])),
