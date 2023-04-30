@@ -38,6 +38,16 @@ header {
   line-height: 24px; 
   z-index: 0;
   white-space: nowrap;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .sst-title {
+    display: none;
+  }
 }
 
 h4 {

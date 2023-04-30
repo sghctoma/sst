@@ -11,8 +11,8 @@ module.exports = {
       m("input.drawer-toggle", {type: "checkbox", id: "drawer-toggle"}),
       m("label.drawer-toggle-label", {for: "drawer-toggle", id: "drawer-toggle-label"}),
       m("header", [
-        "sufni suspension telemetry",
-        Session.current.loaded ? m("div", {style: "float: right;"}, [
+        m(".sst-title", "sufni suspension telemetry"),
+        Session.current.loaded ? m("div", [
           m("span", {id: "sname"}, Session.current.name),
           " (" + Session.current.start_time + " UTC)",
         ]) : null,
