@@ -101,7 +101,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
                  ru.left = end;
                  lu.change.emit();
                  ru.change.emit();
-                 SST.update_plots(-1, -1);
+                 SST.update.plots(-1, -1);
                  '''))
     p.js_on_event(
         SelectionGeometry,
@@ -115,7 +115,7 @@ def travel_figure(telemetry: Telemetry, lod: int,
                  ru.left = geometry['x1'];
                  lu.change.emit();
                  ru.change.emit();
-                 SST.update_plots(geometry['x0'], geometry['x1']);
+                 SST.update.plots(geometry['x0'], geometry['x1']);
                  '''))
 
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
