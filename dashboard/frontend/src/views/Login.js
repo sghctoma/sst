@@ -40,8 +40,16 @@ var Login = {
         }, 'Log Out')
       ]) :
       m('form', {onsubmit: Login.onsubmit}, [
-        m('input[type=text][name=username][placeholder=Username]', {style: "margin: 2px; width: 100%"}),
-        m('input[type=password][name=password][placeholder=Password]', {
+        m('input[type=text]', {
+          name: "username",
+          placeholder: "Username",
+          autocomplete: "username",
+          style: "margin: 2px; width: 100%"
+        }),
+        m('input[type=password]', {
+          name: "password",
+          placeholder: "Password",
+          autocomplete: "current-password",
           style: "margin: 2px; width: 100%",
           class: Login.loginError ? "input-error" : "",
           oninput: function() {
