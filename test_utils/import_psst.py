@@ -18,6 +18,10 @@ if __name__ == '__main__':
         "-a", "--gosst-api",
         default='http://localhost:8080',
         help="gosst HTTP API URL")
+    parser.add_argument(
+        "-k", "--insecure",
+        action='store_true',
+        help="Allow insecure server connections")
     cmd_args = parser.parse_args()
 
     with open(cmd_args.psst_file, 'br') as f:
@@ -32,4 +36,5 @@ if __name__ == '__main__':
     requests.put(
         cmd_args.gosst_api + '/session/psst',
         headers={'X-Token': cmd_args.token},
-        json=session)
+        json=session,
+        verify=not cmd_args.insecure)

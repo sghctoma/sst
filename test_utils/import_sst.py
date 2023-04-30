@@ -23,13 +23,18 @@ if __name__ == '__main__':
         "-s", "--server",
         default='http://localhost:5000/',
         help="HTTP server URL")
+    parser.add_argument(
+        "-k", "--insecure",
+        action='store_true',
+        help="Allow insecure server connections")
     cmd_args = parser.parse_args()
 
     login_data = dict(
         username=cmd_args.user,
         password=getpass.getpass('password: ')
     )
-    resp = requests.post(f'{cmd_args.server}/auth/login', json=login_data)
+    resp = requests.post(f'{cmd_args.server}/auth/login', json=login_data,
+                         verify=not cmd_args.insecure)
     rj = resp.json()
     if 'access_token' not in rj:
         print("[ERR] login failed")
@@ -49,5 +54,6 @@ if __name__ == '__main__':
     resp = requests.put(
         cmd_args.server + '/api/session',
         headers={'Authorization': f'Bearer {token}'},
-        json=session)
+        json=session,
+        verify=not cmd_args.insecure)
     print(resp.json())
