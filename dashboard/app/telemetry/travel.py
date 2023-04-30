@@ -122,7 +122,12 @@ def travel_figure(telemetry: Telemetry, lod: int,
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
 
-    ch = CrosshairTool(dimensions='height', line_color='#d0d0d0')
+    s_current_time = Span(name='s_current_time',
+                          location=0,
+                          dimension='height',
+                          line_color='#d0d0d0')
+    ch = CrosshairTool(dimensions='height', line_color='#d0d0d0',
+                       overlay=s_current_time)
     p.add_tools(ch)
     p.toolbar.active_inspect = ch
 

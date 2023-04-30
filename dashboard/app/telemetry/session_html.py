@@ -127,6 +127,8 @@ def create_cache(session_id: int, lod: int, hst: int):
             'balance_rebound',
             "Rebound velocity balance")
 
+    p_travel.js_on_event(MouseMove,  CustomJS(
+        args=dict(), code='SST.seekVideo(cb_obj.x);'))
     p_map, on_mousemove = map_figure()
     p_travel.js_on_event(MouseMove, on_mousemove)
 

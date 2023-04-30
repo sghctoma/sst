@@ -1,6 +1,7 @@
 var m = require("mithril")
 var Session = require("./Session")
 var Login = require("../views/Login")
+var VideoPlayer = require("../views/VideoPlayer")
 
 var SST = {
   getCookie: function (name) {
@@ -35,6 +36,7 @@ var SST = {
       });
     }
   },
+  seekVideo: VideoPlayer.seek,
   update: {
     process_double_json: function(u) {
       const f_fft = Bokeh.documents[0].get_model_by_name("front_fft");

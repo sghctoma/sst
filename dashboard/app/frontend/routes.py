@@ -79,6 +79,7 @@ def session_html(session_id):
         name=session.name,
         description=session.description,
         start_time=t.Timestamp,
+        end_time=end_time,
         suspension_count=suspension_count,
         full_track=full_track,
         session_track=session_track,

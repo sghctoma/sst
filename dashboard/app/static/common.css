@@ -240,6 +240,23 @@ input[type=file] {
   width: 100%;
 }
 
+.video-button {
+  display: inline-block;
+	float: right;
+  font-size: 14px;
+  padding: 0.1em 0.3em;
+  border: transparent;
+  background: #4f7cb3;
+  color: #d0d0d0;
+  border-radius: 2px;
+	margin: 8px 8px 5px 0px;
+	cursor: pointer;
+}
+
+.video-button:hover {
+  background: #6f9cd3;
+}
+
 .delete-button {
   display: inline-block;
 	float: right;
@@ -295,7 +312,7 @@ input[type=file] {
   flex-direction: column;
   gap: 0px;
   display: flex;
-  min-height: 275px;
+  min-height: 340px;
   background: #15191c;
   padding-bottom: 25px;
 }
@@ -303,13 +320,13 @@ input[type=file] {
 .description-title {
   display: flex;
   flex-direction: row;
-  font-weight: bold;
-  font-size: 15px;
 }
 
 .description-label {
   margin: 8px 0px 0px 8px;
   flex: 1 0 0px;
+  font-weight: bold;
+  font-size: 15px;
 }
 
 .notes-name {
@@ -330,4 +347,10 @@ input[type=file] {
   border-radius: 3px;
   margin: 5px;
   margin-top: 2px;
+}
+
+video {
+  max-height: 275px;
+  width: 100%;
+  z-index: 3;
 }

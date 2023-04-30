@@ -2,6 +2,7 @@ var m = require("mithril")
 var Session = require("../models/Session")
 var Login = require("./Login")
 var Notes = require("./Notes")
+var VideoPlayer = require("./VideoPlayer")
 
 var SingleSuspensionTabs = {
   view: function() {
@@ -153,6 +154,7 @@ module.exports = {
       m(".map", {style: "height: 400px;"}, m.trust(Session.current.divs[2])),
       Session.current.session_track == 'undefined' ? null : (Session.current.full_access ? m(NoMapWithUpload) : m(NoMap)),
       Session.current.suspension_count == 2 ? m(DualSuspensionTabs) : m(SingleSuspensionTabs),
+      m(VideoPlayer),
     ]) : m("div", "SESSION IS LOADING")
   }
 }
