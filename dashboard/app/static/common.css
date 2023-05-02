@@ -33,9 +33,9 @@ header {
   left: 0px; 
   color: #d0d0d0;
   background-color: #0a0a0a;
-  padding: 13px 10px 10px 50px;
-  font-size: 24px; 
-  line-height: 24px; 
+  padding: 3px 10px 3px 50px;
+  font-size: 18px; 
+  line-height: 43px; 
   z-index: 0;
   white-space: nowrap;
 
@@ -353,4 +353,15 @@ video {
   max-height: 275px;
   width: 100%;
   z-index: 3;
+}
+
+.toolbar-icon {
+  color: #d0d0d0;
+  padding: 10px;
+  margin: 2px;
+  border-radius: 5px;
+}
+
+.toolbar-icon:hover {
+  background-color: #40464B;
 }

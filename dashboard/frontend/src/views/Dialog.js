@@ -33,13 +33,7 @@ class Dialog {
       },
       class: this.state.isOpen ? "modal modal-shown" : "modal modal-hidden"
     }, [
-      m("div.modal-content", {
-        style: {
-          top: vnode.attrs.top,
-          left: vnode.attrs.left,
-          position: "relative",
-        },
-      }, [
+      m("div.modal-content", {style: "float: right;"}, [
         m(".modal-close", {
           onclick: () => {
             this.state.closeDialog()

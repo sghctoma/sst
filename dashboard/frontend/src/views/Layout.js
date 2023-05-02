@@ -27,35 +27,37 @@ var Layout = {
       m("input.drawer-toggle", {type: "checkbox", id: "drawer-toggle"}),
       m("label.drawer-toggle-label", {for: "drawer-toggle", id: "drawer-toggle-label"}),
       m("header", [
-        m(".sst-title", {onclick: Layout.loginDialog.state.openDialog}, "sufni suspension telemetry"),
+        m(".sst-title", "sufni suspension telemetry"),
         Session.current.loaded ? m("div", [
           m("span", {id: "sname"}, Session.current.name),
           " (" + timestampToString(Session.current.start_time) + " UTC)",
         ]) : null,
+        m(".toolbar", {style: "margin-right: 5px;"}, [
+          Session.current.full_access ? m("span.fa-solid fa-gear toolbar-icon", {
+            onclick: Layout.setupDialog.state.openDialog,
+          }) : null,
+          Session.current.full_access ? m("span.fa-solid fa-map-location-dot toolbar-icon", {
+            onclick: (event) => {},
+          }) : null,
+          m("span.fa-solid fa-video toolbar-icon", {
+            onclick: (event) => {},
+          }),
+          m("span.fa-solid fa-user toolbar-icon", {
+            onclick: Layout.loginDialog.state.openDialog,
+          }),
+        ]),
       ]),
       m("nav.drawer", {id: "drawer"}, [
-        Session.current.full_access ? m("div", {style: "margin-bottom: 15px;"}, [
-          m("h4", "Manage"),
-          m("div", {
-              style: "display: inline-block;",
-              class: "route-link",
-              onclick: Layout.setupDialog.state.openDialog,
-            }, "Create new bike setup"),
-        ]) : null,
         m("div", {style: "margin-bottom: 15px;"}, [
           m("h4", "Sessions"),
           m(SessionList)
         ]),
       ]),
       m(Layout.loginDialog, {
-        top: "40px",
-        left: "200px",
         onopen: null,
         onclose: null,
       }, m(Login)),
       Session.current.full_access ? m(Layout.setupDialog, {
-        top: "100px",
-        left: "80px",
         onopen: SetupWizard.onopen,
         onclose: SetupWizard.onclose,
       }, m(SetupWizard, {parentDialog: Layout.setupDialog})) : null,
