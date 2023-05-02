@@ -30,7 +30,13 @@ var Dialog = {
   },
   view: function(vnode) {
     return m("div", {class: Dialog.state.isOpen ? "modal modal-shown" : "modal modal-hidden"}, [
-      m("div.modal-content", [
+      m("div.modal-content", {
+        style: {
+          top: vnode.attrs.top,
+          left: vnode.attrs.left,
+          position: "relative",
+        },
+      }, [
         m(".modal-close", {
           onclick: () => {
             Dialog.state.closeDialog()

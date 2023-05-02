@@ -48,6 +48,8 @@ module.exports = {
         ]),
       ]),
       Session.current.full_access ? m(Dialog, {
+        top: "100px",
+        left: "80px",
         onopen: SetupWizard.onopen,
         onclose: SetupWizard.onclose,
       }, m(SetupWizard)) : null,

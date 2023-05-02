@@ -9,7 +9,6 @@
 .modal {
   position: fixed; /* Stay in place */
   z-index: 20; /* Sit on top */
-  padding-top: 100px; /* Location of the box */
   left: 0;
   top: 0;
   width: 100%; /* Full width */
@@ -33,7 +32,6 @@
   display: inline-block;
   color: #d0d0d0;
   background-color: #15191C;
-  margin-left: 80px;
   padding: 20px;
   border: 1px solid #888;
   border-radius: 6px;
