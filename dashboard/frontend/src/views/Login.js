@@ -32,14 +32,14 @@ var Login = {
   },
   view: function() {
     return User.current ?
-      m('div', [
+      m('div', {style: "width: 300px;"}, [
         m('span', {style: "font-size: 14px; color: #d0d0d0;"}, `Logged in as ${User.current}`),
         m('button.button[type=button]', {
-          style: "width: 100%",
+          style: "width: 100%; margin-top: 10px;",
           onclick: () => {Login.logout()},
         }, 'Log Out')
       ]) :
-      m('form', {onsubmit: Login.onsubmit}, [
+      m('form', {style: "width: 300px;", onsubmit: Login.onsubmit}, [
         m('input[type=text]', {
           name: "username",
           placeholder: "Username",

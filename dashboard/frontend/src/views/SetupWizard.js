@@ -227,6 +227,9 @@ var SetupWizard = {
            frontCalibrationForm.validate() &&
            rearCalibrationForm.validate()
   },
+  oncreate: function(vnode) {
+    SetupWizard.dialog = vnode.attrs.parentDialog
+  },
   onopen: function() {
     Board.loadList()
     .catch((e) => {
@@ -279,7 +282,7 @@ var SetupWizard = {
       SetupWizard.submitted = true
       setTimeout(() => {
         SetupWizard.onclose()
-        Dialog.state.closeDialog()
+        SetupWizard.dialog.state.closeDialog()
       }, 1000)
     })
     .catch((error) => {

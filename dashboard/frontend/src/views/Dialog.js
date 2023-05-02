@@ -1,35 +1,38 @@
 var m = require("mithril")
 
-var Dialog = {
-  state: {
+class Dialog {
+  state = {
     isOpen: false,
     onopen: null,
     onclose: null,
-    openDialog: function() {
-      if (Dialog.state.onopen) {
-        Dialog.state.onopen()
+    openDialog: () => {
+      if (this.state.onopen) {
+        this.state.onopen()
       }
-      Dialog.state.isOpen = true;
+      this.state.isOpen = true;
     },
-    closeDialog: function(vnode) {
-      if (Dialog.state.onclose) {
-        Dialog.state.onclose()
+    closeDialog: () => {
+      if (this.state.onclose) {
+        this.state.onclose()
       }
-      Dialog.state.isOpen = false;
+      this.state.isOpen = false;
     }
-  },
-  oncreate : function(vnode) {
-    Dialog.state.onopen = vnode.attrs.onopen
-    Dialog.state.onclose = vnode.attrs.onclose
-    window.onclick = function(event) {
-      if (event.target == vnode.dom) {
-        Dialog.state.closeDialog();
-        m.redraw();
-      }
-    }
-  },
-  view: function(vnode) {
-    return m("div", {class: Dialog.state.isOpen ? "modal modal-shown" : "modal modal-hidden"}, [
+  }
+  oncreate = (vnode) => {
+    this.state.onopen = vnode.attrs.onopen
+    this.state.onclose = vnode.attrs.onclose
+  }
+  view = (vnode) => {
+    return m("div", {
+      id: "modal",
+      onclick: (event) => {
+        if (event.target.id == "modal") {
+          this.state.closeDialog()
+          m.redraw();
+        }
+      },
+      class: this.state.isOpen ? "modal modal-shown" : "modal modal-hidden"
+    }, [
       m("div.modal-content", {
         style: {
           top: vnode.attrs.top,
@@ -39,13 +42,13 @@ var Dialog = {
       }, [
         m(".modal-close", {
           onclick: () => {
-            Dialog.state.closeDialog()
+            this.state.closeDialog()
           }
         }, "Close"),
         vnode.children,
       ])
     ])
-  },
+  }
 }
 
 module.exports = Dialog
