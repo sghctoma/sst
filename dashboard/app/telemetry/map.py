@@ -134,20 +134,6 @@ def map_figure() -> (figure, CustomJS):
                         line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
 
-    on_mousemove = CustomJS(
-        args=dict(dss=ds_session, pos=pos_marker),
-        code='''
-            if (dss.data['lat'].length != 0) {
-                let idx = Math.floor(cb_obj.x * 10);
-                if (idx < 0) {
-                    idx = 0;
-                } else if (idx >= dss.data['lon'].length) {
-                    idx = dss.data['lon'].length - 1;
-                }
-                let lon = dss.data['lon'][idx];
-                let lat = dss.data['lat'][idx];
-                pos.x = lon;
-                pos.y = lat;
-            }''')
+    on_seek = CustomJS(args=dict(dss=ds_session, pos=pos_marker), code='')
 
-    return p, on_mousemove
+    return p, on_seek

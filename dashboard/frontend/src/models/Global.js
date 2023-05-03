@@ -10,6 +10,9 @@ var SST = {
     if (parts.length === 2) return parts.pop().split(';').shift();
   },
   init_models: function() {
+    // Store travel graph Span in VideoPlayer
+    VideoPlayer.travelSpan = Bokeh.documents[0].get_model_by_name("s_current_time")
+
     // Map
     const map = Bokeh.documents[0].get_model_by_name("map");
     if (Session.current.session_track) {

@@ -127,10 +127,26 @@ def create_cache(session_id: int, lod: int, hst: int):
             'balance_rebound',
             "Rebound velocity balance")
 
-    p_travel.js_on_event(MouseMove,  CustomJS(
-        args=dict(), code='SST.seekVideo(cb_obj.x);'))
-    p_map, on_mousemove = map_figure()
-    p_travel.js_on_event(MouseMove, on_mousemove)
+    on_seek_code = '''
+        if (isNaN(cb_obj.location)) {
+            return
+        }
+        if (dss.data['lat'].length != 0) {
+            let idx = Math.floor(cb_obj.location * 10);
+            if (idx < 0) {
+                idx = 0;
+            } else if (idx >= dss.data['lon'].length) {
+                idx = dss.data['lon'].length - 1;
+            }
+            let lon = dss.data['lon'][idx];
+            let lat = dss.data['lat'][idx];
+            pos.x = lon;
+            pos.y = lat;
+        }
+        SST.seekVideo(cb_obj.location)'''
+    p_map, on_seek = map_figure()
+    on_seek.code = on_seek_code
+    p_travel.toolbar.active_inspect.overlay.js_on_change('location', on_seek)
 
     '''
     Construct the layout.

@@ -1,7 +1,5 @@
 import msgpack
-import pytz
 
-from datetime import datetime
 from http import HTTPStatus as status
 
 from bokeh.resources import CDN

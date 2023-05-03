@@ -84,8 +84,7 @@ var Video = {
       },
       ontimeupdate: (e) => {
         if (!VideoPlayer.seeking) {
-          const ch = Bokeh.documents[0].get_model_by_name("s_current_time")
-          ch.location = vnode.dom.currentTime
+          VideoPlayer.travelSpan.location = vnode.dom.currentTime
         }
         e.redraw = false
       },
@@ -105,7 +104,7 @@ var VideoPlayer = {
     VideoPlayer.oninit(vnode)
   },
   seek: function(seconds) {
-    if (!VideoPlayer.seeking) {
+    if (!VideoPlayer.seeking && VideoPlayer.video.paused) {
       VideoPlayer.video.currentTime = VideoPlayer.timeOffset + seconds
     }
   },
