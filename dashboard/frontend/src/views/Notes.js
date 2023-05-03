@@ -1,6 +1,5 @@
 var m = require("mithril")
 var Session = require("../models/Session")
-var VideoPlayer = require("./VideoPlayer")
 
 var Notes = {
   dirty: false,
@@ -28,11 +27,6 @@ var Notes = {
     return m(".description-box", [
       m(".description-title", [
         m(".description-label", "Notes"),
-        m("input[type=file][id=video-input]", {
-          accept: "video/*",
-          onchange: (event) => {VideoPlayer.loadVideo(event.target.files[0])},
-        }),
-        m("label.video-button", {for: "video-input"}, "load video"),
         m("button.save-button", {
           disabled: !Session.current.full_access || !Notes.dirty,
           onclick: Notes.save,

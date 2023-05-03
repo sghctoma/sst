@@ -107,8 +107,7 @@ def map_figure() -> (figure, CustomJS):
         x_range=(-600, 600),
         y_range=(-600, 600),
         sizing_mode='stretch_both',
-        min_height=400,
-        height=400,
+        min_height=300,
         match_aspect=True,
         tools='pan,wheel_zoom,reset',
         toolbar_location='above',
@@ -131,7 +130,7 @@ def map_figure() -> (figure, CustomJS):
     p.add_glyph(cs)
     p.add_glyph(ce)
 
-    pos_marker = Circle(x=0, y=0, size=13,
+    pos_marker = Circle(name="pos_marker", x=0, y=0, size=13,
                         line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
 

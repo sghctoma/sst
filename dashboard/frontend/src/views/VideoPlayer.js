@@ -73,6 +73,7 @@ var Video = {
   },
   view: function(vnode) {
     return m("video", {
+      class: VideoPlayer.loaded ? "video-loaded" : "video-empty",
       onseeking: (e) => {
         VideoPlayer.seeking = true
         e.redraw = false
@@ -99,6 +100,9 @@ var VideoPlayer = {
     VideoPlayer.video = null
     VideoPlayer.timeOffset = null
     VideoPlayer.seeking = false
+  },
+  onremove: function(vnode) {
+    VideoPlayer.oninit(vnode)
   },
   seek: function(seconds) {
     if (!VideoPlayer.seeking) {
@@ -129,6 +133,7 @@ var VideoPlayer = {
     VideoPlayer.error = null
     VideoPlayer.loaded = true
     VideoPlayer.video.controls = true
+    m.redraw()
   },
   view: function(vnode) {
     return !VideoPlayer.error ? m(Video) : m(".video-error", VideoPlayer.error)

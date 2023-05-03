@@ -4,7 +4,8 @@ var User = require("../models/User")
 
 var Login = {
   loginError: false,
-  oninit: function() {
+  oninit: function(vnode) {
+    Login.dialog = vnode.attrs.parentDialog
     User.check()
     .catch(function(e) {})
   },
@@ -17,23 +18,23 @@ var Login = {
     .then(function(result) {
       Login.loginError = false
       Session.current.full_access = true
+      Login.dialog.state.closeDialog()
     })
     .catch(function(e) {
       Login.loginError = true
     })
-    m.redraw();
   },
   logout: function() {
     User.logout()
     .then(function() {
       Session.current.full_access = false
-      m.redraw();
+      Login.dialog.state.closeDialog()
     })
   },
   view: function() {
     return User.current ?
       m('div', {style: "width: 300px;"}, [
-        m('span', {style: "font-size: 14px; color: #d0d0d0;"}, `Logged in as ${User.current}`),
+        m('span', {style: "font-size: 14px; font-weight: bold; color: #d0d0d0;"}, User.current),
         m('button.button[type=button]', {
           style: "width: 100%; margin-top: 10px;",
           onclick: () => {Login.logout()},

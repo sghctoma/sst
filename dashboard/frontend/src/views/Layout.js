@@ -4,6 +4,7 @@ var SessionList = require("./SessionList")
 var Login = require("./Login.js")
 var Dialog = require("./Dialog")
 var SetupWizard = require("./SetupWizard")
+var VideoPlayer = require("./VideoPlayer")
 
 var timestampToString = function(timestamp) {
   return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
@@ -14,6 +15,37 @@ var timestampToString = function(timestamp) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+  })
+}
+
+var loadGPX = async function(event) {
+  const file = event.target.files[0];
+  const gpx = await file.text();
+  const params = {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+    },
+    body: gpx
+  }
+  fetch(
+    "/api/gpx/" + Session.current.id, params
+  )
+  .then((response) => {
+    if (response.ok) {
+      return response.json();
+    } else if (response.status == 401) {
+      Login.logout()
+    } else {
+      alert("GPX track is not applicable!");
+    };
+  })
+  .then((data) => {
+    if (data !== undefined) {
+      SST.update.map(map, data.full_track, data.session_track);
+    }
   })
 }
 
@@ -32,16 +64,22 @@ var Layout = {
           m("span", {id: "sname"}, Session.current.name),
           " (" + timestampToString(Session.current.start_time) + " UTC)",
         ]) : null,
-        m(".toolbar", {style: "margin-right: 5px;"}, [
+        m(".toolbar", [
           Session.current.full_access ? m("span.fa-solid fa-gear toolbar-icon", {
             onclick: Layout.setupDialog.state.openDialog,
           }) : null,
-          Session.current.full_access ? m("span.fa-solid fa-map-location-dot toolbar-icon", {
-            onclick: (event) => {},
+          Session.current.full_access ? m("input[type=file][id=gpx-input]", {
+            accept: ".gpx",
+            onchange: loadGPX,
           }) : null,
-          m("span.fa-solid fa-video toolbar-icon", {
-            onclick: (event) => {},
+          Session.current.full_access ? m("label.fa-solid fa-map-location-dot toolbar-icon", {
+            for: "gpx-input",
+          }) : null,
+          m("input[type=file][id=video-input]", {
+            accept: "video/*",
+            onchange: (event) => {VideoPlayer.loadVideo(event.target.files[0])},
           }),
+          m("label.fa-solid fa-video toolbar-icon", {for: "video-input"}),
           m("span.fa-solid fa-user toolbar-icon", {
             onclick: Layout.loginDialog.state.openDialog,
           }),
@@ -56,7 +94,7 @@ var Layout = {
       m(Layout.loginDialog, {
         onopen: null,
         onclose: null,
-      }, m(Login)),
+      }, m(Login, {parentDialog: Layout.loginDialog})),
       Session.current.full_access ? m(Layout.setupDialog, {
         onopen: SetupWizard.onopen,
         onclose: SetupWizard.onclose,

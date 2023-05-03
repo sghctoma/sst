@@ -13,12 +13,14 @@ var SST = {
     // Map
     const map = Bokeh.documents[0].get_model_by_name("map");
     if (Session.current.session_track) {
-      SST.update.map(map, Session.current.full_track, Session.current.session_track);
-      document.getElementById("nomap").remove()
+      SST.update.map(map, Session.current.full_track, Session.current.session_track)
     } else {
-      map.visible = false;
+      const ratio = map.inner_height / map.inner_width
+      map.x_range.start = -20037508.34
+      map.x_range.end = 20037508.34
+      map.y_range.start = -20037508.34 * ratio
+      map.y_range.end = 20037508.34 * ratio
     }
-
     // Disable tools on mobile
     if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
       const disable_tools = function(item) {

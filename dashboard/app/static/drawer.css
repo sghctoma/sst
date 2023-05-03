@@ -69,7 +69,7 @@ we're going to style the label instead */
 #drawer-toggle:checked ~ #drawer-toggle-label { 
   height: 100%; 
   width: calc(100% - 300px); 
-  background: rgba(255,255,255,.8); 
+  background: rgba(255,255,255,.3); 
 } 
 
 #drawer-toggle:checked ~ #drawer-toggle-label, 
