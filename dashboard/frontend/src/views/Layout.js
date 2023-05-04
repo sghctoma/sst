@@ -44,8 +44,7 @@ var loadGPX = async function(event) {
   })
   .then((data) => {
     if (data !== undefined) {
-      const map = Bokeh.documents[0].get_model_by_name("map");
-      SST.update.map(map, data.full_track, data.session_track);
+      SST.update.map(data.full_track, data.session_track);
       Session.current.session_track = data.session_track
       m.redraw()
     }

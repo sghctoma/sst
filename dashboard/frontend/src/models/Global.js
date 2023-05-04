@@ -14,16 +14,8 @@ var SST = {
     VideoPlayer.travelSpan = Bokeh.documents[0].get_model_by_name("s_current_time")
 
     // Map
-    const map = Bokeh.documents[0].get_model_by_name("map");
-    if (Session.current.session_track) {
-      SST.update.map(map, Session.current.full_track, Session.current.session_track)
-    } else {
-      const ratio = map.inner_height / map.inner_width
-      map.x_range.start = -20037508.34
-      map.x_range.end = 20037508.34
-      map.y_range.start = -20037508.34 * ratio
-      map.y_range.end = 20037508.34 * ratio
-    }
+    SST.update.map(Session.current.full_track, Session.current.session_track)
+
     // Disable tools on mobile
     if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
       const disable_tools = function(item) {
@@ -165,26 +157,38 @@ var SST = {
       p.select_one("ds_r").data = u.r_data;
       p.x_range.end = u.range_end;
     },
-    map: function(map, full_track, session_track) {
-      const start_lon = session_track["lon"][0];
-      const start_lat = session_track["lat"][0];
+    map: function(full_track, session_track) {
+      const map = Bokeh.documents[0].get_model_by_name("map");
+      if (session_track) {
+        const start_lon = session_track["lon"][0];
+        const start_lat = session_track["lat"][0];
 
-      map.select_one("ds_track").data = full_track;
-      map.select_one("ds_session").data = session_track;
+        map.select_one("ds_track").data = full_track;
+        map.select_one("ds_session").data = session_track;
 
-      const ratio = map.inner_height / map.inner_width;
-      map.x_range.start = start_lon - 600;
-      map.x_range.end = start_lon + 600;
-      map.y_range.start = start_lat - (600 * ratio);
-      map.y_range.end = start_lat + (600 * ratio);
+        const ratio = map.inner_height / map.inner_width;
+        map.x_range.start = start_lon - 600;
+        map.x_range.end = start_lon + 600;
+        map.y_range.start = start_lat - (600 * ratio);
+        map.y_range.end = start_lat + (600 * ratio);
 
-      const start_point = map.select_one("start_point");
-      start_point.x = full_track["lon"][0];
-      start_point.y = full_track["lat"][0];
+        const start_point = map.select_one("start_point");
+        start_point.size = 10
+        start_point.x = full_track["lon"][0];
+        start_point.y = full_track["lat"][0];
 
-      const end_point = map.select_one("end_point");
-      end_point.x = full_track["lon"].slice(-1)[0];
-      end_point.y = full_track["lat"].slice(-1)[0];
+        const end_point = map.select_one("end_point");
+        end_point.size = 10
+        end_point.x = full_track["lon"].slice(-1)[0];
+        end_point.y = full_track["lat"].slice(-1)[0];
+
+        map.select_one("pos_marker").size = 13
+      } else {
+        // visible = false does not work, so we just set the size to 0
+        Bokeh.documents[0].get_model_by_name("start_point").size = 0
+        Bokeh.documents[0].get_model_by_name("end_point").size = 0
+        Bokeh.documents[0].get_model_by_name("pos_marker").size = 0
+      }
     },
   }
 }

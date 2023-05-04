@@ -104,12 +104,12 @@ def map_figure() -> (figure, CustomJS):
         name='map',
         x_axis_type=None,
         y_axis_type=None,
-        x_range=(-600, 600),
-        y_range=(-600, 600),
+        x_range=(-20037508.340, 20037508.34),
+        y_range=(-20037508.34, 20037508.34),
         sizing_mode='stretch_both',
         min_height=300,
         match_aspect=True,
-        tools='pan,wheel_zoom,reset',
+        tools='pan,wheel_zoom',
         toolbar_location='above',
         active_drag='pan',
         active_scroll='wheel_zoom',
@@ -133,6 +133,24 @@ def map_figure() -> (figure, CustomJS):
     pos_marker = Circle(name="pos_marker", x=0, y=0, size=13,
                         line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
+
+    on_resize = CustomJS(args=dict(dss=ds_session), code='''
+        const ratio = cb_obj.inner_width / cb_obj.inner_height;
+        var start_lon = 0
+        var start_lat = 0
+        var range = 20037508.34
+        if (dss.data["lon"].length != 0) {
+          start_lon = dss.data["lon"][0]
+          start_lat = dss.data["lat"][0]
+          range = 600
+        }
+        cb_obj.x_range.start = start_lon - (range * ratio);
+        cb_obj.x_range.end = start_lon + (range * ratio);
+        cb_obj.y_range.start = start_lat - range;
+        cb_obj.y_range.end = start_lat + range;
+        ''')
+    p.js_on_change('inner_width', on_resize)
+    p.js_on_change('inner_height', on_resize)
 
     on_seek = CustomJS(args=dict(dss=ds_session, pos=pos_marker), code='')
 

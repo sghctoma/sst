@@ -2,7 +2,7 @@ import msgpack
 import numpy as np
 
 from bokeh.document import Document
-from bokeh.events import DocumentReady, MouseMove
+from bokeh.events import DocumentReady
 from bokeh.embed import components
 from bokeh.layouts import row
 from bokeh.models.callbacks import CustomJS
