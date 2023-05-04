@@ -18,39 +18,6 @@ var timestampToString = function(timestamp) {
   })
 }
 
-var loadGPX = async function(event) {
-  const file = event.target.files[0];
-  const gpx = await file.text();
-  const params = {
-    method: "PUT",
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
-    },
-    body: gpx
-  }
-  fetch(
-    "/api/gpx/" + Session.current.id, params
-  )
-  .then((response) => {
-    if (response.ok) {
-      return response.json();
-    } else if (response.status == 401) {
-      Login.logout()
-    } else {
-      alert("GPX track is not applicable!");
-    };
-  })
-  .then((data) => {
-    if (data !== undefined) {
-      SST.update.map(data.full_track, data.session_track);
-      Session.current.session_track = data.session_track
-      m.redraw()
-    }
-  })
-}
-
 var Layout = {
   oninit: function(vnode) {
     Layout.setupDialog = new Dialog()
@@ -72,11 +39,24 @@ var Layout = {
           }) : null,
           Session.current.full_access ? m("input[type=file][id=gpx-input]", {
             accept: ".gpx",
-            onchange: loadGPX,
+            onchange: (event) => {
+              Session.importGPX(event)
+              .catch((error) => {
+                if (error.code == 401) {
+                  Login.logout()
+                } else {
+                  setTimeout(() => {
+                    Session.gpxError = ""
+                    m.redraw()
+                  }, 1500)
+                }
+              })
+            },
           }) : null,
-          Session.current.full_access ? m("label.fa-solid fa-map-location-dot toolbar-icon", {
-            for: "gpx-input",
-          }) : null,
+          Session.current.full_access ?
+            (!Session.gpxError ? m("label.fa-solid fa-map-location-dot toolbar-icon", {for: "gpx-input"}) :
+                                m("span.fa-solid fa-ban toolbar-icon input-error")) :
+          null,
           m("input[type=file][id=video-input]", {
             accept: "video/*",
             onchange: (event) => {VideoPlayer.loadVideo(event.target.files[0])},

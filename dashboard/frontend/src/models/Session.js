@@ -10,6 +10,7 @@ var timestampToString = function(timestamp) {
 }
 
 var Session = {
+  gpxError: "",
   list: {},
   loadList: function() {
     return m.request({
@@ -100,6 +101,33 @@ var Session = {
     })
     .then(function(result) {
       Session.change(name, description)
+    })
+  },
+  importGPX: async function(event) {
+    const file = event.target.files[0];
+    const gpx = await file.text();
+    return m.request({
+      method: "PUT",
+      url: "/api/gpx/" + Session.current.id,
+      withCredentials: true,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
+      body: gpx,
+      serialize: value => value,
+    })
+    .then(function(result) {
+      if (result !== undefined) {
+        SST.update.map(result.full_track, result.session_track);
+        Session.current.session_track = result.session_track
+      }
+    })
+    .catch(function(error) {
+      if (error.code == 400) {
+        Session.gpxError = "GPX not applicable"
+      }
+      throw(error)
     })
   },
 }
