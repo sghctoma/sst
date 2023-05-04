@@ -84,7 +84,7 @@ var Video = {
       },
       ontimeupdate: (e) => {
         if (!VideoPlayer.seeking) {
-          VideoPlayer.travelSpan.location = vnode.dom.currentTime
+          VideoPlayer.travelSpan.location = vnode.dom.currentTime - VideoPlayer.timeOffset
         }
         e.redraw = false
       },
@@ -133,6 +133,7 @@ var VideoPlayer = {
     }
     
     VideoPlayer.timeOffset = Session.current.start_time - creationTime
+    VideoPlayer.video.currentTime = VideoPlayer.timeOffset
     VideoPlayer.error = null
     VideoPlayer.loaded = true
     VideoPlayer.video.controls = true
