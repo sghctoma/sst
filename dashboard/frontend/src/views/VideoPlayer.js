@@ -124,18 +124,22 @@ var VideoPlayer = {
     const creationTime = await getMP4CreationTime(file)
     if (!overlapsWithSession(creationTime)) {
       VideoPlayer.error = "Video and session do not overlap"
-      // XXX m.redraw()
-      // XXX return
+      m.redraw()
+      setTimeout(() => {
+        VideoPlayer.error = ""
+        m.redraw()
+      }, 1500)
+      return
     }
     
-    VideoPlayer.timeOffset = 0 // XXX Session.current.start_time - creationTime
+    VideoPlayer.timeOffset = Session.current.start_time - creationTime
     VideoPlayer.error = null
     VideoPlayer.loaded = true
     VideoPlayer.video.controls = true
     m.redraw()
   },
   view: function(vnode) {
-    return !VideoPlayer.error ? m(Video) : m(".video-error", VideoPlayer.error)
+    return !VideoPlayer.error ? m(Video) : null
   }
 }
 

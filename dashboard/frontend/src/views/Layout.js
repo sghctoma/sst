@@ -81,7 +81,8 @@ var Layout = {
             accept: "video/*",
             onchange: (event) => {VideoPlayer.loadVideo(event.target.files[0])},
           }),
-          m("label.fa-solid fa-video toolbar-icon", {for: "video-input"}),
+          !VideoPlayer.error ? m("label.fa-solid fa-video toolbar-icon", {for: "video-input"}) :
+                               m("span.fa-solid fa-ban toolbar-icon input-error"),
           m("span.fa-solid fa-user toolbar-icon", {
             onclick: Layout.loginDialog.state.openDialog,
           }),
