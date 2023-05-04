@@ -78,7 +78,7 @@ var Session = {
   load: function(id) {
     return m.request({
       method: "GET",
-      url: "/bokeh/" + id,
+      url: "/api/session/" + id + "/bokeh",
       withCredentials: true,
     })
     .then(function(result) {
@@ -108,7 +108,7 @@ var Session = {
     const gpx = await file.text();
     return m.request({
       method: "PUT",
-      url: "/api/gpx/" + Session.current.id,
+      url: "/api/session/" + Session.current.id + "/gpx",
       withCredentials: true,
       headers: {
         "Content-Type": "application/octet-stream",

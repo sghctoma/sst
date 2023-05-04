@@ -1,20 +1,27 @@
 import base64
+import json
 import msgpack
 import socket
 
 from io import BytesIO
 from http import HTTPStatus as status
 
-from flask import current_app, jsonify, request, send_file
-from flask_jwt_extended import jwt_required
+from flask import current_app, jsonify, request, send_file, Markup
+from flask_jwt_extended import (
+    jwt_required,
+    verify_jwt_in_request,
+    unset_jwt_cookies
+)
 
 from app import id_queue
 from app.api.session import bp
 from app.extensions import db
 from app.models.session import Session
 from app.models.session_html import SessionHtml
+from app.models.track import Track
 from app.telemetry.balance import update_balance
 from app.telemetry.fft import update_fft
+from app.telemetry.map import gpx_to_dict, track_data
 from app.telemetry.psst import (
     Suspension,
     Strokes,
@@ -260,3 +267,116 @@ def generate_bokeh(id: int):
         return '', status.NO_CONTENT
 
     return jsonify(msg=f"already generated (session {id})"), status.BAD_REQUEST
+
+
+@bp.route('/last/bokeh', methods=['GET'], defaults={'session_id': None})
+@bp.route('/<int:session_id>/bokeh', methods=['GET'])
+def session_html(session_id):
+    # Not using @jwt_required(optional=True), because we want to be able to
+    # load the dashboard even with an invalid token.
+    try:
+        verify_jwt_in_request()
+        full_access = True
+    except BaseException:
+        full_access = False
+
+    if not session_id:
+        session = db.session.execute(db.select(Session).order_by(
+            Session.timestamp.desc()).limit(1)).scalar_one_or_none()
+    else:
+        session = db.session.execute(
+            db.select(Session).filter_by(id=session_id)).scalar_one_or_none()
+    if not session:
+        return jsonify(), status.NOT_FOUND
+
+    session_html = db.session.execute(db.select(SessionHtml).filter_by(
+        session_id=session.id)).scalar_one_or_none()
+    if not session_html:
+        return jsonify(), status.NOT_FOUND
+    components_script = Markup(session_html.script.replace(
+        '<script type="text/javascript">', '').replace('</script>', ''))
+    components_divs = [Markup(d) if d else None for d in session_html.divs]
+
+    track = db.session.execute(
+        db.select(Track).filter_by(id=session.track)).scalar_one_or_none()
+
+    d = msgpack.unpackb(session.data)
+    t = dataclass_from_dict(Telemetry, d)
+
+    suspension_count = 0
+    if t.Front.Present:
+        suspension_count += 1
+    if t.Rear.Present:
+        suspension_count += 1
+
+    record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
+    elapsed_time = record_num / t.SampleRate
+    start_time = t.Timestamp
+    end_time = start_time + elapsed_time
+    full_track, session_track = track_data(track.track if track else None,
+                                           start_time, end_time)
+
+    response = jsonify(
+        id=session.id,
+        name=session.name,
+        description=session.description,
+        start_time=t.Timestamp,
+        end_time=end_time,
+        suspension_count=suspension_count,
+        full_track=full_track,
+        session_track=session_track,
+        script=components_script,
+        divs=components_divs,
+        full_access=full_access,
+    )
+    if not full_access:
+        unset_jwt_cookies(response)
+    return response
+
+
+@bp.route('/<int:id>/gpx', methods=['PUT'])
+@jwt_required()
+def upload_gpx(id: int):
+    session = db.session.execute(
+        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+    if not session:
+        return jsonify(msg="Session does not exist!"), status.NOT_FOUND
+
+    d = msgpack.unpackb(session.data)
+    t = dataclass_from_dict(Telemetry, d)
+    record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
+    elapsed_time = record_num / t.SampleRate
+    start_time = t.Timestamp
+    end_time = start_time + elapsed_time
+
+    track_dict = gpx_to_dict(request.data)
+    ts, tf = track_dict['time'][0], track_dict['time'][-1]
+    full_track, session_track = track_data(track_dict, start_time, end_time)
+    if session_track is None:
+        return jsonify(msg="Track is not applicable!"), status.BAD_REQUEST
+
+    new_track = Track(track=json.dumps(track_dict))
+    db.session.add(new_track)
+    db.session.commit()
+
+    s1 = db.aliased(Session)
+    s2 = db.aliased(Session)
+
+    stmt_select = (
+        db.session.query(s2.id)
+        .select_from(s1)
+        .join(s2, s1.setup == s2.setup)
+        .filter(s1.id == id)
+        .filter(s2.timestamp >= ts)
+        .filter(s2.timestamp <= tf)
+    )
+    stmt_update = (
+        db.update(Session)
+        .filter(Session.id.in_(stmt_select))
+        .values(track=new_track.id)
+    )
+    db.session.execute(stmt_update)
+    db.session.commit()
+
+    data = dict(full_track=full_track, session_track=session_track)
+    return jsonify(data), 200
