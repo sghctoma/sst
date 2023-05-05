@@ -311,7 +311,7 @@ def session_html(session_id):
 
     record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
     elapsed_time = record_num / t.SampleRate
-    start_time = t.Timestamp
+    start_time = session.timestamp
     end_time = start_time + elapsed_time
     full_track, session_track = track_data(track.track if track else None,
                                            start_time, end_time)
@@ -320,7 +320,7 @@ def session_html(session_id):
         id=session.id,
         name=session.name,
         description=session.description,
-        start_time=t.Timestamp,
+        start_time=session.timestamp,
         end_time=end_time,
         suspension_count=suspension_count,
         full_track=full_track,
@@ -346,7 +346,7 @@ def upload_gpx(id: int):
     t = dataclass_from_dict(Telemetry, d)
     record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
     elapsed_time = record_num / t.SampleRate
-    start_time = t.Timestamp
+    start_time = session.timestamp
     end_time = start_time + elapsed_time
 
     track_dict = gpx_to_dict(request.data)

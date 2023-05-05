@@ -34,21 +34,13 @@ def _session_track(start: int, end: int, t: np.array, track: dict) -> (
 
     start_idx = session_indices[0][0]
     end_idx = session_indices[0][-1] + 1  # +1, so that the last is included
-    # Use previous location if first GPS data point is after start_time. This
-    # makes location estimates more realistic in case GPS tracking turns on
-    # after we started data acquisition (e.g. Garmin auto-start needs 10 km/h)
-    # to start tracking.
-    if t[start_idx] > start:
-        start_idx -= 1
 
     session_lon = np.array(track['lon'][start_idx:end_idx])
     session_lat = np.array(track['lat'][start_idx:end_idx])
     session_time = np.array(t[start_idx:end_idx]) - start
-    session_time = [t * 10 for t in session_time]
     session_time[0] = 0
 
-    tms = (end - start) * 10
-    x = np.arange(0, tms + 1, 1)
+    x = np.arange(0, session_time[-1], 0.1)
     yi = np.array([session_lon, session_lat])
     y = pchip_interpolate(session_time, yi, x, axis=1)
 
