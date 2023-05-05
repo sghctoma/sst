@@ -17,14 +17,15 @@ type strokestat struct {
 }
 
 type stroke struct {
-	Start             int
-	End               int
-	Stat              strokestat
-	DigitizedTravel   []int
-	DigitizedVelocity []int
-	length            float64
-	duration          float64
-	airCandidate      bool
+	Start                 int
+	End                   int
+	Stat                  strokestat
+	DigitizedTravel       []int
+	DigitizedVelocity     []int
+	FineDigitizedVelocity []int
+	length                float64
+	duration              float64
+	airCandidate          bool
 }
 
 type strokes struct {
@@ -77,8 +78,7 @@ func digitize(data, bins []float64) []int {
 	return inds
 }
 
-func digitizeVelocity(v []float64) (bins []float64, data []int) {
-	step := VELOCITY_HIST_STEP
+func digitizeVelocity(v []float64, step float64) (bins []float64, data []int) {
 	mn := (math.Floor(floats.Min(v)/step) - 0.5) * step // Subtracting half bin ensures that 0 will be at the middle of one bin
 	mx := (math.Floor(floats.Max(v)/step) + 1.5) * step // Adding 1.5 bins ensures that all values will fit in bins, and that
 	// the last bin fits the step boundary.
@@ -155,14 +155,16 @@ func (this *strokes) categorize(strokes []*stroke, travel []float64, maxTravel f
 	}
 }
 
-func (this *strokes) digitize(dt, dv []int) {
+func (this *strokes) digitize(dt, dv, dvFine []int) {
 	for _, s := range this.Compressions {
 		s.DigitizedTravel = dt[s.Start : s.End+1]
 		s.DigitizedVelocity = dv[s.Start : s.End+1]
+		s.FineDigitizedVelocity = dvFine[s.Start : s.End+1]
 	}
 	for _, s := range this.Rebounds {
 		s.DigitizedTravel = dt[s.Start : s.End+1]
 		s.DigitizedVelocity = dv[s.Start : s.End+1]
+		s.FineDigitizedVelocity = dvFine[s.Start : s.End+1]
 	}
 }
 

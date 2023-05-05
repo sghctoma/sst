@@ -24,6 +24,7 @@ const (
 	TRAVEL_HIST_BINS                    = 20    // number of travel histogram bins
 	VELOCITY_HIST_TRAVEL_BINS           = 10    // number of travel histogram bins for velocity histogram
 	VELOCITY_HIST_STEP                  = 100.0 // (mm/s) step between velocity histogram bins
+	VELOCITY_HIST_STEP_FINE             = 15.0  // (mm/s) step between fine-grained velocity histogram bins
 	BOTTOMOUT_THRESHOLD                 = 3     // (mm) bottomouts are regions where travel > max_travel - this value
 )
 
@@ -48,13 +49,14 @@ type Linkage struct {
 }
 
 type suspension struct {
-	Present      bool
-	Calibration  Calibration
-	Travel       []float64
-	Velocity     []float64
-	Strokes      strokes
-	TravelBins   []float64
-	VelocityBins []float64
+	Present          bool
+	Calibration      Calibration
+	Travel           []float64
+	Velocity         []float64
+	Strokes          strokes
+	TravelBins       []float64
+	VelocityBins     []float64
+	FineVelocityBins []float64
 }
 
 type Number interface {
@@ -186,15 +188,17 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, r
 
 		v, _ := filter.Process(pd.Front.Travel, t)
 		pd.Front.Velocity = v
-		vbins, dv := digitizeVelocity(v)
+		vbins, dv := digitizeVelocity(v, VELOCITY_HIST_STEP)
 		pd.Front.VelocityBins = vbins
+		vbinsFine, dvFine := digitizeVelocity(v, VELOCITY_HIST_STEP_FINE)
+		pd.Front.FineVelocityBins = vbinsFine
 
 		strokes := filterStrokes(v, pd.Front.Travel, pd.Linkage.MaxFrontTravel, pd.SampleRate)
 		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Linkage.MaxFrontTravel)
 		if len(pd.Front.Strokes.Compressions) == 0 && len(pd.Front.Strokes.Rebounds) == 0 {
 			pd.Front.Present = false
 		} else {
-			pd.Front.Strokes.digitize(dt, dv)
+			pd.Front.Strokes.digitize(dt, dv, dvFine)
 		}
 	}
 	if pd.Rear.Present {
@@ -217,15 +221,17 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, r
 
 		v, _ := filter.Process(pd.Rear.Travel, t)
 		pd.Rear.Velocity = v
-		vbins, dv := digitizeVelocity(v)
+		vbins, dv := digitizeVelocity(v, VELOCITY_HIST_STEP)
 		pd.Rear.VelocityBins = vbins
+		vbinsFine, dvFine := digitizeVelocity(v, VELOCITY_HIST_STEP_FINE)
+		pd.Rear.FineVelocityBins = vbinsFine
 
 		strokes := filterStrokes(v, pd.Rear.Travel, pd.Linkage.MaxRearTravel, pd.SampleRate)
 		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
 		if len(pd.Rear.Strokes.Compressions) == 0 && len(pd.Rear.Strokes.Rebounds) == 0 {
 			pd.Rear.Present = false
 		} else {
-			pd.Rear.Strokes.digitize(dt, dv)
+			pd.Rear.Strokes.digitize(dt, dv, dvFine)
 		}
 	}
 
