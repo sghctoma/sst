@@ -16,7 +16,6 @@ var Session = {
     return m.request({
       method: "GET",
       url: "/api/session",
-      withCredentials: true,
     })
     .then(function(result) {
       let lastDate = "";
@@ -38,7 +37,6 @@ var Session = {
       headers: {
         "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
       },
-      withCredentials: true,
     })
     .then(function() {
       let day_idx
@@ -79,7 +77,6 @@ var Session = {
     return m.request({
       method: "GET",
       url: "/api/session/" + id + "/bokeh",
-      withCredentials: true,
     })
     .then(function(result) {
       Session.current = result
@@ -96,7 +93,6 @@ var Session = {
       headers: {
         "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
       },
-      withCredentials: true,
       body: {"name": name, "desc": description},
     })
     .then(function(result) {
@@ -109,7 +105,6 @@ var Session = {
     return m.request({
       method: "PUT",
       url: "/api/session/" + Session.current.id + "/gpx",
-      withCredentials: true,
       headers: {
         "Content-Type": "application/octet-stream",
         "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),

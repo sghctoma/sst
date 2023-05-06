@@ -9,7 +9,6 @@ var Board = {
       headers: {
         "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
       },
-      withCredentials: true,
     })
     .then(function(result) {
       result.forEach(item => {Board.list.set(item.id, item)})
