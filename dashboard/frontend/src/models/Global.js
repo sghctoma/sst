@@ -79,13 +79,14 @@ var SST = {
     },
     plots: function(start, end) {
       const args = "?start=" + start + "&end=" + end;
-      fetch('/api/session/' + Session.current.id + '/filter' + args)
-        .then((response) => { return response.json(); })
-        .then((update) => {
+      m.request({
+        method: "GET",
+        url: '/api/session/' + Session.current.id + '/filter' + args,
+      })
+      .then((update) => {
           Session.current.suspension_count == 2 ? SST.update.process_double_json(update) :
                                                   SST.update.process_single_json(update);
-        }
-      )
+      })
     },
     fft: function(p, u) {
       p.select_one("ds_fft").data = u.data;
