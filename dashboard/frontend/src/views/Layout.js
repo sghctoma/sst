@@ -58,7 +58,7 @@ var Layout = {
               Session.importGPX(event)
               .catch((error) => {
                 if (error.code == 401) {
-                  Login.logout()
+                  Login.forceLogout()
                 } else {
                   setTimeout(() => {
                     Session.gpxError = ""
