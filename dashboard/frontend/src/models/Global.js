@@ -49,10 +49,10 @@ var SST = {
       SST.update.fft(r_fft, u.rear.fft);
       SST.update.thist(f_thist, u.front.thist);
       SST.update.thist(r_thist, u.rear.thist);
-      SST.update.vhist(f_vhist.children[0], u.front.vhist);
-      SST.update.vhist(r_vhist.children[0], u.rear.vhist);
-      SST.update.vbands(f_vhist.children[1], u.front.vbands);
-      SST.update.vbands(r_vhist.children[1], u.rear.vbands);
+      SST.update.vhist(f_vhist.children[1], f_vhist.children[0], u.front.vhist);
+      SST.update.vhist(r_vhist.children[1], r_vhist.children[0], u.rear.vhist);
+      SST.update.vbands(f_vhist.children[2], u.front.vbands);
+      SST.update.vbands(r_vhist.children[2], u.rear.vbands);
       SST.update.balance(cbalance, u.balance.compression);
       SST.update.balance(rbalance, u.balance.rebound);
     },
@@ -64,13 +64,13 @@ var SST = {
       if (u.front !== null) {
         SST.update.fft(fft, u.front.fft);
         SST.update.thist(thist, u.front.thist);
-        SST.update.vhist(vhist.children[0], u.front.vhist);
-        SST.update.vbands(vhist.children[1], u.front.vbands);
+        SST.update.vhist(vhist.children[1], vhist.children[0], u.front.vhist);
+        SST.update.vbands(vhist.children[2], u.front.vbands);
       } else {
         SST.update.fft(fft, u.rear.fft);
         SST.update.thist(thist, u.rear.thist);
-        SST.update.vhist(vhist.children[0], u.rear.vhist);
-        SST.update.vbands(vhist.children[1], u.rear.vbands);
+        SST.update.vhist(vhist.children[1], vhist.children[0], u.rear.vhist);
+        SST.update.vbands(vhist.children[2], u.rear.vbands);
       }
     },
     plots: function(start, end) {
@@ -103,11 +103,14 @@ var SST = {
       const s_max = p.select_one("s_max");
       s_max.location = u.mx;
     },
-    vhist: function(p, u) {
+    vhist: function(p, p_lowspeed, u) {
       p.select_one("ds_hist").data = u.data;
       p.x_range.end = u.mx;
+      p_lowspeed.select_one("ds_hist_lowspeed").data = u.data_lowspeed;
+      p_lowspeed.x_range.end = u.mx_lowspeed;
   
       p.select_one("ds_normal").data = u.normal_data;
+      p_lowspeed.select_one("ds_normal_lowspeed").data = u.normal_data_lowspeed;
 
       const top = p.y_range.end;
       const bottom = p.y_range.start;

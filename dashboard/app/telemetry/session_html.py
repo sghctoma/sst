@@ -44,13 +44,15 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Front.TravelBins,
             front_color,
             "Travel histogram (front)")
-        p_front_vel_hist = velocity_histogram_figure(
+        p_front_vel_hist, p_front_vel_hist_ls = velocity_histogram_figure(
             telemetry.Front.Strokes,
             telemetry.Front.Velocity,
             telemetry.Front.TravelBins,
             telemetry.Front.VelocityBins,
+            telemetry.Front.FineVelocityBins,
             hst,
-            "Speed histogram (front)")
+            "Speed histogram (front)",
+            "LS histogram (front)")
         p_front_vel_stats = velocity_band_stats_figure(
             telemetry.Front.Strokes,
             telemetry.Front.Velocity,
@@ -68,13 +70,15 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Rear.TravelBins,
             rear_color,
             "Travel histogram (rear)")
-        p_rear_vel_hist = velocity_histogram_figure(
+        p_rear_vel_hist, p_rear_vel_hist_ls = velocity_histogram_figure(
             telemetry.Rear.Strokes,
             telemetry.Rear.Velocity,
             telemetry.Rear.TravelBins,
             telemetry.Rear.VelocityBins,
+            telemetry.Rear.FineVelocityBins,
             hst,
-            "Speed histogram (rear)")
+            "Speed histogram (rear)",
+            "LS histogram (rear)")
         p_rear_vel_stats = velocity_band_stats_figure(
             telemetry.Rear.Strokes,
             telemetry.Rear.Velocity,
@@ -175,6 +179,7 @@ def create_cache(session_id: int, lod: int, hst: int):
             name=f'{prefix}velocity_hist',
             sizing_mode='stretch_width',
             children=[
+                p_front_vel_hist_ls,
                 p_front_vel_hist,
                 p_front_vel_stats])
         document.add_root(p_front_travel_hist)
@@ -189,6 +194,7 @@ def create_cache(session_id: int, lod: int, hst: int):
             name=f'{prefix}velocity_hist',
             sizing_mode='stretch_width',
             children=[
+                p_rear_vel_hist_ls,
                 p_rear_vel_hist,
                 p_rear_vel_stats])
         document.add_root(p_rear_travel_hist)

@@ -100,19 +100,30 @@ def _normal_distribution_data(strokes: Strokes, velocity: list[float],
     return dict(pdf=pdf.tolist(), ny=ny.tolist())
 
 
-def _velocity_histogram_data(strokes: Strokes, step: float,
-                             tbins: list[float], vbins: list[float]) -> (
+def _velocity_histogram_data(strokes: Strokes, hst: int, tbins: list[float],
+                             vbins: list[float], vbins_fine: list[float]) -> (
                              dict[str, Any], float):
+    step = vbins[1] - vbins[0]
+    step_lowspeed = vbins_fine[1] - vbins_fine[0]
     divider = (len(tbins) - 1) // TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM
     hist = np.zeros((TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM, len(vbins) - 1))
     total_count = 0
+
+    hist_lowspeed = np.zeros((TRAVEL_BINS_FOR_VELOCITY_HISTOGRAM,
+                              len(vbins_fine) - 1))
+
     for s in strokes.Compressions + strokes.Rebounds:
         total_count += s.Stat.Count
         for i in range(s.Stat.Count):
             vbin = s.DigitizedVelocity[i]
             tbin = s.DigitizedTravel[i] // divider
             hist[tbin][vbin] += 1
+
+            vbin_fine = s.FineDigitizedVelocity[i]
+            if -(hst+step_lowspeed) <= vbins_fine[vbin_fine] < hst:
+                hist_lowspeed[tbin][vbin_fine] += 1
     hist = hist / total_count * 100.0
+    hist_lowspeed = hist_lowspeed / total_count * 100.0
 
     thist = np.transpose(hist)
     largest_bin = 0
@@ -121,17 +132,35 @@ def _velocity_histogram_data(strokes: Strokes, step: float,
         if sm > largest_bin:
             largest_bin = sm
 
+    thist_lowspeed = np.transpose(hist_lowspeed)
+    largest_bin_lowspeed = 0
+    for i in range(len(thist_lowspeed)):
+        sm = np.sum(thist_lowspeed[i])
+        if sm > largest_bin_lowspeed:
+            largest_bin_lowspeed = sm
+
     sd = {str(k): v.tolist() for k, v in enumerate(hist)}
     sd['y'] = (np.array(vbins[:-1]) + step / 2).tolist()
-    return sd, HISTOGRAM_RANGE_MULTIPLIER * largest_bin
+
+    sd_lowspeed = {str(k): v.tolist() for k, v in enumerate(hist_lowspeed)}
+    sd_lowspeed['y'] = (np.array(vbins_fine[:-1]) + step_lowspeed / 2).tolist()
+
+    return (sd, sd_lowspeed,
+            HISTOGRAM_RANGE_MULTIPLIER * largest_bin,
+            HISTOGRAM_RANGE_MULTIPLIER * largest_bin_lowspeed)
 
 
 def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
                               tbins: list[float], vbins: list[float],
-                              high_speed_threshold: int, title: str) -> figure:
+                              vbins_fine: list[float], hst: int,
+                              title: str, title_lowspeed: str) -> figure:
     step = vbins[1] - vbins[0]
-    sd, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
+    step_lowspeed = vbins_fine[1] - vbins_fine[0]
+    sd, sd_lowspeed, mx, mx_lowspeed = _velocity_histogram_data(
+        strokes, hst, tbins, vbins, vbins_fine)
     source = ColumnDataSource(name='ds_hist', data=sd)
+    source_lowspeed = ColumnDataSource(name='ds_hist_lowspeed',
+                                       data=sd_lowspeed)
 
     p = figure(
         title=title,
@@ -159,6 +188,34 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
     p.line(x='pdf', y='ny', line_width=2, source=source_normal,
            line_dash='dashed', color=Spectral11[-2])
 
+    p_lowspeed = figure(
+        title=title_lowspeed,
+        height=600,
+        max_width=350,
+        sizing_mode='stretch_width',
+        x_range=(0, mx_lowspeed),
+        y_range=(hst+100, -(hst+100)),
+        x_axis_label="Time (%)",
+        y_axis_label='Speed (mm/s)',
+        toolbar_location='above',
+        tools='ypan,ywheel_zoom,reset',
+        active_drag='ypan',
+        output_backend='webgl')
+    p_lowspeed.yaxis[0].formatter = PrintfTickFormatter(format="%5d")
+    k_lowspeed = list(sd_lowspeed.keys())
+    k_lowspeed.remove('y')
+    p_lowspeed.hbar_stack(stackers=k_lowspeed, name='hb_lowspeed', y='y',
+                          height=step_lowspeed, color=palette,
+                          line_color='black', fill_alpha=0.8,
+                          source=source_lowspeed)
+
+    source_normal_lowspeed = ColumnDataSource(
+        name='ds_normal_lowspeed',
+        data=_normal_distribution_data(strokes, velocity, step_lowspeed))
+    p_lowspeed.line(x='pdf', y='ny', line_width=2,
+                    source=source_normal_lowspeed,
+                    line_dash='dashed', color=Spectral11[-2])
+
     mapper = LinearColorMapper(palette=palette, low=0, high=100)
     color_bar = ColorBar(
         color_mapper=mapper,
@@ -166,10 +223,11 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
         title="Travel (%)",
         ticker=FixedTicker(ticks=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]))
     p.add_layout(color_bar, 'above')
+    p_lowspeed.add_layout(color_bar, 'above')
 
     lowspeed_box = BoxAnnotation(
-        top=high_speed_threshold,
-        bottom=-high_speed_threshold,
+        top=hst,
+        bottom=-hst,
         left=0,
         fill_color='#FFFFFF',
         fill_alpha=0.1)
@@ -191,7 +249,7 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
     p.js_on_event(events.Pan, js_update_label_positions)
     p.js_on_event(events.MouseWheel, js_update_label_positions)
 
-    return p
+    return p, p_lowspeed
 
 
 def _add_velocity_stat_labels(p: figure, strokes: Strokes, mx):
@@ -359,14 +417,22 @@ def velocity_band_stats_figure(strokes: Strokes, velocity: list[float],
 
 
 def update_velocity_histogram(strokes: Strokes, velocity: list[float],
-                              tbins: list[float], vbins: list[float]):
+                              tbins: list[float], vbins: list[float],
+                              vbins_fine: list[float],
+                              high_speed_threshold: int):
     step = vbins[1] - vbins[0]
-    data, mx = _velocity_histogram_data(strokes, step, tbins, vbins)
+    step_lowspeed = vbins_fine[1] - vbins_fine[0]
+    data, data_lowspeed, mx, mx_lowspeed = _velocity_histogram_data(
+        strokes, high_speed_threshold, tbins, vbins, vbins_fine)
     avgr, maxr, avgc, maxc = _velocity_stats(strokes)
     return dict(
         data=data,
         mx=mx,
+        data_lowspeed=data_lowspeed,
+        mx_lowspeed=mx_lowspeed,
         normal_data=_normal_distribution_data(strokes, velocity, step),
+        normal_data_lowspeed=_normal_distribution_data(strokes, velocity,
+                                                       step_lowspeed),
         avgr=avgr,
         maxr=maxr,
         avgc=avgc,

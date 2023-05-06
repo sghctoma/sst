@@ -72,12 +72,14 @@ def _update_data(strokes: Strokes, suspension: Suspension, sample_rate: int):
         strokes,
         suspension.Velocity,
         suspension.TravelBins,
-        suspension.VelocityBins
+        suspension.VelocityBins,
+        suspension.FineVelocityBins,
+        200
     )
     vbands = update_velocity_band_stats(
         strokes,
         suspension.Velocity,
-        350
+        200
     )
     return dict(
         fft=fft,

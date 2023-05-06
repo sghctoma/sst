@@ -37,6 +37,7 @@ class Stroke:
     Stat: StrokeStat
     DigitizedTravel: list[int]
     DigitizedVelocity: list[int]
+    FineDigitizedVelocity: list[int]
 
 
 @dataclass
@@ -64,6 +65,7 @@ class Suspension:
     Strokes: Strokes
     TravelBins: list[float]
     VelocityBins: list[float]
+    FineVelocityBins: list[float]
 
 
 @dataclass

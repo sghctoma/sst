@@ -90,7 +90,7 @@ def create_app():
                 try:
                     id = id_queue.get()
                     app.logger.info(f"generating cache for session {id}")
-                    create_cache(id, 5, 350)
+                    create_cache(id, 5, 200)
                     app.logger.info(f"cache ready for session {id}")
                 except BaseException as e:
                     app.logger.error(f"cache failed for session {id}: {e}")
