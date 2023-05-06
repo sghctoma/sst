@@ -28,7 +28,7 @@ var SessionListItem = {
           Session.remove(vnode.children[0].id)
           .catch((e) => {
             if (e.code == 401) {
-              Login.logout()
+              Login.forceLogout()
             }
           })
         },

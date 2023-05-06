@@ -31,6 +31,13 @@ var Login = {
       Login.dialog.state.closeDialog()
     })
   },
+  forceLogout: function() {
+    User.logout()
+    .then(function() {
+      Session.current.full_access = false
+      Login.dialog.state.openDialog()
+    })
+  },
   view: function() {
     return User.current ?
       m('div', {style: "width: 300px;"}, [

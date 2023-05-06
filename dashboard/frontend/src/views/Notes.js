@@ -1,5 +1,6 @@
 var m = require("mithril")
 var Session = require("../models/Session")
+var Login = require("./Login.js")
 
 var Notes = {
   dirty: false,
@@ -19,7 +20,7 @@ var Notes = {
     })
     .catch((e) => {
       if (e.code == 401) {
-        Login.logout()
+        Login.forceLogout()
       }
     })
   },

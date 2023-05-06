@@ -234,7 +234,7 @@ var SetupWizard = {
     Board.loadList()
     .catch((e) => {
       if (e.code == 401) {
-        Login.logout()
+        Login.forceLogout()
       }
     })
     Setup.loadList()
@@ -287,7 +287,7 @@ var SetupWizard = {
     })
     .catch((error) => {
       if (error.code == 401) {
-        Login.logout()
+        Login.forceLogout()
       }
       SetupWizard.error = error.response.msg
     })

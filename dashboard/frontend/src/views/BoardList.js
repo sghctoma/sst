@@ -7,7 +7,7 @@ module.exports = {
     Board.loadList()
     .catch((e) => {
       if (e.code == 401) {
-        Login.logout()
+        Login.forceLogout()
       }
     })
   },
