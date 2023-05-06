@@ -9,7 +9,7 @@ from bokeh.models.callbacks import CustomJS
 from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
-from bokeh.models.tickers import FixedTicker
+from bokeh.models.tickers import FixedTicker, SingleIntervalTicker
 from bokeh.models.tools import WheelZoomTool
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
@@ -191,15 +191,14 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
     p_lowspeed = figure(
         title=title_lowspeed,
         height=600,
-        max_width=350,
+        max_width=250,
         sizing_mode='stretch_width',
         x_range=(0, mx_lowspeed),
         y_range=(hst+100, -(hst+100)),
         x_axis_label="Time (%)",
         y_axis_label='Speed (mm/s)',
-        toolbar_location='above',
-        tools='ypan,ywheel_zoom,reset',
-        active_drag='ypan',
+        toolbar_location=None,
+        tools='',
         output_backend='webgl')
     p_lowspeed.yaxis[0].formatter = PrintfTickFormatter(format="%5d")
     k_lowspeed = list(sd_lowspeed.keys())
@@ -208,6 +207,7 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
                           height=step_lowspeed, color=palette,
                           line_color='black', fill_alpha=0.8,
                           source=source_lowspeed)
+    p_lowspeed.xaxis.ticker = SingleIntervalTicker(interval=1.0)
 
     source_normal_lowspeed = ColumnDataSource(
         name='ds_normal_lowspeed',

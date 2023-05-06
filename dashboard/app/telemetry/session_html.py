@@ -52,7 +52,7 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Front.FineVelocityBins,
             hst,
             "Speed histogram (front)",
-            "LS histogram (front)")
+            "Low-speed (front)")
         p_front_vel_stats = velocity_band_stats_figure(
             telemetry.Front.Strokes,
             telemetry.Front.Velocity,
@@ -78,7 +78,7 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Rear.FineVelocityBins,
             hst,
             "Speed histogram (rear)",
-            "LS histogram (rear)")
+            "Low-speed (rear)")
         p_rear_vel_stats = velocity_band_stats_figure(
             telemetry.Rear.Strokes,
             telemetry.Rear.Velocity,
@@ -179,8 +179,8 @@ def create_cache(session_id: int, lod: int, hst: int):
             name=f'{prefix}velocity_hist',
             sizing_mode='stretch_width',
             children=[
-                p_front_vel_hist_ls,
                 p_front_vel_hist,
+                p_front_vel_hist_ls,
                 p_front_vel_stats])
         document.add_root(p_front_travel_hist)
         document.add_root(p_front_fft)
@@ -194,8 +194,8 @@ def create_cache(session_id: int, lod: int, hst: int):
             name=f'{prefix}velocity_hist',
             sizing_mode='stretch_width',
             children=[
-                p_rear_vel_hist_ls,
                 p_rear_vel_hist,
+                p_rear_vel_hist_ls,
                 p_rear_vel_stats])
         document.add_root(p_rear_travel_hist)
         document.add_root(p_rear_fft)
