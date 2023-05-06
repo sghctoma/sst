@@ -124,6 +124,7 @@ var VideoPlayer = {
     const creationTime = await getMP4CreationTime(file)
     if (!overlapsWithSession(creationTime)) {
       VideoPlayer.error = "Video and session do not overlap"
+      SST.setError(VideoPlayer.error)
       m.redraw()
       setTimeout(() => {
         VideoPlayer.error = ""

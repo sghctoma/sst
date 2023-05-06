@@ -2,8 +2,12 @@ var m = require("mithril")
 var Session = require("./Session")
 var Login = require("../views/Login")
 var VideoPlayer = require("../views/VideoPlayer")
+var Layout = require("../views/Layout")
 
 var SST = {
+  setError: function(error) {
+    Layout.setError(error)
+  },
   getCookie: function (name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);

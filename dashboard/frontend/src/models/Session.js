@@ -121,6 +121,7 @@ var Session = {
     .catch(function(error) {
       if (error.code == 400) {
         Session.gpxError = "GPX not applicable"
+        SST.setError(Session.gpxError)
       }
       throw(error)
     })
