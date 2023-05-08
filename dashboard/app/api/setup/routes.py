@@ -49,7 +49,12 @@ def put():
 @bp.route('/combined', methods=['PUT'])
 @jwt_required()
 def put_combined():
-    linkage = dfd(Linkage, request.json['linkage'])
+    lnk = request.json['linkage']
+    if type(lnk) == int:
+        linkage = db.session.execute(
+            db.select(Linkage).filter_by(id=lnk)).scalar_one_or_none()
+    else:
+        linkage = dfd(Linkage, request.json['linkage'])
     if not linkage or not linkage.validate():
         return jsonify(msg="Invalid data for linkage!"), status.BAD_REQUEST
 
