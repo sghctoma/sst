@@ -20,11 +20,6 @@ type record struct {
 	ShockAngle uint16
 }
 
-type sst_record struct {
-	ForkAngle  uint16
-	ShockAngle uint16
-}
-
 type NotSSTError struct{}
 
 func (e *NotSSTError) Error() string {

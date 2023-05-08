@@ -59,88 +59,73 @@ func initiateBokehGeneration(url string) error {
 	return nil
 }
 
-func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
-	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
-	if string(board[:2]) == "ID" {
-		boardId := hex.EncodeToString(board[2:])
-		err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
-		if err != nil {
-			// Store unknown ID, so that it can be picked up from the UI
-			db.QueryRow(queries.InsertBoard, boardId, nil)
-			return -1, &NoSuchBoardError{boardId}
-		}
-	} else if string(board[:6]) == "SETUP_" {
-		setupId = int(binary.LittleEndian.Uint32(board[6:]))
-		err := db.QueryRow(queries.Setup, setupId).Scan(&linkageId, &frontCalibrationId, &rearCalibrationId)
-		if err != nil {
-			return -1, err
-		}
-	} else {
-		return -1, &InvalidBoardError{}
-	}
-
+func getLinkage(db *sql.DB, id int) (*psst.Linkage, error) {
 	var linkage psst.Linkage
-	rows, err := db.Query(queries.Linkage, linkageId)
+	rows, err := db.Query(queries.Linkage, id)
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
 	if err = scan.RowStrict(&linkage, rows); err != nil {
-		return -1, err
+		return nil, err
 	}
 	if err = linkage.ProcessRawData(); err != nil {
+		return nil, err
+	}
+
+	return &linkage, nil
+}
+
+func getCalibration(db *sql.DB, id int, maxStroke, maxTravel float64) (*psst.Calibration, error) {
+	var calibration psst.Calibration
+	rows, err := db.Query(queries.Calibration, id)
+	if err != nil {
+		return nil, err
+	}
+	if err = scan.RowStrict(&calibration, rows); err != nil {
+		return nil, err
+	}
+	if err := calibration.ProcessRawInputs(); err != nil {
+		return nil, err
+	}
+	rows, err = db.Query(queries.CalibrationMethod, calibration.MethodId)
+	if err != nil {
+		return nil, err
+	}
+	calibration.Method = new(psst.CalibrationMethod)
+	if err = scan.RowStrict(calibration.Method, rows); err != nil {
+		return nil, err
+	}
+	if err = calibration.Method.ProcessRawData(); err != nil {
+		return nil, err
+	}
+	if err = calibration.Prepare(maxStroke, maxTravel); err != nil {
+		return nil, err
+	}
+
+	return &calibration, nil
+}
+
+func putSessionWithSetup(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
+	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
+	setupId = int(binary.LittleEndian.Uint32(board[6:]))
+	err := db.QueryRow(queries.Setup, setupId).Scan(&linkageId, &frontCalibrationId, &rearCalibrationId)
+	if err != nil {
 		return -1, err
 	}
 
-	var frontCalibration psst.Calibration
-	rows, err = db.Query(queries.Calibration, frontCalibrationId)
+	linkage, err := getLinkage(db, linkageId)
 	if err != nil {
-		return -1, err
-	}
-	if err = scan.RowStrict(&frontCalibration, rows); err != nil {
-		return -1, err
-	}
-	if err := frontCalibration.ProcessRawInputs(); err != nil {
-		return -1, err
-	}
-	rows, err = db.Query(queries.CalibrationMethod, frontCalibration.MethodId)
-	if err != nil {
-		return -1, err
-	}
-	frontCalibration.Method = new(psst.CalibrationMethod)
-	if err = scan.RowStrict(frontCalibration.Method, rows); err != nil {
-		return -1, err
-	}
-	if err = frontCalibration.Method.ProcessRawData(); err != nil {
-		return -1, err
-	}
-	if err = frontCalibration.Prepare(linkage.MaxFrontStroke, linkage.MaxFrontTravel); err != nil {
-		return -1, err
+		return -1, nil
 	}
 
-	var rearCalibration psst.Calibration
-	rows, err = db.Query(queries.Calibration, rearCalibrationId)
+	frontCalibration, err := getCalibration(db, frontCalibrationId, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
 	if err != nil {
-		return -1, err
+		return -1, nil
 	}
-	if err = scan.RowStrict(&rearCalibration, rows); err != nil {
-		return -1, err
-	}
-	if err := rearCalibration.ProcessRawInputs(); err != nil {
-		return -1, err
-	}
-	rows, err = db.Query(queries.CalibrationMethod, rearCalibration.MethodId)
+
+	rearCalibration, err := getCalibration(db, rearCalibrationId, linkage.MaxRearStroke, linkage.MaxRearTravel)
 	if err != nil {
-		return -1, err
-	}
-	rearCalibration.Method = new(psst.CalibrationMethod)
-	if err = scan.RowStrict(rearCalibration.Method, rows); err != nil {
-		return -1, err
-	}
-	if err = rearCalibration.Method.ProcessRawData(); err != nil {
-		return -1, err
-	}
-	if err = rearCalibration.Prepare(linkage.MaxRearStroke, linkage.MaxRearTravel); err != nil {
-		return -1, err
+		return -1, nil
 	}
 
 	front, rear, meta, err := sst.ProcessRaw(sst_data)
@@ -148,7 +133,55 @@ func putSession(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_dat
 		return -1, err
 	}
 	meta.Name = name
-	pd, err := psst.ProcessRecording(front, rear, meta, linkage, frontCalibration, rearCalibration)
+	pd, err := psst.ProcessRecording(front, rear, meta, *linkage, *frontCalibration, *rearCalibration)
+	if err != nil {
+		return -1, err
+	}
+
+	var data []byte
+	enc := codec.NewEncoderBytes(&data, h)
+	enc.Encode(pd)
+
+	var lastInsertedId int
+	err = db.QueryRow(queries.InsertSession, name, pd.Timestamp, "", setupId, data).Scan(&lastInsertedId)
+	if err != nil {
+		return -1, err
+	}
+
+	return lastInsertedId, nil
+}
+
+func putSessionWithBoard(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
+	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
+	boardId := hex.EncodeToString(board[2:])
+	err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
+	if err != nil {
+		// Store unknown ID, so that it can be picked up from the UI
+		db.QueryRow(queries.InsertBoard, boardId, nil)
+		return -1, &NoSuchBoardError{boardId}
+	}
+
+	linkage, err := getLinkage(db, linkageId)
+	if err != nil {
+		return -1, nil
+	}
+
+	frontCalibration, err := getCalibration(db, frontCalibrationId, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
+	if err != nil {
+		return -1, nil
+	}
+
+	rearCalibration, err := getCalibration(db, rearCalibrationId, linkage.MaxRearStroke, linkage.MaxRearTravel)
+	if err != nil {
+		return -1, nil
+	}
+
+	front, rear, meta, err := sst.ProcessRaw(sst_data)
+	if err != nil {
+		return -1, err
+	}
+	meta.Name = name
+	pd, err := psst.ProcessRecording(front, rear, meta, *linkage, *frontCalibration, *rearCalibration)
 	if err != nil {
 		return -1, err
 	}
@@ -213,7 +246,15 @@ func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 		return
 	}
 
-	if id, err := putSession(db, h, header.BoardId, name, data); err != nil {
+	var id int
+	if string(header.BoardId[:2]) == "ID" {
+		id, err = putSessionWithBoard(db, h, header.BoardId, name, data)
+	} else if string(header.BoardId[:6]) == "SETUP_" {
+		id, err = putSessionWithSetup(db, h, header.BoardId, name, data)
+	} else {
+		err = &InvalidBoardError{}
+	}
+	if err != nil {
 		conn.Write([]byte{0xfa /* ERR_VAL from LwIP */})
 		log.Println("[ERR] session '", name, "' could not be imported:", err)
 	} else {
