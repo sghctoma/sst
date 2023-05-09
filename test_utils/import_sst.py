@@ -21,7 +21,7 @@ if __name__ == '__main__':
         help="Setup ID")
     parser.add_argument(
         "-s", "--server",
-        default='http://localhost:5000/',
+        default='http://localhost:5000',
         help="HTTP server URL")
     parser.add_argument(
         "-k", "--insecure",

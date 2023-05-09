@@ -1,6 +1,7 @@
 import base64
 import json
 import msgpack
+import requests
 import socket
 
 from io import BytesIO
@@ -183,49 +184,25 @@ def delete(id: int):
 @bp.route('', methods=['PUT'])
 @jwt_required()
 def put():
-    try:
-        data = request.json
-        name = bytes(data['name'], 'ascii')
-        setup_id = int(data['setup'])
-        encoded_sst = data['data']
-        sst_data = base64.b64decode(encoded_sst)
-    except BaseException:
-        return jsonify(msg="Invalid data for Session"), status.BAD_REQUEST
-
-    gosst_server = (current_app.config['GOSST_HOST'],
-                    current_app.config['GOSST_PORT'])
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(gosst_server)
-
-    # We don't have a board ID here, so we use the setup ID prefixed with
-    # "SETUP_". This is handled in gosst-tcp.
-    header = (b'SETUP_' + int.to_bytes(setup_id, 4, 'little') +
-              len(sst_data).to_bytes(8, 'little', signed=False) +
-              name)
-    client_socket.send(header)
-
-    # wait for header response
-    response = client_socket.recv(1)[0]
-    if response != 4:
-        return jsonify(msg="Header was not accepted"), status.BAD_REQUEST
-
-    # send SST data
-    client_socket.send(sst_data)
-    response = client_socket.recv(1)[0]
-    if response != 6:
+    api_server = current_app.config['GOSST_HTTP_API']
+    url = f'{api_server}/api/internal/session'
+    resp = requests.put(url, json=request.json)
+    if resp.status_code == status.CREATED:
+        return jsonify(id=resp.json()['id']), status.CREATED
+    else:
         return jsonify(msg="Session could not be imported"), status.BAD_REQUEST
 
-    response = client_socket.recv(4)
-    id = int.from_bytes(response, 'little')
-    client_socket.close()
 
-    if 'desc' in data:
-        db.session.execute(db.update(Session).filter_by(id=id).values(
-            description=data['desc']
-        ))
-        db.session.commit()
-
-    return jsonify(id=id), status.CREATED
+@bp.route('/normalized', methods=['PUT'])
+@jwt_required()
+def put_normalized():
+    api_server = current_app.config['GOSST_HTTP_API']
+    url = f'{api_server}/api/internal/session/normalized'
+    resp = requests.put(url, json=request.json)
+    if resp.status_code == status.CREATED:
+        return jsonify(id=resp.json()['id']), status.CREATED
+    else:
+        return jsonify(msg="Session could not be imported"), status.BAD_REQUEST
 
 
 @bp.route('/psst', methods=['PUT'])

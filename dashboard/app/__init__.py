@@ -33,8 +33,7 @@ def create_app():
     app.config['JWT_COOKIE_SECURE'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['GOSST_HOST'] = 'localhost'
-    app.config['GOSST_PORT'] = 557
+    app.config['GOSST_HTTP_API'] = 'http://localhost:8080'
     app.config.from_prefixed_env()
 
     app.logger.addHandler(logging.StreamHandler(sys.stdout))
