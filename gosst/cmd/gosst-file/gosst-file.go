@@ -62,7 +62,12 @@ func main() {
 		log.Fatalln(err)
 	}
 	meta.Name = opts.TelemetryFile
-	pd, err := psst.ProcessRecording(front, rear, meta, linkage, *fcal, *rcal)
+	setup := psst.SetupData{
+		Linkage:          &linkage,
+		FrontCalibration: fcal,
+		RearCalibration:  rcal,
+	}
+	pd, err := psst.ProcessRecording(front, rear, meta, &setup)
 	if err != nil {
 		log.Fatalln(err)
 	}

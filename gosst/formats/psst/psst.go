@@ -70,6 +70,12 @@ type Meta struct {
 	Timestamp  int64
 }
 
+type SetupData struct {
+	Linkage          *Linkage
+	FrontCalibration *Calibration
+	RearCalibration  *Calibration
+}
+
 type Processed struct {
 	Meta
 	Front    suspension
@@ -141,12 +147,12 @@ func (e *RecordCountMismatchError) Error() string {
 	return "Front and rear record counts are not equal"
 }
 
-func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, rcal Calibration) (*Processed, error) {
+func ProcessRecording[T Number](front, rear []T, meta Meta, setup *SetupData) (*Processed, error) {
 	var pd Processed
 	pd.Meta = meta
-	pd.Front.Calibration = fcal
-	pd.Rear.Calibration = rcal
-	pd.Linkage = lnk
+	pd.Front.Calibration = *setup.FrontCalibration
+	pd.Rear.Calibration = *setup.RearCalibration
+	pd.Linkage = *setup.Linkage
 
 	fc := len(front)
 	rc := len(rear)
@@ -167,7 +173,7 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, r
 
 	if pd.Front.Present {
 		pd.Front.Travel = make([]float64, fc)
-		front_coeff := math.Sin(lnk.HeadAngle * math.Pi / 180.0)
+		front_coeff := math.Sin(pd.Linkage.HeadAngle * math.Pi / 180.0)
 
 		for idx, value := range front {
 			// Front travel might under/overshoot because of erronous data
@@ -175,10 +181,10 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, r
 			// connection due to vibration), so we don't error out, just cap
 			// travel. Errors like these will be obvious on the graphs, and
 			// the affected regions can be filtered by hand.
-			out, _ := fcal.Evaluate(float64(value))
+			out, _ := pd.Front.Calibration.Evaluate(float64(value))
 			x := out * front_coeff
 			x = math.Max(0, x)
-			x = math.Min(x, lnk.MaxFrontTravel)
+			x = math.Min(x, pd.Linkage.MaxFrontTravel)
 			pd.Front.Travel[idx] = x
 		}
 
@@ -208,10 +214,10 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, lnk Linkage, fcal, r
 			//  a) inaccurately measured leverage ratio
 			//  b) inaccuracies introduced by polynomial fitting
 			// So we just cap it at calculated maximum.
-			out, _ := rcal.Evaluate(float64(value))
+			out, _ := pd.Rear.Calibration.Evaluate(float64(value))
 			x := pd.Linkage.polynomial.At(out)
 			x = math.Max(0, x)
-			x = math.Min(x, lnk.MaxRearTravel)
+			x = math.Min(x, pd.Linkage.MaxRearTravel)
 			pd.Rear.Travel[idx] = x
 		}
 

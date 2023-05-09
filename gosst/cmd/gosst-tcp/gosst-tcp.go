@@ -8,17 +8,15 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"regexp"
-	"strconv"
 
-	"github.com/blockloop/scan"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
 	psst "gosst/formats/psst"
 	sst "gosst/formats/sst"
+	common "gosst/internal/common"
 	queries "gosst/internal/db"
 )
 
@@ -36,122 +34,7 @@ func (e *InvalidBoardError) Error() string {
 	return "received malformed board id"
 }
 
-type BokehFailedError struct{}
-
-func (e *BokehFailedError) Error() string {
-	return "Bokeh generator failed"
-}
-
-func initiateBokehGeneration(url string) error {
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte{}))
-	if err != nil {
-		return err
-	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 204 {
-		return &BokehFailedError{}
-	}
-	return nil
-}
-
-func getLinkage(db *sql.DB, id int) (*psst.Linkage, error) {
-	var linkage psst.Linkage
-	rows, err := db.Query(queries.Linkage, id)
-	if err != nil {
-		return nil, err
-	}
-	if err = scan.RowStrict(&linkage, rows); err != nil {
-		return nil, err
-	}
-	if err = linkage.ProcessRawData(); err != nil {
-		return nil, err
-	}
-
-	return &linkage, nil
-}
-
-func getCalibration(db *sql.DB, id int, maxStroke, maxTravel float64) (*psst.Calibration, error) {
-	var calibration psst.Calibration
-	rows, err := db.Query(queries.Calibration, id)
-	if err != nil {
-		return nil, err
-	}
-	if err = scan.RowStrict(&calibration, rows); err != nil {
-		return nil, err
-	}
-	if err := calibration.ProcessRawInputs(); err != nil {
-		return nil, err
-	}
-	rows, err = db.Query(queries.CalibrationMethod, calibration.MethodId)
-	if err != nil {
-		return nil, err
-	}
-	calibration.Method = new(psst.CalibrationMethod)
-	if err = scan.RowStrict(calibration.Method, rows); err != nil {
-		return nil, err
-	}
-	if err = calibration.Method.ProcessRawData(); err != nil {
-		return nil, err
-	}
-	if err = calibration.Prepare(maxStroke, maxTravel); err != nil {
-		return nil, err
-	}
-
-	return &calibration, nil
-}
-
-func putSessionWithSetup(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
-	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
-	setupId = int(binary.LittleEndian.Uint32(board[6:]))
-	err := db.QueryRow(queries.Setup, setupId).Scan(&linkageId, &frontCalibrationId, &rearCalibrationId)
-	if err != nil {
-		return -1, err
-	}
-
-	linkage, err := getLinkage(db, linkageId)
-	if err != nil {
-		return -1, nil
-	}
-
-	frontCalibration, err := getCalibration(db, frontCalibrationId, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
-	if err != nil {
-		return -1, nil
-	}
-
-	rearCalibration, err := getCalibration(db, rearCalibrationId, linkage.MaxRearStroke, linkage.MaxRearTravel)
-	if err != nil {
-		return -1, nil
-	}
-
-	front, rear, meta, err := sst.ProcessRaw(sst_data)
-	if err != nil {
-		return -1, err
-	}
-	meta.Name = name
-	pd, err := psst.ProcessRecording(front, rear, meta, *linkage, *frontCalibration, *rearCalibration)
-	if err != nil {
-		return -1, err
-	}
-
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, h)
-	enc.Encode(pd)
-
-	var lastInsertedId int
-	err = db.QueryRow(queries.InsertSession, name, pd.Timestamp, "", setupId, data).Scan(&lastInsertedId)
-	if err != nil {
-		return -1, err
-	}
-
-	return lastInsertedId, nil
-}
-
-func putSessionWithBoard(db *sql.DB, h codec.Handle, board [10]byte, name string, sst_data []byte) (int, error) {
+func putSession(db *sql.DB, h codec.Handle, board [10]byte, server, name string, sst_data []byte) (int, error) {
 	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
 	boardId := hex.EncodeToString(board[2:])
 	err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
@@ -161,19 +44,9 @@ func putSessionWithBoard(db *sql.DB, h codec.Handle, board [10]byte, name string
 		return -1, &NoSuchBoardError{boardId}
 	}
 
-	linkage, err := getLinkage(db, linkageId)
+	setup, err := common.GetSetupsForIds(db, linkageId, frontCalibrationId, rearCalibrationId)
 	if err != nil {
-		return -1, nil
-	}
-
-	frontCalibration, err := getCalibration(db, frontCalibrationId, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
-	if err != nil {
-		return -1, nil
-	}
-
-	rearCalibration, err := getCalibration(db, rearCalibrationId, linkage.MaxRearStroke, linkage.MaxRearTravel)
-	if err != nil {
-		return -1, nil
+		return -1, err
 	}
 
 	front, rear, meta, err := sst.ProcessRaw(sst_data)
@@ -181,17 +54,12 @@ func putSessionWithBoard(db *sql.DB, h codec.Handle, board [10]byte, name string
 		return -1, err
 	}
 	meta.Name = name
-	pd, err := psst.ProcessRecording(front, rear, meta, *linkage, *frontCalibration, *rearCalibration)
+	pd, err := psst.ProcessRecording(front, rear, meta, setup)
 	if err != nil {
 		return -1, err
 	}
 
-	var data []byte
-	enc := codec.NewEncoderBytes(&data, h)
-	enc.Encode(pd)
-
-	var lastInsertedId int
-	err = db.QueryRow(queries.InsertSession, name, pd.Timestamp, "", setupId, data).Scan(&lastInsertedId)
+	lastInsertedId, err := common.InsertSession(db, pd, server, name, "Imported from "+name, setupId)
 	if err != nil {
 		return -1, err
 	}
@@ -248,9 +116,7 @@ func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 
 	var id int
 	if string(header.BoardId[:2]) == "ID" {
-		id, err = putSessionWithBoard(db, h, header.BoardId, name, data)
-	} else if string(header.BoardId[:6]) == "SETUP_" {
-		id, err = putSessionWithSetup(db, h, header.BoardId, name, data)
+		id, err = putSession(db, h, header.BoardId, server, name, data)
 	} else {
 		err = &InvalidBoardError{}
 	}
@@ -268,11 +134,6 @@ func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 		b[2] = byte(id >> 16)
 		b[3] = byte(id >> 24)
 		conn.Write(b)
-
-		url := server + "/api/session/" + strconv.Itoa(id) + "/bokeh"
-		if err := initiateBokehGeneration(url); err != nil {
-			log.Println("[WARN] could not initiate Bokeh component generation", err)
-		}
 	}
 }
 
