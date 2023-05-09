@@ -7,9 +7,16 @@ services:
     volumes:
       - data:/data/
     restart: unless-stopped
-  gosst:
+  gosst-http:
     build:
-      target: gosst
+      target: gosst-http
+      context: ./gosst
+    volumes:
+      - data:/data/
+    restart: unless-stopped
+  gosst-tcp:
+    build:
+      target: gosst-tcp
       context: ./gosst
     ports:
       - "557:557"
