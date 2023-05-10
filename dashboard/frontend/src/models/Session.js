@@ -18,16 +18,30 @@ var Session = {
       url: "/api/session",
     })
     .then(function(result) {
-      let lastDate = "";
+      Session.list = {}
+      let lastDate = ""
       result.forEach(function(item, index) {
         const d = timestampToString(item.timestamp)
         if (d != lastDate) {
-          Session.list[d] = [item];
-          lastDate = d;
+          Session.list[d] = [item]
+          lastDate = d
         } else {
-          Session.list[d].push(item);
+          Session.list[d].push(item)
         }
-      });
+      })
+    })
+  },
+  putNormalized: function(normalizedSession) {
+    return m.request({
+      method: "PUT",
+      url: "/api/session/normalized",
+      headers: {
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
+      body: normalizedSession,
+    })
+    .then(function(result) {
+      return result.id
     })
   },
   remove: function(id) {

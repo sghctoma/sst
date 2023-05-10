@@ -103,6 +103,17 @@ input[type=file] {
   display: none;
 }
 
+input[type="file"]::file-selector-button {
+  color: #d0d0d0;
+  background-color: #20262B;
+  border: none;
+  transition: 1s;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background-color: #40464B;
+}
+
 /* session list tooltips */
 
 .tooltip {

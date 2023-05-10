@@ -4,6 +4,7 @@ var SessionList = require("./SessionList")
 var Login = require("./Login.js")
 var Dialog = require("./Dialog")
 var SetupWizard = require("./SetupWizard")
+var ImportWizard = require("./ImportWizard")
 var VideoPlayer = require("./VideoPlayer")
 
 var timestampToString = function(timestamp) {
@@ -27,6 +28,7 @@ var ErrorPopup = {
 var Layout = {
   oninit: function(vnode) {
     Layout.setupDialog = new Dialog()
+    Layout.importDialog = new Dialog()
     Layout.loginDialog = new Dialog()
     Layout.errorDialog = new Dialog()
     Layout.error = ""
@@ -51,6 +53,9 @@ var Layout = {
         m(".toolbar", [
           Session.current.full_access ? m("span.fa-solid fa-gear toolbar-icon", {
             onclick: Layout.setupDialog.state.openDialog,
+          }) : null,
+          Session.current.full_access ? m("span.fa-solid fa-cloud-upload toolbar-icon", {
+            onclick: Layout.importDialog.state.openDialog,
           }) : null,
           Session.current.full_access ? m("input[type=file][id=gpx-input]", {
             accept: ".gpx",
@@ -97,6 +102,10 @@ var Layout = {
         onopen: null,
         onclose: null,
       }, m(Login, {parentDialog: Layout.loginDialog})),
+      Session.current.full_access ? m(Layout.importDialog, {
+        onopen: ImportWizard.onopen,
+        onclose: ImportWizard.onclose,
+      }, m(ImportWizard, {parentDialog: Layout.importDialog})) : null,
       Session.current.full_access ? m(Layout.setupDialog, {
         onopen: SetupWizard.onopen,
         onclose: SetupWizard.onclose,
