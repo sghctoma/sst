@@ -1,8 +1,6 @@
-import base64
 import json
 import msgpack
 import requests
-import socket
 
 from io import BytesIO
 from http import HTTPStatus as status

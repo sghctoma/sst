@@ -55,7 +55,9 @@ def put_combined():
             db.select(Linkage).filter_by(id=lnk)).scalar_one_or_none()
     else:
         linkage = dfd(Linkage, request.json['linkage'])
-    if not linkage or not linkage.validate():
+        if not linkage.validate():
+            linkage = None
+    if not linkage:
         return jsonify(msg="Invalid data for linkage!"), status.BAD_REQUEST
 
     front_calibration = (dfd(Calibration, request.json['front_calibration'])
