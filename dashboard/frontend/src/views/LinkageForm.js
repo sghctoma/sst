@@ -13,6 +13,7 @@ var LinkageForm = {
     data: null,
   },
   selected: 0,
+  leverageFileName: null,
   onselect: (value) => {
     LinkageForm.selected = value;
     const ll = Linkage.list.get(LinkageForm.selected)
@@ -94,11 +95,18 @@ var LinkageForm = {
         oninput: (e) => (LinkageForm.params.rear_stroke = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 0, 200),
       }),
-      m(Textarea, {
+      m(InputField, {
         name: "Leverage ratio",
-        value: LinkageForm.params.data,
-        oninput: (e) => (LinkageForm.params.data = e.target.value),
-        validate: (value) => value ? "" : "Required",
+        type: "file",
+        accept: ".csv",
+        style: "display: inline-block;",
+        value: LinkageForm.leverageFileName,
+        onchange: async (e) => {
+          LinkageForm.params.data = await e.target.files[0].text()
+          LinkageForm.leverageFileName = e.target.value
+          m.redraw()
+        },
+        validate: (value) => (value ? "" : "Required"),
       }),
     ] : null))
   }
