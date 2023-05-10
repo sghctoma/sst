@@ -112,7 +112,7 @@ func newStroke(start, end int, duration float64, travel, velocity []float64, max
 	for i := start; i <= end; i++ {
 		if travel[i] > maxTravel-BOTTOMOUT_THRESHOLD {
 			bo += 1
-			for ; travel[i] > maxTravel-BOTTOMOUT_THRESHOLD; i++ {
+			for ; i < len(travel) && travel[i] > maxTravel-BOTTOMOUT_THRESHOLD; i++ {
 			}
 		}
 	}
