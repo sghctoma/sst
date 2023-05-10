@@ -67,14 +67,39 @@ func processNormalized(data string) ([]float64, []float64, error) {
 		return nil, nil, err
 	}
 
+	// If there are samples larger than 1, we treat the dataset as percentage values
+	percentage := false
+	for idx := range rows {
+		if forkColumn != -1 {
+			f, _ := strconv.ParseFloat(rows[idx][forkColumn], 64)
+			if f > 1 {
+				percentage = true
+				break
+			}
+		}
+		if shockColumn != -1 {
+			r, _ := strconv.ParseFloat(rows[idx][shockColumn], 64)
+			if r > 1 {
+				percentage = true
+				break
+			}
+		}
+	}
+
 	var front, rear []float64
 	for idx := range rows {
 		if forkColumn != -1 {
 			f, _ := strconv.ParseFloat(rows[idx][forkColumn], 64)
+			if percentage {
+				f /= 100.0
+			}
 			front = append(front, f)
 		}
 		if shockColumn != -1 {
 			r, _ := strconv.ParseFloat(rows[idx][shockColumn], 64)
+			if percentage {
+				r /= 100.0
+			}
 			rear = append(rear, r)
 		}
 	}
