@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/base64"
 	"encoding/csv"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jessevdk/go-flags"
@@ -41,8 +41,8 @@ type normalizedSession struct {
 	RawData     string `json:"data,omitempty" binding:"required"`
 }
 
-func processNormalized(data []byte) ([]float64, []float64, error) {
-	reader := csv.NewReader(bytes.NewReader(data))
+func processNormalized(data string) ([]float64, []float64, error) {
+	reader := csv.NewReader(strings.NewReader(data))
 	reader.Comma = ';'
 	csv_header, err := reader.Read()
 	if err != nil {
@@ -165,17 +165,11 @@ func (this *RequestHandler) PutNormalizedSession(c *gin.Context) {
 		return
 	}
 
-	normalizedData, err := base64.StdEncoding.DecodeString(session.RawData)
+	front, rear, err := processNormalized(session.RawData)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	front, rear, err := processNormalized(normalizedData)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
 	meta := psst.Meta{
 		Name:       session.Name,
 		Version:    255,
