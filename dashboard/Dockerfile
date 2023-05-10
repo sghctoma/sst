@@ -27,7 +27,7 @@ COPY --from=build /usr/src/app/static/main.js ./app/static/
 
 ENV FLASK_APP=app
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////data/sst.db
-ENV FLASK_GOSST_HTTP_API=http://gosst:8080
+ENV FLASK_GOSST_HTTP_API=http://gosst-http:8080
 ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
 ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
 ENV PYTHONUNBUFFERED=1
