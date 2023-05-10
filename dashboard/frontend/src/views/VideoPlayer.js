@@ -145,4 +145,22 @@ var VideoPlayer = {
   }
 }
 
+const adjustVideoOffset = (offset) => {
+  VideoPlayer.timeOffset += offset
+  VideoPlayer.video.currentTime += offset
+}
+
+document.addEventListener('keyup', function(event) {
+  if (!VideoPlayer.loaded) {
+    return
+  }
+  if (event.key == 'z') {
+    adjustVideoOffset(-0.05)
+  } else if (event.key == 'x') {
+    adjustVideoOffset(+0.05)
+  } else if (event.key == ' ') {
+    VideoPlayer.video.paused ? VideoPlayer.video.play() : VideoPlayer.video.pause()
+  }
+});
+
 module.exports = VideoPlayer
