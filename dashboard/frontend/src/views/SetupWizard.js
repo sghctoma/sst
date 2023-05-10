@@ -3,47 +3,13 @@ var Board = require("../models/Board")
 var BoardList = require("./BoardList")
 var Dialog = require("./Dialog")
 var Login = require("./Login")
-var LinkageList = require("./LinkageList")
 var CalibrationMethodList = require("./CalibrationMethodList")
 var CalibrationMethod = require("../models/CalibrationMethod")
 var Setup = require("../models/Setup")
 var Linkage = require("../models/Linkage")
-
-const InputField = {
-  view: (vnode) => {
-    const { name, type, value, oninput, validate } = vnode.attrs
-    const error = validate(value)
-    return m(".input-field", [
-      m("label", { for: name }, name),
-      m("input", {
-        type,
-        name,
-        value,
-        oninput,
-        class: error && "input-error",
-      }),
-      error && m(".error-message", error),
-    ]);
-  },
-}
-
-const Textarea = {
-  view: (vnode) => {
-    const { name, value, oninput, validate } = vnode.attrs
-    const error = validate(value)
-    return m(".input-field", [
-      m("label", { for: name }, name),
-      m("textarea", {
-        name,
-        value,
-        oninput,
-        rows: 10,
-        class: error && "input-error",
-      }),
-      error && m(".error-message", error),
-    ]);
-  },
-}
+var LinkageForm = require("./LinkageForm")
+var InputField = require("./InputField")
+var Textarea = require("./Textarea")
 
 var GeneralForm = {
   name: null,
@@ -90,106 +56,6 @@ var GeneralForm = {
         ]),
       ]),
     ]);
-  }
-}
-
-var LinkageForm = {
-  params: {
-    name: null,
-    head_angle: null,
-    front_stroke: null,
-    rear_stroke: null,
-    data: null,
-  },
-  selected: 0,
-  onselect: (value) => {
-    LinkageForm.selected = value;
-    const ll = Linkage.list.get(LinkageForm.selected)
-    LinkageForm.params = ll !== undefined ? {
-      name: ll.name,
-      head_angle: ll.head_angle,
-      front_stroke: ll.front_stroke,
-      rear_stroke: ll.rear_stroke,
-      data: ll.data,
-    } : {
-      name: null,
-      head_angle: null,
-      front_stroke: null,
-      rear_stroke: null,
-      data: null,
-    },
-    m.redraw();
-  },
-  validateRange: (value, min, max) => {
-    if (!value) {
-      return "Required"
-    }
-    if (value < min || value > max) {
-      return `Must be between ${min} and ${max}.`
-    }
-    return ""
-  },
-  validate: () => {
-    return LinkageForm.selected !== 0 || (
-           LinkageForm.validateRange(LinkageForm.params.head_angle, 45, 90) === "" &&
-           LinkageForm.validateRange(LinkageForm.params.front_stroke, 0, 300) === "" &&
-           LinkageForm.validateRange(LinkageForm.params.rear_stroke, 0, 200) === "" &&
-           LinkageForm.validateRange(LinkageForm.params.head_angle, 45, 90) === "" &&
-           LinkageForm.params.data !== null)
-  },
-  reset: () => {
-    LinkageForm.params.name = null
-    LinkageForm.params.head_angle = null
-    LinkageForm.params.front_stroke = null
-    LinkageForm.params.rear_stroke = null
-    LinkageForm.params.data = null
-    LinkageForm.selected = 0
-  },
-  view: function(vnode) {
-    return m(".setup-page", [
-      m(".setup-page-header", "Linkage"),
-      m(".input-field", [
-        m("label", {for: "linkage"}, "Linkage"),
-        m(".linkage", [
-          m(LinkageList, {selected: LinkageForm.selected, onselect: LinkageForm.onselect}),
-        ])
-      ]),
-    ].concat(LinkageForm.selected == 0 ? [
-      m(InputField, {
-        name: "Name",
-        type: "text",
-        value: LinkageForm.params.name,
-        oninput: (e) => (LinkageForm.params.name = e.target.value),
-        validate: (value) => value ? "" : "Required",
-      }),
-      m(InputField, {
-        name: "Head angle",
-        type: "number",
-        value: LinkageForm.params.head_angle,
-        oninput: (e) => (LinkageForm.params.head_angle = parseFloat(e.target.value)),
-        validate: (value) => LinkageForm.validateRange(value, 45, 90),
-      }),
-      m(InputField, {
-        name: "Front stroke",
-        type: "number",
-        value: LinkageForm.params.front_stroke,
-        oninput: (e) => (LinkageForm.params.front_stroke = parseFloat(e.target.value)),
-        validate: (value) => LinkageForm.validateRange(value, 0, 300),
-      }),
-      m(InputField, {
-        name: "Rear stroke",
-        type: "number",
-        value: LinkageForm.params.rear_stroke,
-        oninput: (e) => (LinkageForm.params.rear_stroke = parseFloat(e.target.value)),
-        validate: (value) => LinkageForm.validateRange(value, 0, 200),
-      }),
-      m(Textarea, {
-        name: "Leverage ratio",
-        value: LinkageForm.params.data,
-        oninput: (e) => (LinkageForm.params.data = e.target.value),
-        validate: (value) => value ? "" : "Required",
-      }),
-    ] : null))
   }
 }
 
@@ -287,6 +153,7 @@ var SetupWizard = {
   submit: async function() {
     if (!SetupWizard.validate()) {
       SetupWizard.error = "There are missing or invalid values!"
+      return
     }
 
     var linkageBody = parseInt(LinkageForm.selected)
