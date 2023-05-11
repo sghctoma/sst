@@ -1,4 +1,5 @@
 var m = require("mithril")
+var Papa = require("papaparse")
 var Dialog = require("./Dialog")
 var Login = require("./Login")
 var LinkageForm = require("./LinkageForm")
@@ -66,13 +67,6 @@ var GeneralForm = {
         validate: (value) => value ? "" : "Required",
       }),
       m(InputField, {
-        name: "Sample rate",
-        type: "number",
-        value: GeneralForm.params.sample_rate,
-        oninput: (e) => (GeneralForm.params.sample_rate = parseInt(e.target.value)),
-        validate: (value) => GeneralForm.validateRange(value, 200, 20000),
-      }),
-      m(InputField, {
         name: "Data",
         type: "file",
         accept: ".csv",
@@ -80,10 +74,30 @@ var GeneralForm = {
         value: GeneralForm.sessionFileName,
         onchange: async (e) => {
           GeneralForm.params.data = await e.target.files[0].text()
+          var firstSamples = Papa.parse(GeneralForm.params.data, {
+            header: true,
+            preview: 2,
+            dynamicTyping: true,
+          })
+          console.log(firstSamples)
+          if (firstSamples.errors.length === 0 && 
+             firstSamples.data.length == 2 && 
+             firstSamples.data[0]["Time"] !== undefined) {
+            const s1 = firstSamples.data[0]["Time"]
+            const s2 = firstSamples.data[1]["Time"]
+            GeneralForm.params.sample_rate = Math.ceil(1.0 / (s2 - s1))
+          }
           GeneralForm.sessionFileName = e.target.value
           m.redraw()
         },
         validate: (value) => (value ? "" : "Required"),
+      }),
+      m(InputField, {
+        name: "Sample rate",
+        type: "number",
+        value: GeneralForm.params.sample_rate,
+        oninput: (e) => (GeneralForm.params.sample_rate = parseInt(e.target.value)),
+        validate: (value) => GeneralForm.validateRange(value, 200, 20000),
       }),
     ]);
   }

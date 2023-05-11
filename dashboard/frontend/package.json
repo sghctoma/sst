@@ -16,7 +16,8 @@
   "author": "sghctoma",
   "license": "MIT",
   "dependencies": {
-    "mithril": "^2.2.2"
+    "mithril": "^2.2.2",
+    "papaparse": "^5.4.1"
   },
   "devDependencies": {
     "@types/mithril": "^2.0.12",
