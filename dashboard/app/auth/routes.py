@@ -1,3 +1,4 @@
+from argon2 import PasswordHasher
 from http import HTTPStatus as status
 
 from flask import jsonify, request
@@ -27,6 +28,24 @@ def login():
     response = jsonify({"access_token": access_token})
     set_access_cookies(response, access_token)
     return response
+
+
+@bp.route("/pwchange", methods=["PATCH"])
+@jwt_required()
+def password_change():
+    old_password = request.json.get('old_password', None)
+    new_password = request.json.get('new_password', None)
+    if not current_user.check_password(old_password):
+        return jsonify(msg="Wrong password"), status.FORBIDDEN
+    if len(new_password) < 10:
+        return jsonify(msg="Password is not secure"), status.BAD_REQUEST
+
+    ph = PasswordHasher()
+    current_user.hash = ph.hash(new_password)
+    db.session.merge(current_user)
+    db.session.commit()
+
+    return '', status.NO_CONTENT
 
 
 @bp.route("/logout", methods=["POST"])

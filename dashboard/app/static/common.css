@@ -95,7 +95,7 @@ button:hover {
   color: #a0a0a0;
 }
 
-.input-error {
+.input-error, input:invalid {
   background-color: #6f312d !important;
 }
 

@@ -19,9 +19,6 @@ var User = {
     return m.request({
       method: 'POST',
       url: '/auth/login',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: {username, password},
     })
     .then(function(result) {
@@ -39,6 +36,16 @@ var User = {
     })
     .then(function() {
       User.current = null
+    })
+  },
+  pwchange: function(old_password, new_password) {
+    return m.request({
+      method: 'PATCH',
+      url: '/auth/pwchange',
+      headers: {
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
+      body: {old_password, new_password},
     })
   },
 }
