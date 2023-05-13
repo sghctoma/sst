@@ -72,14 +72,21 @@ function waitForDivs(divIds, callback) {
 }
 
 module.exports = {
-  oncreate: async function(vnode) {
+  oncreate: function(vnode) {
     // Load new session and update dashboard
-    await Session.load(vnode.attrs.key)
-    document.getElementById("layout-stylesheet").setAttribute("href",
-      Session.current.suspension_count == 1 ? "static/layout-single.css" : "static/layout-double.css")
-    document.title = `Sufni Suspenion Telemetry (${Session.current.name})`
-    m.redraw()
-    waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
+    Session.load(vnode.attrs.key)
+    .then(() => {
+      document.getElementById("layout-stylesheet").setAttribute("href",
+        Session.current.suspension_count == 1 ? "static/layout-single.css" : "static/layout-double.css")
+      document.title = `Sufni Suspenion Telemetry (${Session.current.name})`
+      m.redraw()
+      waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
+    })
+    .catch((error) => {
+      if (error.code == 401) {
+        Login.forceLogout()
+      }
+    })
   },
   onremove: function() {
     if (Bokeh.documents.length != 0) {

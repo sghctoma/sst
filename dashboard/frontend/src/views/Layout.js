@@ -1,5 +1,6 @@
 var m = require("mithril")
 var Session = require("../models/Session")
+var User = require("../models/User")
 var SessionList = require("./SessionList")
 var Login = require("./Login.js")
 var Dialog = require("./Dialog")
@@ -51,13 +52,13 @@ var Layout = {
           " (" + timestampToString(Session.current.start_time) + " UTC)",
         ]) : null,
         m(".toolbar", [
-          Session.current.full_access ? m("span.fa-solid fa-gear toolbar-icon", {
+          User.current ? m("span.fa-solid fa-gear toolbar-icon", {
             onclick: Layout.setupDialog.state.openDialog,
           }) : null,
-          Session.current.full_access ? m("span.fa-solid fa-cloud-upload toolbar-icon", {
+          User.current ? m("span.fa-solid fa-cloud-upload toolbar-icon", {
             onclick: Layout.importDialog.state.openDialog,
           }) : null,
-          Session.current.full_access ? m("input[type=file][id=gpx-input]", {
+          User.current && Session.current.loaded ? m("input[type=file][id=gpx-input]", {
             accept: ".gpx",
             onchange: (event) => {
               Session.importGPX(event)
@@ -73,16 +74,17 @@ var Layout = {
               })
             },
           }) : null,
-          Session.current.full_access ?
+          User.current && Session.current.loaded ?
             (!Session.gpxError ? m("label.fa-solid fa-map-location-dot toolbar-icon", {for: "gpx-input"}) :
                                 m("span.fa-solid fa-ban toolbar-icon input-error")) :
           null,
-          m("input[type=file][id=video-input]", {
+          Session.current.loaded ? m("input[type=file][id=video-input]", {
             accept: "video/*",
             onchange: (event) => {VideoPlayer.loadVideo(event.target.files[0])},
-          }),
-          !VideoPlayer.error ? m("label.fa-solid fa-video toolbar-icon", {for: "video-input"}) :
-                               m("span.fa-solid fa-ban toolbar-icon input-error"),
+          }) : null,
+          Session.current.loaded ?
+            (!VideoPlayer.error ? m("label.fa-solid fa-video toolbar-icon", {for: "video-input"}) :
+                                 m("span.fa-solid fa-ban toolbar-icon input-error")) : null,
           m("span.fa-solid fa-user toolbar-icon", {
             onclick: Layout.loginDialog.state.openDialog,
           }),
@@ -102,11 +104,11 @@ var Layout = {
         onopen: null,
         onclose: null,
       }, m(Login, {parentDialog: Layout.loginDialog})),
-      Session.current.full_access ? m(Layout.importDialog, {
+      User.current ? m(Layout.importDialog, {
         onopen: ImportWizard.onopen,
         onclose: ImportWizard.onclose,
       }, m(ImportWizard, {parentDialog: Layout.importDialog})) : null,
-      Session.current.full_access ? m(Layout.setupDialog, {
+      User.current ? m(Layout.setupDialog, {
         onopen: SetupWizard.onopen,
         onclose: SetupWizard.onclose,
       }, m(SetupWizard, {parentDialog: Layout.setupDialog})) : null,

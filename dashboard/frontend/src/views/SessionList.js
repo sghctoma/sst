@@ -1,6 +1,8 @@
 var m = require("mithril")
 var Session = require("../models/Session")
+var User = require("../models/User")
 var Login = require("./Login")
+
 
 var SessionDayItem = {
  view: function(vnode) {
@@ -23,7 +25,7 @@ var SessionListItem = {
             }, vnode.children[0].name),
         m("span.tooltiptext", vnode.children[0].description != "" ? vnode.children[0].description : "No description")
       ]),
-      Session.current.full_access ? m("button.delete-button", {
+      User.current ? m("button.delete-button", {
         onclick: () => {
           Session.remove(vnode.children[0].id)
           .catch((e) => {
