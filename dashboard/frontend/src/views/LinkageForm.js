@@ -77,6 +77,7 @@ var LinkageForm = {
       m(InputField, {
         name: "Head angle",
         type: "number",
+        step: "any",
         value: LinkageForm.params.head_angle,
         oninput: (e) => (LinkageForm.params.head_angle = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 45, 90),

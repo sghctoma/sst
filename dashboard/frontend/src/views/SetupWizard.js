@@ -107,6 +107,7 @@ class CalibrationForm {
         m(InputField, {
           name: input,
           type: "number",
+          step: "any",
           value: this.params[input],
           oninput: (e) => (this.params[input] = parseFloat(e.target.value)),
           validate: (value) => this.validateValue(value),
