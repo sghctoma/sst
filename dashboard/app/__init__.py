@@ -17,7 +17,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.exceptions import HTTPException
 
-from app.extensions import db, jwt
+from app.extensions import db, jwt, sio
 from app.telemetry.session_html import create_cache
 from app.utils.first_init import first_init
 
@@ -71,6 +71,7 @@ def create_app():
     # Initialize Flask extensions here
     jwt.init_app(app)
     db.init_app(app)
+    sio.init_app(app)
 
     # Register blueprints here
     from app.frontend import bp as frontend_bp
@@ -90,6 +91,7 @@ def create_app():
                     id = id_queue.get()
                     app.logger.info(f"generating cache for session {id}")
                     create_cache(id, 5, 200)
+                    sio.emit("session_ready")
                     app.logger.info(f"cache ready for session {id}")
                 except BaseException as e:
                     app.logger.error(f"cache failed for session {id}: {e}")

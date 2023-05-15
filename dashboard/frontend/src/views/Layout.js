@@ -7,6 +7,7 @@ var Dialog = require("./Dialog")
 var SetupWizard = require("./SetupWizard")
 var ImportWizard = require("./ImportWizard")
 var VideoPlayer = require("./VideoPlayer")
+var SocketIO = require("./SocketIO")
 
 var timestampToString = function(timestamp) {
   return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
@@ -43,6 +44,7 @@ var Layout = {
   },
   view: function(vnode) {
     return m("main.layout", [
+      m(SocketIO),
       m("input.drawer-toggle", {type: "checkbox", id: "drawer-toggle"}),
       m("label.drawer-toggle-label", {for: "drawer-toggle", id: "drawer-toggle-label"}),
       m("header", [

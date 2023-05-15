@@ -23,13 +23,13 @@ RUN apt-get update && apt-get -y install \
 	libopenjp2-7
 
 COPY ./app ./app
+COPY ./dashboard.py ./dashboard.py
 COPY --from=build /usr/src/app/static/main.js ./app/static/
 
-ENV FLASK_APP=app
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////data/sst.db
 ENV FLASK_GOSST_HTTP_API=http://gosst-http:8080
 ENV FLASK_JWT_PRIVATE_KEY_FILE=/data/private_key.pem
 ENV FLASK_JWT_PUBLIC_KEY_FILE=/data/public_key.pem
 ENV PYTHONUNBUFFERED=1
 
-CMD flask init && gunicorn "app:create_app()" --bind 0.0.0.0:5000 --workers=4 --threads=2
+CMD flask init && gunicorn dashboard:app --bind 0.0.0.0:5000 --worker-class eventlet --workers 1
