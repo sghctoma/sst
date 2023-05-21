@@ -57,8 +57,9 @@ gosst/gosst-http
 gosst/gosst-tcp
 gosst/gosst-file
 
-# compiled executable for byb2sst
+# compiled executable for test utils
 test_utils/byb2sst/byb2sst
+test_utils/gosst-tcp-dummy/gosst-tcp-dummy
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
