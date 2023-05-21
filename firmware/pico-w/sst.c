@@ -398,45 +398,52 @@ static void on_sync_data() {
         sleep_ms(1000);
     } else {
         display_message(&disp, "DAT SYNC");
-        struct list *imported = list_create();
- 
-        // send all .SST files in the root directory via TCP
         FRESULT fr;
         DIR dj;
         FILINFO fno;
         uint all = 0;
-        uint succ = 0;
+
+        // get a list of all .SST files in the root directory
+        struct list *to_import = list_create();
         fr = f_findfirst(&dj, &fno, "", "?????.SST");
         while (fr == FR_OK && fno.fname[0]) {
             ++all;
-            display_message(&disp, fno.fname);
-            if (send_file(fno.fname)) {
-                list_push(imported, fno.fname);
-                ++succ;
-            }
-            sleep_ms(100);
+            list_push(to_import, fno.fname);
             fr = f_findnext(&dj, &fno);
         }
         f_closedir(&dj);
 
-        // move successfully imported files to "uploaded" directory
-        struct node *n = imported->head;
+        // send all files on the list via TCP, and move them
+        // to the "uploaded" directory
+        uint err = 0;
+        uint curr = 0;
+        struct node *n = to_import->head;
+        TCHAR path_new[19];
+        TCHAR status[10];
+        TCHAR failed[12];
+
         while (n != NULL) {
-            TCHAR path_new[19];
-            sprintf(path_new, "uploaded/%s", n->data);
-            f_rename(n->data, path_new);
+            ++curr;
+            if (send_file(n->data)) {
+                sprintf(path_new, "uploaded/%s", n->data);
+                f_rename(n->data, path_new);
+            } else {
+                ++err;
+            }
+            sprintf(status, "%u / %u", curr, all);
+            sprintf(failed, "failed: %u", err);
+            ssd1306_clear(&disp);
+            ssd1306_draw_string(&disp, 0,  0, 2, status);
+            ssd1306_draw_string(&disp, 0, 24, 1, failed);
+            ssd1306_show(&disp);
+
+            // wait a bit to avoid weird TCP errors...
+            sleep_ms(100);
             n = n->next;
         }
-        list_delete(imported);
+        list_delete(to_import);
 
-        // display results
-        char s[16], a[16];
-        sprintf(s, "S: %u", succ);
-        sprintf(a, "A: %u", all);
-        ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 0,  0, 2, s);
-        ssd1306_draw_string(&disp, 0, 16, 2, a);
-        ssd1306_show(&disp);
+        // leave results on the display for a bit
         sleep_ms(3000);
     }
     wifi_disconnect();
