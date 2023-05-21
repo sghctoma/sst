@@ -32,7 +32,7 @@
 #include "sst.h"
 #include "list.h"
 #include "config.h"
-#include "pin_config.h"
+#include "hardware_config.h"
 
 static volatile enum state state;
 

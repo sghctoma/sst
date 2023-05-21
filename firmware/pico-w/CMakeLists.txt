@@ -19,7 +19,6 @@ add_executable(sufni-suspension-telemetry
     list.c
     tcpclient.c
     config.c
-    hw_config.c
     msc_disk.c
     sst_usb_descriptors.c
     ds3231.c
