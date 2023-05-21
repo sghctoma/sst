@@ -10,7 +10,7 @@ struct config config = {
     .ssid = "sst",
     .psk = "changemeplease",
     .ntp_server = "pool.ntp.org",
-    .sst_server = "52.136.213.121",
+    .sst_server = "sst.sghctoma.com",
     .sst_server_port = 557
 };
 
