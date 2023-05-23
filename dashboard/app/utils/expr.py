@@ -52,7 +52,7 @@ class ExpressionParser:
         if isinstance(node, ast.Expression):
             return self._validate(node.body)
         if isinstance(node, ast.Num):
-            return 0
+            return 1
         if isinstance(node, ast.Name):
             return self._Name(node.id)
         if isinstance(node, ast.BinOp):
@@ -67,7 +67,7 @@ class ExpressionParser:
             self._Name(node.func.id)
             [self._validate(a) for a in node.args]
             {k.arg: self._validate(k.value) for k in node.keywords}
-            return 0
+            return 1
         else:
             raise TypeError(node)
 
