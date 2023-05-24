@@ -1,5 +1,5 @@
-#ifndef _PIN_CONFIG_H
-#define _PIN_CONFIG_H
+#ifndef _HARDWARE_CONFIG_H
+#define _HARDWARE_CONFIG_H
 
 #include <string.h>
 #include "my_debug.h"
@@ -117,4 +117,4 @@ spi_t *spi_get_by_num(size_t num) {
     }
 }
 
-#endif // _PIN_CONFIG_H
+#endif // _HARDWARE_CONFIG_H
