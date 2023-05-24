@@ -203,7 +203,7 @@ bool send_file(const char *filename) {
         sleep_ms(1);
     }
 
-    uint8_t buffer[READ_BUF_LEN];
+    static uint8_t buffer[READ_BUF_LEN];
     uint br = READ_BUF_LEN;
     FSIZE_t total_read = 0;
     while (br == READ_BUF_LEN) {
@@ -220,7 +220,6 @@ bool send_file(const char *filename) {
         //     to speed things up significantly (5-6x speedup), but might as
         //     well blink to show progress.
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        sleep_ms(10);
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 
         while (tcp_sndbuf(conn->pcb) < br) {
