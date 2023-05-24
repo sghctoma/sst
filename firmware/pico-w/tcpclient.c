@@ -112,7 +112,7 @@ static bool tcp_client_open(void *arg) {
             free(conn);
             return false;
         }
-        tight_loop_contents();
+        sleep_ms(1);
     }
     
     conn->pcb = tcp_new_ip_type(IP_GET_TYPE(&conn->remote_addr));
@@ -174,7 +174,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        tight_loop_contents();
+        sleep_ms(1);
     }
 
     conn->data_len =
@@ -184,7 +184,6 @@ bool send_file(const char *filename) {
         (FILENAME_LENGTH - 1) + // we don't send the terminating null byte
         finfo.fsize;
 
-    //cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
     cyw43_arch_lwip_begin();
     tcp_write(conn->pcb, "ID", 2, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
@@ -197,7 +196,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        tight_loop_contents();
+        sleep_ms(1);
     }
 
     static uint8_t buffer[READ_BUF_LEN];
@@ -220,7 +219,9 @@ bool send_file(const char *filename) {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 
         while (tcp_sndbuf(conn->pcb) < br) {
-            tight_loop_contents();
+            // XXX Lots of errors in Release mode if we have a too short sleep
+            //     here.
+            sleep_ms(20);
         }
         
         cyw43_arch_lwip_begin();
@@ -241,7 +242,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        tight_loop_contents();
+        sleep_ms(1);
     }
 
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
