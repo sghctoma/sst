@@ -112,8 +112,7 @@ static bool tcp_client_open(void *arg) {
             free(conn);
             return false;
         }
-        cyw43_arch_poll();
-        sleep_ms(1);
+        tight_loop_contents();
     }
     
     conn->pcb = tcp_new_ip_type(IP_GET_TYPE(&conn->remote_addr));
@@ -175,8 +174,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        cyw43_arch_poll();
-        sleep_ms(1);
+        tight_loop_contents();
     }
 
     conn->data_len =
@@ -199,8 +197,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        cyw43_arch_poll();
-        sleep_ms(1);
+        tight_loop_contents();
     }
 
     static uint8_t buffer[READ_BUF_LEN];
@@ -223,15 +220,14 @@ bool send_file(const char *filename) {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
 
         while (tcp_sndbuf(conn->pcb) < br) {
-            cyw43_arch_poll();
-            sleep_ms(1);
+            tight_loop_contents();
         }
         
         cyw43_arch_lwip_begin();
         tcp_write(conn->pcb, buffer, br, TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
         cyw43_arch_lwip_end();
 
-        if (total_read == finfo.fsize) {
+        if (total_read == finfo.fsize && NULL != conn->pcb) {
             cyw43_arch_lwip_begin();
             tcp_output(conn->pcb);
             cyw43_arch_lwip_end();
@@ -245,8 +241,7 @@ bool send_file(const char *filename) {
         if (conn->status < 0) {
             return false;
         }
-        cyw43_arch_poll();
-        sleep_ms(1);
+        tight_loop_contents();
     }
 
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);

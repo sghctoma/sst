@@ -46,9 +46,7 @@ target_include_directories(sufni-suspension-telemetry PUBLIC
 target_link_libraries(sufni-suspension-telemetry
     pico_stdlib
     pico_multicore
-    # XXX Using polling for now due to locking issues with
-    #     pico_cyw43_arch_lwip_threadsafe_background 
-    pico_cyw43_arch_lwip_poll
+    pico_cyw43_arch_lwip_threadsafe_background
     hardware_adc
     hardware_sleep
     tinyusb_board

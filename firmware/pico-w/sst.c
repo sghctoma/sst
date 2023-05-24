@@ -60,14 +60,14 @@ static void soft_reset() {
 }
 
 static bool on_battery() {
-    cyw43_arch_init();
+    cyw43_thread_enter();
     bool ret = !cyw43_arch_gpio_get(2);
-    cyw43_arch_deinit();
+    cyw43_thread_exit();
     return ret;
 }
 
 static float read_voltage() {
-    cyw43_arch_init();
+    cyw43_thread_enter();
     sleep_ms(1); // NOTE ADC3 readings are way too high without this sleep.
     adc_gpio_init(29);   // GPIO29 measures VSYS/3
     adc_select_input(3); // GPIO29 is ADC #3
@@ -78,7 +78,6 @@ static float read_voltage() {
     cyw43_thread_exit();
     const float conversion_factor = 3.3f / (1 << 12);
     float ret = vsys * conversion_factor;
-    cyw43_arch_deinit();
     return ret;
 }
 
@@ -95,7 +94,6 @@ static bool msc_present() {
 }
 
 static bool wifi_connect() {
-    cyw43_arch_init_with_country(CYW43_COUNTRY_HUNGARY);
     cyw43_arch_enable_sta_mode();
     return cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
 }
@@ -103,7 +101,6 @@ static bool wifi_connect() {
 static void wifi_disconnect() {
     cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
     sleep_ms(100);
-    cyw43_arch_deinit();
 }
 
 static time_t rtc_timestamp() {
@@ -636,6 +633,8 @@ int main() {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
+        cyw43_arch_init_with_country(CYW43_COUNTRY_HUNGARY);
+
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
 
