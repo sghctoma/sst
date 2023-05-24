@@ -7,8 +7,6 @@
 #define READ_BUF_LEN 1024
 #define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
                            // so length is always 10.
-#define SERVER_PORT 557
-#define SERVER_IP "40.68.254.87" // XXX read from config file
 #define POLL_TIME_S 5
 
 #define STATUS_INIT        1
