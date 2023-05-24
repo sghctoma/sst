@@ -47,6 +47,7 @@ target_link_libraries(sufni-suspension-telemetry
     pico_stdlib
     pico_multicore
     pico_cyw43_arch_lwip_threadsafe_background
+    pico_lwip_sntp
     hardware_adc
     hardware_sleep
     tinyusb_board
@@ -60,6 +61,8 @@ target_link_libraries(sufni-suspension-telemetry
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DSNTP_DEBUG=LWIP_DBG_ON)
     pico_enable_stdio_uart(sufni-suspension-telemetry 1)
 endif()
 
