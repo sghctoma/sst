@@ -1,7 +1,6 @@
 #ifndef _SST_H
 #define _SST_H
 
-#include "hw_config.h"
 #include "tusb.h"
 #include "as5600.h"
 #include "ntp.h"

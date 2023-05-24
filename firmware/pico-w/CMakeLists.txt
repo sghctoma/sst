@@ -29,7 +29,7 @@ pico_generate_pio_header(sufni-suspension-telemetry
     ${CMAKE_CURRENT_LIST_DIR}/i2c.pio
 )
 
-add_subdirectory(../lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(../lib/no-OS-FatFS-SD-SPI-RPi-Pico/src lib/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 add_subdirectory(../lib/pico-as5600 lib/pico-as5600)
 add_subdirectory(../lib/pico-ssd1306 lib/pico-ssd1306)
 

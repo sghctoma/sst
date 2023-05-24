@@ -77,7 +77,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
         sd = sd_get_by_num(0);
         sd->init(sd);
     }
-    *block_count = sd_sectors(sd);
+    *block_count = sd->get_num_sectors(sd);
     *block_size  = BLOCK_SIZE; 
 }
 
