@@ -59,5 +59,9 @@ target_link_libraries(sufni-suspension-telemetry
     ssd1306
 )
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    pico_enable_stdio_uart(sufni-suspension-telemetry 1)
+endif()
+
 pico_add_extra_outputs(sufni-suspension-telemetry)
 

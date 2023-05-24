@@ -616,6 +616,9 @@ int main() {
     tusb_init();
     rtc_init();
     adc_init();
+#ifndef NDEBUG
+    stdio_uart_init();
+#endif
 
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SCL);
