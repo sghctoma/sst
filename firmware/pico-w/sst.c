@@ -94,9 +94,13 @@ static bool msc_present() {
     return true;
 }
 
-static bool wifi_connect() {
+static bool wifi_connect(bool do_ntp) {
     cyw43_arch_enable_sta_mode();
-    return cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
+    bool ret = cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
+    if (ret && do_ntp) {
+        sync_rtc_to_ntp();
+    }
+    return ret;
 }
 
 static void wifi_disconnect() {
@@ -370,7 +374,7 @@ static void on_rec_stop() {
 
 static void on_sync_data() {
     display_message(&disp, "CONNECT");
-    if (!wifi_connect()) {
+    if (!wifi_connect(true)) {
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else {
@@ -469,7 +473,7 @@ static void on_idle() {
 
 static void on_sync_time() {
     display_message(&disp, "CONNECT");
-    if (!wifi_connect()) {
+    if (!wifi_connect(false)) {
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else {
@@ -603,6 +607,7 @@ int main() {
     ds3231_init(&rtc, I2C_PIO, I2C_SM,
                 pio_i2c_write_blocking,
                 pio_i2c_read_blocking);
+    sleep_ms(1); // without this, garbage values are read from the RTC
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
     setup_ntp(config.ntp_server);
