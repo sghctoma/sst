@@ -41,9 +41,10 @@ static uint32_t clock0_orig;
 static uint32_t clock1_orig;
 
 static ssd1306_t disp;
-static struct ds3231 rtc;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
+
+struct ds3231 rtc;
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -476,10 +477,6 @@ static void on_sync_time() {
         if (!sync_rtc_to_ntp()) {
             display_message(&disp, "NTP ERR");
             sleep_ms(1000);
-        } else {
-            datetime_t dt;
-            rtc_get_datetime(&dt);
-            ds3231_set_datetime(&rtc, &dt);
         }
     }
     wifi_disconnect();
@@ -608,7 +605,7 @@ int main() {
                 pio_i2c_read_blocking);
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
-    init_ntp(config.ntp_server);
+    setup_ntp(config.ntp_server);
 
     setup_display(&disp);
 

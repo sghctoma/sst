@@ -2,31 +2,12 @@
 #include "lwip/apps/sntp.h"
 #include "pico/time.h"
 #include "hardware/rtc.h"
+#include "include/ds3231.h"
+
+extern struct ds3231 rtc;
 
 static volatile uint64_t start_time_us = 0;
 static volatile bool ntp_done = false;
-
-uint64_t get_system_time_us() {
-    uint64_t t = start_time_us + time_us_64();
-    return start_time_us + time_us_64();
-}
-
-void set_system_time_us(uint32_t sec, uint32_t us) {
-    time_t epoch = sec;
-    struct tm *time = gmtime(&epoch);
-    datetime_t dt = {
-        .year  = time->tm_year + 1900,
-        .month = time->tm_mon + 1,
-        .day   = time->tm_mday,
-        .dotw  = 0,
-        .hour  = time->tm_hour,
-        .min   = time->tm_min,
-        .sec   = time->tm_sec,
-    };
-    rtc_set_datetime(&dt);
-    start_time_us = (mktime(time) * 1000000 + us) - time_us_64();
-    ntp_done = true;
-}
 
 static time_t rtc_timestamp() {
     datetime_t rtc;
@@ -49,12 +30,6 @@ static time_t rtc_timestamp() {
     return t;
 }
 
-void init_ntp(const char* server) {
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, server);
-    start_time_us = rtc_timestamp() * 1000000;
-}
-
 bool sync_rtc_to_ntp() {
     ntp_done = false;
     sntp_init();
@@ -67,4 +42,33 @@ bool sync_rtc_to_ntp() {
     sntp_stop();
 
     return ntp_done;
+}
+
+void setup_ntp(const char* server) {
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, server);
+    start_time_us = rtc_timestamp() * 1000000;
+}
+
+uint64_t get_system_time_us() {
+    uint64_t t = start_time_us + time_us_64();
+    return start_time_us + time_us_64();
+}
+
+void set_system_time_us(uint32_t sec, uint32_t us) {
+    time_t epoch = sec;
+    struct tm *time = gmtime(&epoch);
+    datetime_t dt = {
+        .year  = time->tm_year + 1900,
+        .month = time->tm_mon + 1,
+        .day   = time->tm_mday,
+        .dotw  = 0,
+        .hour  = time->tm_hour,
+        .min   = time->tm_min,
+        .sec   = time->tm_sec,
+    };
+    rtc_set_datetime(&dt);
+    ds3231_set_datetime(&rtc, &dt);
+    start_time_us = (mktime(time) * 1000000 + us) - time_us_64();
+    ntp_done = true;
 }
