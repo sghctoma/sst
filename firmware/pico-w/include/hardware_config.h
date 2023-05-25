@@ -7,7 +7,7 @@
 #define I2C_PIO          pio0
 #define I2C_SM           0
 #define PIO_PIN_SDA      2
-#define PIO_PIN_SCL      (PIO_PIN_SDA + 1)
+// SCL has to be PIO_PIN_SDA+1
 
 // ----------------------------------------------------------------------------
 // Battery
