@@ -14,6 +14,7 @@ pico_sdk_init()
 
 add_executable(sufni-suspension-telemetry
     sst.c
+    microsd.c
     pushbutton.c
     ntp.c
     list.c
@@ -36,6 +37,12 @@ add_subdirectory(../lib/pico-ssd1306 lib/pico-ssd1306)
 if(${DISP_PROTO} STREQUAL SPI)
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSPI_DISPLAY
+    )
+endif()
+
+if(${SPI_MICROSD})
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DSPI_MICROSD
     )
 endif()
 
@@ -67,4 +74,3 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 pico_add_extra_outputs(sufni-suspension-telemetry)
-

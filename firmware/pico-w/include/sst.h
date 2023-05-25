@@ -42,7 +42,4 @@ enum command {
 #define BUFFER_SIZE 2048
 #define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
                            // so length is always 10.
-#define I2C_PIO pio0
-#define I2C_SM 0
-
 #endif /* _SST_H */

@@ -25,6 +25,8 @@
 #include "hardware/spi.h"
 #include "hardware/watchdog.h"
 #include "bsp/board.h"
+#include "ff.h"
+#include "hw_config.h"
 
 // For scb_hw so we can enable deep sleep
 #include "hardware/structs/scb.h"
@@ -32,6 +34,7 @@
 #include "sst.h"
 #include "list.h"
 #include "config.h"
+
 #include "hardware_config.h"
 
 static volatile enum state state;
