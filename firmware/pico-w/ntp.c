@@ -9,7 +9,7 @@ extern struct ds3231 rtc;
 static volatile uint64_t start_time_us = 0;
 static volatile bool ntp_done = false;
 
-static time_t rtc_timestamp() {
+time_t rtc_timestamp() {
     datetime_t rtc;
     rtc_get_datetime(&rtc);
 

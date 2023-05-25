@@ -215,7 +215,7 @@ static int open_datafile() {
         return fr;
     }
 
-    struct header h = {"SST", 3, SAMPLE_RATE, get_system_time_us()};
+    struct header h = {"SST", 3, SAMPLE_RATE, rtc_timestamp()};
     f_write(&recording, &h, sizeof(struct header), NULL);
 
     return index;

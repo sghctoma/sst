@@ -25,7 +25,7 @@ struct header {
     char magic[3];
     uint8_t version;
     uint16_t sample_rate;
-    uint64_t timestamp;
+    time_t timestamp;
 };
 
 struct record {

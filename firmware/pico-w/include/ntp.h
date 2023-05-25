@@ -2,6 +2,7 @@
 #define _NTP_H
 
 #include "pico/stdlib.h"
+#include "sys/types.h"
 
 #define NTP_TIMEOUT_TIME 2000
 
@@ -10,6 +11,7 @@
 // hasn't been synced yet.
 void setup_ntp(const char* server);
 
+time_t rtc_timestamp();
 uint64_t get_system_time_us();
 bool sync_rtc_to_ntp();
 
