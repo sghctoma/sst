@@ -604,7 +604,7 @@ int main() {
 #endif
 
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
-    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SCL+1);
+    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA+1);
 
     datetime_t dt;
     ds3231_init(&rtc, I2C_PIO, I2C_SM,
