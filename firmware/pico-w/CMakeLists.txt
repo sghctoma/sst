@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.21.1)
 
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
