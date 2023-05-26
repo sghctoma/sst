@@ -2,7 +2,7 @@
 #include "lwip/apps/sntp.h"
 #include "pico/time.h"
 #include "hardware/rtc.h"
-#include "include/ds3231.h"
+#include "../rtc/ds3231.h"
 
 extern struct ds3231 rtc;
 

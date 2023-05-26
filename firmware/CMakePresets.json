@@ -11,7 +11,7 @@
       "displayName": "I2C display, SDIO MicroSD card",
       "hidden": false,
       "description": "Default configuration with I2C display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "DISP_PROTO": "PIO_I2C",
         "SPI_MICROSD": ""
@@ -22,7 +22,7 @@
       "displayName": "SPI display, SDIO MicroSD card",
       "hidden": false,
       "description": "Configuration with SPI display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build_spi_display/",
+      "binaryDir": "${sourceDir}/build/spi_display",
       "cacheVariables": {
         "DISP_PROTO": "SPI",
         "SPI_MICROSD": ""
@@ -33,7 +33,7 @@
       "displayName": "I2C display, SPI MicroSD card",
       "hidden": false,
       "description": "Configuration with I2C display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build_spi_microsd",
+      "binaryDir": "${sourceDir}/build/spi_microsd",
       "cacheVariables": {
         "DISP_PROTO": "PIO_I2C",
         "SPI_MICROSD": "ON"
@@ -44,7 +44,7 @@
       "displayName": "SPI display, SPI MicroSD card",
       "hidden": false,
       "description": "Configuration with SPI display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build_spi_display_microsd",
+      "binaryDir": "${sourceDir}/build/spi_display_microsd",
       "cacheVariables": {
         "DISP_PROTO": "SPI",
         "SPI_MICROSD": "ON"

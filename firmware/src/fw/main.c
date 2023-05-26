@@ -5,8 +5,6 @@
 #include "cyw43_country.h"
 #include "cyw43_ll.h"
 #include "device/usbd.h"
-#include "include/ds3231.h"
-#include "include/ntp.h"
 #include "lwip/dhcp.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
@@ -32,8 +30,10 @@
 #include "hardware/structs/scb.h"
 
 #include "sst.h"
-#include "list.h"
-#include "config.h"
+#include "../ntp//ntp.h"
+#include "../rtc//ds3231.h"
+#include "../util/list.h"
+#include "../util/config.h"
 
 #include "hardware_config.h"
 

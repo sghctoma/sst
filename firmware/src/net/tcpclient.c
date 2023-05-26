@@ -1,16 +1,17 @@
-#include "include/lwipopts.h"
 #include "lwip/ip_addr.h"
 #include "lwip/tcpbase.h"
 #include "pico/unique_id.h"
 #include "pico/cyw43_arch.h"
+#include "pico/time.h"
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
 #include "hw_config.h"
-#include "pico/time.h"
-#include "tcpclient.h"
-#include "config.h"
+
+#include "lwipopts.h"
+#include "../net/tcpclient.h"
+#include "../util/config.h"
 
 static err_t tcp_client_close(void *arg) {
     struct connection *conn = (struct connection *)arg;

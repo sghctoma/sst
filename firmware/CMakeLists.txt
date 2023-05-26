@@ -13,26 +13,26 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 pico_sdk_init()
 
 add_executable(sufni-suspension-telemetry
-    sst.c
-    microsd.c
-    pushbutton.c
-    ntp.c
-    list.c
-    tcpclient.c
-    config.c
-    msc_disk.c
-    sst_usb_descriptors.c
-    ds3231.c
-    pio_i2c.c
+    src/fw/main.c
+    src/fs/microsd.c
+    src/msc/msc_disk.c
+    src/msc/sst_usb_descriptors.c
+    src/net/tcpclient.c
+    src/ntp/ntp.c
+    src/pio_i2c/pio_i2c.c
+    src/rtc/ds3231.c
+    src/ui/pushbutton.c
+    src/util/config.c
+    src/util/list.c
 )
 
 pico_generate_pio_header(sufni-suspension-telemetry
-    ${CMAKE_CURRENT_LIST_DIR}/i2c.pio
+    ${CMAKE_CURRENT_LIST_DIR}/src/pio_i2c/i2c.pio
 )
 
-add_subdirectory(../lib/no-OS-FatFS-SD-SPI-RPi-Pico/src lib/no-OS-FatFS-SD-SPI-RPi-Pico/src)
-add_subdirectory(../lib/pico-as5600 lib/pico-as5600)
-add_subdirectory(../lib/pico-ssd1306 lib/pico-ssd1306)
+add_subdirectory(external/no-OS-FatFS-SD-SPI-RPi-Pico/src firmware/external/no-OS-FatFS-SD-SPI-RPi-Pico/src)
+add_subdirectory(external/pico-as5600 firmware/external/pico-as5600)
+add_subdirectory(external/pico-ssd1306 firmware/external/pico-ssd1306)
 
 if(${DISP_PROTO} STREQUAL SPI)
     target_compile_options(sufni-suspension-telemetry PUBLIC
@@ -47,7 +47,8 @@ if(${SPI_MICROSD})
 endif()
 
 target_include_directories(sufni-suspension-telemetry PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/include/
+    ${CMAKE_CURRENT_LIST_DIR}/src/msc
+    ${CMAKE_CURRENT_LIST_DIR}/src/net
 )
 
 target_link_libraries(sufni-suspension-telemetry

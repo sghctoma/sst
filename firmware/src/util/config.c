@@ -1,10 +1,10 @@
 #include <stdint.h>
 
-#include "ff_stdio.h"
-#include "config.h"
-
 #include "pico/cyw43_arch.h"
 #include "pico/sleep.h"
+
+#include "ff_stdio.h"
+#include "config.h"
 
 struct config config = {
     .ssid = "sst",

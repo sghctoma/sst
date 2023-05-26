@@ -46,12 +46,11 @@
 *.lprof
 
 # build directories
-firmware/pico/build/
-firmware/pico-w/build/
+firmware/build/
 
 # HW configs for my debug environment and prototype DAQ
-firmware/pico-w/include/hardware_config_debug.h
-firmware/pico-w/include/hardware_config_mine.h
+firmware/src/fw/hardware_config_debug.h
+firmware/src/fw/hardware_config_mine.h
 
 # external documentations
 sourcematerial/

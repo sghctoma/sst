@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "sst.h"
+#include "../fw/sst.h"
 
 struct node {
     char data[FILENAME_LENGTH];

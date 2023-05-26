@@ -30,7 +30,7 @@ socket, which SPI it is driven by, and how it is wired.
 #include "hw_config.h"
 #include "ff.h"
 #include "diskio.h"
-#include "hardware_config.h"
+#include "../fw/hardware_config.h"
 
 static spi_t spis[] = {  // One for each SPI.
 #ifdef SPI_MICROSD
