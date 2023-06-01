@@ -6,7 +6,7 @@ var Layout = require("../views/Layout")
 
 var SST = {
   setError: function(error) {
-    Layout.setError(error)
+    Layout.error = error
   },
   getCookie: function (name) {
     const value = `; ${document.cookie}`;
@@ -86,6 +86,9 @@ var SST = {
       .then((update) => {
           Session.current.suspension_count == 2 ? SST.update.process_double_json(update) :
                                                   SST.update.process_single_json(update);
+      })
+      .catch((error) => {
+        SST.setError('Invalid range!')
       })
     },
     fft: function(p, u) {

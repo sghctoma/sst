@@ -27,21 +27,38 @@ html,body,.layout {
   /* background-color: rgb(10, 10, 10); */
 }
 
-header { 
-  width: 100%; 
-  position: fixed; 
-  left: 0px; 
+header {
+  width: 100%;
+  position: fixed;
+  left: 0px;
   color: #d0d0d0;
   background-color: #0a0a0a;
   padding: 3px 10px 3px 50px;
-  font-size: 18px; 
-  line-height: 43px; 
+  font-size: 18px;
+  line-height: 43px;
   z-index: 0;
   white-space: nowrap;
 
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+message-bar {
+  display: flex;
+  width: 50%;
+  position: fixed;
+  left: 25%;
+  top: 50px;
+  line-height: 43px;
+  color: #ff594e;
+  background-color: #15191C;
+  padding: 3px 10px 3px 50px;
+  font-size: 14px;
+  z-index: 5;
+  align-items: center;
+  border-radius: 3px;
+  box-shadow: -4px 5px 10px 0px #000000;
 }
 
 @media (max-width: 960px) {

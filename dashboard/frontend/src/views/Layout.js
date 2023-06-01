@@ -21,26 +21,12 @@ var timestampToString = function(timestamp) {
   })
 }
 
-var ErrorPopup = {
-  view: function(vnode) {
-    return m(".error-message", Layout.error)
-  },
-}
-
 var Layout = {
   oninit: function(vnode) {
     Layout.setupDialog = new Dialog()
     Layout.importDialog = new Dialog()
     Layout.loginDialog = new Dialog()
-    Layout.errorDialog = new Dialog()
     Layout.error = ""
-  },
-  setError: function(error) {
-    Layout.error = error
-    if (error) {
-      Layout.errorDialog.state.openDialog()
-      m.redraw()
-    }
   },
   view: function(vnode) {
     return m("main.layout", [
@@ -92,16 +78,13 @@ var Layout = {
           }),
         ]),
       ]),
+      Layout.error ? m("message-bar", {onclick: (event) => {Layout.error = null}}, Layout.error) : null,
       m("nav.drawer", {id: "drawer"}, [
         m("div", {style: "margin-bottom: 15px;"}, [
           m("h4", "Sessions"),
           m(SessionList)
         ]),
       ]),
-      m(Layout.errorDialog, {
-        onopen: null,
-        onclose: () => {Layout.error = null},
-      }, m(ErrorPopup)),
       m(Layout.loginDialog, {
         onopen: null,
         onclose: null,
