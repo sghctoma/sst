@@ -93,7 +93,7 @@ var SST = {
     },
     fft: function(p, u) {
       p.select_one("ds_fft").data = u.data;
-      p.select_one("b_fft").glyph.width = u.width;
+      p.select_one("b_fft").glyph.width = 4.9 / u.data.freqs.length
     },
     thist: function(p, u) {
       p.select_one("ds_hist").data = u.data;
