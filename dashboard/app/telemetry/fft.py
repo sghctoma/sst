@@ -11,9 +11,9 @@ from app.telemetry.psst import Strokes
 
 def _fft_data(strokes: Strokes, travel: list[float], tick: float) -> (
               dict[str, np.array]):
-    stroke_travel = []
-    for s in strokes.Compressions + strokes.Rebounds:
-        stroke_travel.extend(travel[s.Start:s.End+1])
+    start = min(strokes.Compressions[0].Start, strokes.Rebounds[0].Start)
+    end = max(strokes.Compressions[-1].End, strokes.Rebounds[-1].End)
+    stroke_travel = travel[start:end]
     balanced_travel = stroke_travel - np.mean(stroke_travel)
     n = np.max([20000, len(balanced_travel)])
     balanced_travel_f = rfft(balanced_travel, n=n)
