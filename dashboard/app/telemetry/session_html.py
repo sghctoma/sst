@@ -58,7 +58,6 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Front.Velocity,
             hst)
         p_front_fft = fft_figure(
-            telemetry.Front.Strokes,
             telemetry.Front.Travel,
             tick,
             front_color,
@@ -84,7 +83,6 @@ def create_cache(session_id: int, lod: int, hst: int):
             telemetry.Rear.Velocity,
             hst)
         p_rear_fft = fft_figure(
-            telemetry.Rear.Strokes,
             telemetry.Rear.Travel,
             tick,
             rear_color,

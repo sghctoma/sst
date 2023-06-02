@@ -63,9 +63,7 @@ def _validate_range(start: int, end: int, count: int) -> bool:
             start >= 0 and end < count)
 
 
-def _update_data(strokes: Strokes, suspension: Suspension, sample_rate: int):
-    tick = 1.0 / sample_rate
-    fft = update_fft(strokes, suspension.Travel, tick)
+def _update_stroke_based(strokes: Strokes, suspension: Suspension):
     thist = update_travel_histogram(strokes, suspension.TravelBins)
     vhist = update_velocity_histogram(
         strokes,
@@ -81,7 +79,6 @@ def _update_data(strokes: Strokes, suspension: Suspension, sample_rate: int):
         200
     )
     return dict(
-        fft=fft,
         thist=thist,
         vhist=vhist,
         vbands=vbands,
@@ -145,12 +142,17 @@ def filter(id: int):
         end = None
 
     updated_data = {'front': None, 'rear': None}
+    tick = 1.0 / t.SampleRate
     if t.Front.Present:
         f_strokes = _filter_strokes(t.Front.Strokes, start, end)
-        updated_data['front'] = _update_data(f_strokes, t.Front, t.SampleRate)
+        updated_data['front'] = _update_stroke_based(f_strokes, t.Front)
+        updated_data['front']['fft'] = update_fft(
+            t.Front.Travel[start:end], tick)
     if t.Rear.Present:
         r_strokes = _filter_strokes(t.Rear.Strokes, start, end)
-        updated_data['rear'] = _update_data(r_strokes, t.Rear, t.SampleRate)
+        updated_data['rear'] = _update_stroke_based(r_strokes, t.Rear)
+        updated_data['rear']['fft'] = update_fft(
+            t.Rear.Travel[start:end], tick)
     if t.Front.Present and t.Rear.Present:
         updated_data['balance'] = dict(
             compression=update_balance(
