@@ -25,6 +25,16 @@ from app.utils.first_init import first_init
 id_queue = queue.Queue()
 
 
+def _sqlite_pragmas(app: Flask):
+    if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+        def _pragma_on_connect(dbapi_con, con_record):
+            dbapi_con.execute('PRAGMA journal_mode=WAL')
+
+        with app.app_context():
+            from sqlalchemy import event
+            event.listen(db.engine, 'connect', _pragma_on_connect)
+
+
 def create_app():
     app = Flask(__name__)
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
@@ -70,8 +80,10 @@ def create_app():
 
     # Initialize Flask extensions here
     jwt.init_app(app)
-    db.init_app(app)
     sio.init_app(app)
+
+    db.init_app(app)
+    _sqlite_pragmas(app)
 
     # Register blueprints here
     from app.frontend import bp as frontend_bp
