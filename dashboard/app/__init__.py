@@ -17,7 +17,7 @@ from flask_jwt_extended import (
 )
 from werkzeug.exceptions import HTTPException
 
-from app.extensions import db, jwt, sio
+from app.extensions import db, jwt, migrate, sio
 from app.telemetry.session_html import create_cache
 from app.utils.first_init import first_init
 
@@ -84,6 +84,7 @@ def create_app():
 
     db.init_app(app)
     _sqlite_pragmas(app)
+    migrate.init_app(app, db)
 
     # Register blueprints here
     from app.frontend import bp as frontend_bp
