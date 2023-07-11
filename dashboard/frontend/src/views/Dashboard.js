@@ -10,13 +10,13 @@ var SingleSuspensionTabs = {
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone", checked: "checked"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
-        m(".travel-hist", m.trust(Session.current.divs[6] ? Session.current.divs[5] : Session.current.divs[8])),
-        m(".fft", m.trust(Session.current.divs[6] ? Session.current.divs[7] : Session.current.divs[9])),
+        m(".travel-hist", m.trust(Session.current.divs[5])),
+        m(".fft", m.trust(Session.current.divs[6])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabtwo"}),
       m("label.label", {style: "grid-column: 2", for: "tabtwo"}, "Damping"),
       m(".panel damping", {tabindex: "1"}, [
-        m(".velocity-hist", m.trust(Session.current.divs[7] ? Session.current.divs[7] : Session.current.divs[10])),
+        m(".velocity-hist", m.trust(Session.current.divs[7])),
       ]),
     ])
   }
