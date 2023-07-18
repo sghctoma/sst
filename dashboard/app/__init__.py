@@ -39,7 +39,8 @@ def create_app():
     app = Flask(__name__)
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_ALGORITHM'] = 'RS256'
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=20)
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+    app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
     app.config['JWT_COOKIE_SECURE'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -65,7 +66,7 @@ def create_app():
         try:
             exp_timestamp = get_jwt()["exp"]
             now = datetime.now(timezone.utc)
-            target_timestamp = datetime.timestamp(now + timedelta(minutes=1.5))
+            target_timestamp = datetime.timestamp(now + timedelta(minutes=10))
             if target_timestamp > exp_timestamp:
                 access_token = create_access_token(identity=get_current_user())
                 set_access_cookies(response, access_token)
