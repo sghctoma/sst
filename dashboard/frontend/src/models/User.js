@@ -31,8 +31,11 @@ var User = {
   },
   logout: function() {
     return m.request({
-      method: 'POST',
+      method: 'DELETE',
       url: '/auth/logout',
+      headers: {
+        "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
+      },
     })
     .then(function() {
       User.current = null
