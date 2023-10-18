@@ -42,7 +42,7 @@ def _initiate_database():
     )
     cm_percentage = CalibrationMethod(
         id=2,
-        name="fraction",
+        name="percentage",
         description="Sample is in percentage of maximum suspension stroke.",
         properties=dict(
             inputs=[],
