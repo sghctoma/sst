@@ -11,7 +11,7 @@ from app.telemetry.psst import Telemetry, dataclass_from_dict
 class Session(db.Model):
     id: int = db.Column(db.Integer, primary_key=True)
     name: str = db.Column(db.String)
-    setup: str = db.Column('setup_id', db.Integer, db.ForeignKey('setup.id'))
+    setup: int = db.Column('setup_id', db.Integer, db.ForeignKey('setup.id'))
     description: str = db.Column(db.String)
     timestamp: int = db.Column(db.Integer, nullable=False)
     track: int = db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
