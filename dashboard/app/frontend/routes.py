@@ -1,5 +1,6 @@
 from bokeh.resources import CDN
-from flask import render_template, Markup
+from flask import render_template
+from markupsafe import Markup
 
 from app.frontend import bp
 

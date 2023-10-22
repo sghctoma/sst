@@ -110,10 +110,8 @@ def create_app():
                 except BaseException as e:
                     app.logger.error(f"cache failed for session {id}: {e}")
 
-    @app.before_first_request
-    def before_first_request():
-        gt = threading.Thread(target=html_generator)
-        gt.daemon = True
-        gt.start()
+    generator_thread = threading.Thread(target=html_generator)
+    generator_thread.daemon = True
+    generator_thread.start()
 
     return app

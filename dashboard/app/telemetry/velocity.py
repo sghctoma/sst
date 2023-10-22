@@ -229,6 +229,7 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
         top=hst,
         bottom=-hst,
         left=0,
+        right=None,  # XXX https://github.com/bokeh/bokeh/issues/13432
         fill_color='#FFFFFF',
         fill_alpha=0.1)
     p.add_layout(lowspeed_box)

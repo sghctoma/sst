@@ -5,12 +5,13 @@ import requests
 from io import BytesIO
 from http import HTTPStatus as status
 
-from flask import current_app, jsonify, request, send_file, Markup
+from flask import current_app, jsonify, request, send_file
 from flask_jwt_extended import (
     jwt_required,
     verify_jwt_in_request,
     unset_jwt_cookies
 )
+from markupsafe import Markup
 
 from app import id_queue
 from app.api.session import bp
