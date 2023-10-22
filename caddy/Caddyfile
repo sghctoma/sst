@@ -2,7 +2,7 @@
 	admin off
 	default_sni sst.caddy.local
 }
-:443, sst.caddy.local {
+:443, sst.caddy.local, localhost {
 	tls internal
 	handle {
 		reverse_proxy dashboard:5000
