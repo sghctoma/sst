@@ -1,6 +1,6 @@
 # -- build image
 
-FROM node:20.0-bullseye-slim as build
+FROM node:21.0-bookworm-slim as build
 
 WORKDIR /usr/src/app
 COPY frontend/ /usr/src/app/
@@ -8,7 +8,7 @@ RUN npm install && npm run build
 
 # -- prod image
 
-FROM python:3.9-slim-bullseye AS dashboard
+FROM python:3.11-slim-bookworm AS dashboard
 
 WORKDIR /dashboard
 EXPOSE 5000/tcp
