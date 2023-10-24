@@ -107,7 +107,7 @@ static bool wifi_connect(bool do_ntp) {
 }
 
 static void wifi_disconnect() {
-    cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+    cyw43_arch_disable_sta_mode();
     sleep_ms(100);
 }
 
@@ -621,8 +621,6 @@ int main() {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
-        cyw43_arch_init_with_country(CYW43_COUNTRY_HUNGARY);
-
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
 
@@ -638,6 +636,8 @@ int main() {
             display_message(&disp, "CONF ERR");
             while(true) { tight_loop_contents(); }
         }
+
+        cyw43_arch_init_with_country(config.country);
  
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;

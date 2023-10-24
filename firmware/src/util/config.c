@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "pico/cyw43_arch.h"
+#include "cyw43_country.h"
 #include "pico/sleep.h"
 
 #include "ff_stdio.h"
@@ -11,7 +12,8 @@ struct config config = {
     .psk = "changemeplease",
     .ntp_server = "pool.ntp.org",
     .sst_server = "sst.sghctoma.com",
-    .sst_server_port = 557
+    .sst_server_port = 557,
+    .country = CYW43_COUNTRY_HUNGARY
 };
 
 bool load_config() {
@@ -42,10 +44,13 @@ bool load_config() {
             } else if (strcmp(key, "SST_SERVER_PORT") == 0) {
                 config.sst_server_port = atoi(value);
                 ++count;
+            } else if (strcmp(key, "COUNTRY") == 0) {
+                config.country = CYW43_COUNTRY(key[0], key[1], 0);
+                ++count;
             }
         }
     }
     f_close(&config_fil);
   
-    return count == 5;
+    return count == 6;
 }

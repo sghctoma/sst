@@ -10,6 +10,7 @@ struct config {
     char ntp_server[264];
     char sst_server[264];
     uint16_t sst_server_port;
+    uint32_t country;
 };
 
 extern struct config config;
