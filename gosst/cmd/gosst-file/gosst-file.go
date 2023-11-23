@@ -14,11 +14,6 @@ import (
 	sst "gosst/formats/sst"
 )
 
-type calibrations struct {
-	FrontCalibration psst.Calibration `json:"front"`
-	RearCalibration  psst.Calibration `json:"rear"`
-}
-
 func main() {
 	var opts struct {
 		TelemetryFile string `short:"t" long:"telemetry" description:"Telemetry data file (.SST)" required:"true"`
@@ -39,7 +34,7 @@ func main() {
 	if err := json.Unmarshal(l, &linkage); err != nil {
 		log.Fatalln(err)
 	}
-	if linkage.ProcessRawData() != nil {
+	if err := linkage.ProcessRawData(); err != nil {
 		log.Fatalln(err)
 	}
 
