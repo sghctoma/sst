@@ -111,6 +111,27 @@ static void wifi_disconnect() {
     sleep_ms(100);
 }
 
+static time_t rtc_timestamp() {
+    datetime_t rtc;
+    rtc_get_datetime(&rtc);
+
+    struct tm utc = {
+        .tm_year = rtc.year - 1900,
+        .tm_mon = rtc.month - 1,
+        .tm_mday = rtc.day,
+        .tm_hour = rtc.hour,
+        .tm_min = rtc.min,
+        .tm_sec = rtc.sec,
+        .tm_isdst = -1,
+        .tm_wday = 0,
+        .tm_yday = 0,
+    };
+
+    time_t t = mktime(&utc);
+
+    return t;
+}
+
 // ----------------------------------------------------------------------------
 // Data acquisition
 
@@ -613,7 +634,6 @@ int main() {
     sleep_ms(1); // without this, garbage values are read from the RTC
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
-    setup_ntp(config.ntp_server);
 
     setup_display(&disp);
 

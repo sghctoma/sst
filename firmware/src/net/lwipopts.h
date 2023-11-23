@@ -87,16 +87,4 @@
 #define SLIP_DEBUG                  LWIP_DBG_OFF
 #define DHCP_DEBUG                  LWIP_DBG_OFF
 
-#define SNTP_SERVER_DNS 1
-#define SNTP_STARTUP_DELAY 0
-#define SNTP_COMP_ROUNDTRIP 1
-
-#define SNTP_GET_SYSTEM_TIME(sec, us) \
-    do{uint64_t time = get_system_time_us();\
-       (sec) = time / 1000000;\
-       (us) = time % 1000000;\
-       }while(0)
-
-#define SNTP_SET_SYSTEM_TIME_US set_system_time_us
-
 #endif /* __LWIPOPTS_H__ */

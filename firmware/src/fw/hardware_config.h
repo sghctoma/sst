@@ -6,7 +6,7 @@
 
 #define I2C_PIO          pio0
 #define I2C_SM           0
-#define PIO_PIN_SDA      2
+#define PIO_PIN_SDA      12
 // SCL has to be PIO_PIN_SDA+1
 
 // ----------------------------------------------------------------------------
@@ -19,8 +19,8 @@
 // ----------------------------------------------------------------------------
 // Buttons
 
-#define BUTTON_LEFT      4
-#define BUTTON_RIGHT     5
+#define BUTTON_LEFT      5
+#define BUTTON_RIGHT     1
 
 // ----------------------------------------------------------------------------
 // Display
@@ -32,10 +32,10 @@
 #ifdef SPI_DISPLAY
 #define DISPLAY_SPI      spi1
 #define DISPLAY_PIN_MISO 12
-#define DISPLAY_PIN_MOSI 11
-#define DISPLAY_PIN_SCK  10
+#define DISPLAY_PIN_MOSI 15
+#define DISPLAY_PIN_SCK  14
 #define DISPLAY_PIN_CS   13
-#define DISPLAY_PIN_RST  6
+#define DISPLAY_PIN_RST  11
 #else
 #define DISPLAY_ADDRESS  0x3c
 #endif // SPI_DISPLAY
@@ -69,7 +69,7 @@
 #define FORK_PIN_SCL     9
 
 #define SHOCK_I2C        i2c1
-#define SHOCK_PIN_SDA    14
-#define SHOCK_PIN_SCL    15
+#define SHOCK_PIN_SDA    26
+#define SHOCK_PIN_SCL    27
 
 #endif // _HARDWARE_CONFIG_H
