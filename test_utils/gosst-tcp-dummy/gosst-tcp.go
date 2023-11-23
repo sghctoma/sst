@@ -8,6 +8,7 @@ import (
 	"net"
 	"regexp"
 
+	"github.com/augustoroman/hexdump"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -22,10 +23,13 @@ func handleRequest(conn net.Conn) {
 	l, err := conn.Read(bufHeader)
 	if err != nil || l != 27 {
 		log.Println("[ERR] Could not fetch header")
+		log.Println(hexdump.Dump(bufHeader))
 		conn.Write([]byte{0xf1 /* ERR_CLSD from LwIP */})
 		return
 	}
 	defer conn.Close()
+	log.Println("[INFO] Fetched header")
+	log.Println(hexdump.Dump(bufHeader))
 
 	reader := bytes.NewReader(bufHeader)
 	var header header
@@ -99,6 +103,7 @@ func main() {
 			log.Println("[ERR]", err.Error())
 			continue
 		}
+		log.Println("[INFO] Accepted connection from " + conn.RemoteAddr().String())
 		go handleRequest(conn)
 	}
 }

@@ -1,3 +1,5 @@
+github.com/augustoroman/hexdump v0.0.0-20190827031536-6506f4163e93 h1:z6k1vb5L2wqLK4SIk3fpUiXnhNWSZ6Oyy8AaLqr0B+A=
+github.com/augustoroman/hexdump v0.0.0-20190827031536-6506f4163e93/go.mod h1:ps2Vk8wMZarkeIPtUqW/FUvwVVdeRDbewMYz+EmuEgk=
 github.com/jessevdk/go-flags v1.5.0 h1:1jKYvbxEjfUl0fmqTCOfonvskHHXMjBySTLW4y9LFvc=
 github.com/jessevdk/go-flags v1.5.0/go.mod h1:Fw0T6WPc1dYxT4mKEZRfG5kJhaTDP9pj1c2EWnYs/m4=
 golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4 h1:EZ2mChiOa8udjfp6rRmswTbtZN/QzUQp4ptM4rnjHvc=
