@@ -99,4 +99,10 @@
 
 #define SNTP_SET_SYSTEM_TIME_US set_system_time_us
 
+#define LWIP_MDNS_RESPONDER         1
+#define LWIP_IGMP                   1
+#define LWIP_NUM_NETIF_CLIENT_DATA  1
+#define LWIP_AUTOIP                 1
+#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL+3)
+
 #endif /* __LWIPOPTS_H__ */

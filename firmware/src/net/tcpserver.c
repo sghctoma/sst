@@ -1,6 +1,8 @@
 #include "tcpserver.h"
 #include "lwip/tcp.h"
 #include "lwip/tcpbase.h"
+#include "lwip/apps/mdns.h"
+#include "lwip/netif.h"
 #include "pico/time.h"
 #include "pico/unique_id.h"
 #include "ff.h"
@@ -393,10 +395,26 @@ static bool process_dirinfo_request(struct tcpserver *server) {
 }
 
 // ----------------------------------------------------------------------------
+// MDNS functions
+static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
+    err_t res;
+    LWIP_UNUSED_ARG(txt_userdata);
+    
+    res = mdns_resp_add_service_txtitem(service, NULL, 0);
+    LWIP_ERROR("mdns add service txt failed\n", (res == ERR_OK), return);
+}
+
+// ----------------------------------------------------------------------------
 // "Public" functions
 
 bool start_tcp_server() {
     pico_get_unique_board_id(&board_id);
+
+    mdns_resp_init();
+    mdns_resp_add_netif(netif_default, "sufni_telemetry_daq");
+    s8_t slot = mdns_resp_add_service(netif_default, "sufnidaq", "_gosst",
+        DNSSD_PROTO_TCP, 1557, mdns_srv_txt, NULL);
+    mdns_resp_announce(netif_default);
 
     struct tcpserver *server = tcp_server_init();
     if (NULL == server) {
@@ -424,6 +442,9 @@ bool start_tcp_server() {
         sleep_ms(1);
     }
     free(server);
+
+    mdns_resp_del_service (netif_default, slot);
+    mdns_resp_remove_netif (netif_default);
 
     return true;
 }

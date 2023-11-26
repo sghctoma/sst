@@ -57,6 +57,8 @@ target_link_libraries(sufni-suspension-telemetry
     pico_multicore
     pico_cyw43_arch_lwip_threadsafe_background
     pico_lwip_sntp
+    pico_lwip_netif
+    pico_lwip_mdns
     hardware_adc
     hardware_sleep
     tinyusb_board
