@@ -18,6 +18,7 @@ add_executable(sufni-suspension-telemetry
     src/msc/msc_disk.c
     src/msc/sst_usb_descriptors.c
     src/net/tcpclient.c
+    src/net/tcpserver.c
     src/ntp/ntp.c
     src/pio_i2c/pio_i2c.c
     src/rtc/ds3231.c

@@ -8,7 +8,7 @@
 
 struct node {
     char data[FILENAME_LENGTH];
-	struct node *next;
+    struct node *next;
 };
 
 struct list {

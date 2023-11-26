@@ -31,6 +31,7 @@
 
 #include "sst.h"
 #include "../ntp//ntp.h"
+#include "../net/tcpserver.h"
 #include "../rtc//ds3231.h"
 #include "../util/list.h"
 #include "../util/config.h"
@@ -181,7 +182,8 @@ static int setup_storage() {
 }
 
 static int open_datafile() {
-    uint16_t index = 0;
+    // start from 1, 0 is the special value for the headers in tcpserver
+    uint16_t index = 1;
     FIL index_fil;
     FRESULT fr = f_open(&index_fil, "INDEX", FA_OPEN_EXISTING | FA_READ);
     if (fr == FR_OK || fr == FR_EXIST) {

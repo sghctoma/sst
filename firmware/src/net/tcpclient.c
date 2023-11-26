@@ -13,6 +13,18 @@
 #include "../net/tcpclient.h"
 #include "../util/config.h"
 
+#define READ_BUF_LEN (10 * 1024)
+#define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
+                           // so length is always 10.
+#define POLL_TIME_S 5
+
+#define STATUS_INIT        1
+#define STATUS_DNS_FOUND   2
+#define STATUS_CONNECTED   3
+#define STATUS_HEADER_OK   4
+#define STATUS_DATA_SENT   5
+#define STATUS_SUCCESS     6
+
 static err_t tcp_client_close(void *arg) {
     struct connection *conn = (struct connection *)arg;
     err_t err = ERR_OK;
@@ -83,7 +95,7 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
             tcp_result(arg, s);
         } else {
             conn->status = s;
-        }        
+        }
     }
     pbuf_free(p);
 
