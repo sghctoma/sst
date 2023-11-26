@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "tcpserver.h"
 #include "lwip/tcp.h"
 #include "lwip/tcpbase.h"
@@ -8,8 +9,6 @@
 #include "ff.h"
 
 #include "../util/list.h"
-#include "tcpclient.h"
-#include <stdio.h>
 
 #define READ_BUF_LEN (10 * 1024)
 #define TCP_PORT 1557
@@ -99,17 +98,6 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
 
 // ----------------------------------------------------------------------------
 // TCP helper functions
-
-static struct tcpserver * tcp_server_init(void) {
-    struct tcpserver *server = calloc(1, sizeof(struct tcpserver));
-    if (server == NULL) {
-        return NULL;
-    }
-
-    server->status = STATUS_INITIALIZED;
-    
-    return server;
-}
 
 static bool tcp_server_open(void *arg) {
     struct tcpserver *server = (struct tcpserver*)arg;
@@ -407,44 +395,59 @@ static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
 // ----------------------------------------------------------------------------
 // "Public" functions
 
-bool start_tcp_server() {
+bool tcpserver_init(struct tcpserver *server) {
     pico_get_unique_board_id(&board_id);
 
-    mdns_resp_init();
+    if (server->mdns_initialized) {
+        mdns_resp_restart(netif_default);
+    } else {
+        mdns_resp_init();
+        server->mdns_initialized = true;
+    }
     mdns_resp_add_netif(netif_default, "sufni_telemetry_daq");
-    s8_t slot = mdns_resp_add_service(netif_default, "sufnidaq", "_gosst",
+    server->mdns_slot = mdns_resp_add_service(netif_default, "sufnidaq", "_gosst",
         DNSSD_PROTO_TCP, 1557, mdns_srv_txt, NULL);
     mdns_resp_announce(netif_default);
-
-    struct tcpserver *server = tcp_server_init();
-    if (NULL == server) {
-        return false;
-    }
 
     if (!tcp_server_open(server)) {
         tcp_server_result(server, -1);
         return false;
     }
 
-    while (server->status != STATUS_FINISHED) {
-        if (server->status == STATUS_FILE_REQUESTED) {
-            if (server->requested_file == 0) {
-                process_dirinfo_request(server);
-            } else if (process_sst_file_request(server)) {
-                TCHAR path_old[10];
-                TCHAR path_new[19];
-                sprintf(path_old, "%05d.SST", server->requested_file);
-                sprintf(path_new, "uploaded/%s", path_old);
-                f_rename(path_old, path_new);
-            }
-        }
-        
-        sleep_ms(1);
-    }
-    free(server);
-
-    mdns_resp_del_service (netif_default, slot);
-    mdns_resp_remove_netif (netif_default);
-
+    server->status = STATUS_INITIALIZED;
+    
     return true;
+}
+
+void tcpserver_teardown(struct tcpserver *server) {
+    tcp_server_close(server);
+    mdns_resp_del_service (netif_default, server->mdns_slot);
+    mdns_resp_remove_netif (netif_default);
+}
+
+bool tcpserver_process(struct tcpserver *server) {
+    if (server->requested_file == 0) {
+        return process_dirinfo_request(server);
+    } else if (process_sst_file_request(server)) {
+        TCHAR path_old[10];
+        TCHAR path_new[19];
+        sprintf(path_old, "%05d.SST", server->requested_file);
+        sprintf(path_new, "uploaded/%s", path_old);
+        f_rename(path_old, path_new);
+        return true;
+    }
+
+    return false;
+}
+
+void inline tcpserver_finish(struct tcpserver *server) {
+    server->status = STATUS_FINISHED;
+}
+
+bool inline tcpserver_finished(struct tcpserver *server) {
+    return server->status == STATUS_FINISHED;    
+}
+
+bool inline tcpserver_requested(struct tcpserver *server) {
+    return server->status == STATUS_FILE_REQUESTED;    
 }

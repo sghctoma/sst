@@ -103,6 +103,6 @@
 #define LWIP_IGMP                   1
 #define LWIP_NUM_NETIF_CLIENT_DATA  1
 #define LWIP_AUTOIP                 1
-#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL+3)
+#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL+10)
 
 #endif /* __LWIPOPTS_H__ */

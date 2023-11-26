@@ -15,8 +15,8 @@ enum state {
     REC_START,
     RECORD,
     REC_STOP,
-    SYNC_TIME,
     SYNC_DATA,
+    SERVE_TCP,
     MSC,
 };
 #define STATES_COUNT 9

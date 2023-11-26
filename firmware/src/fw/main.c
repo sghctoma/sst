@@ -47,6 +47,7 @@ static uint32_t clock1_orig;
 static ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
 static FIL recording;
+static struct tcpserver server;
 
 struct ds3231 rtc;
 
@@ -476,22 +477,6 @@ static void on_idle() {
     }
 }
 
-static void on_sync_time() {
-    display_message(&disp, "CONNECT");
-    if (!wifi_connect(false)) {
-        display_message(&disp, "CONN ERR");
-        sleep_ms(1000);
-    } else {
-        display_message(&disp, "NTP SYNC");
-        if (!sync_rtc_to_ntp()) {
-            display_message(&disp, "NTP ERR");
-            sleep_ms(1000);
-        }
-    }
-    wifi_disconnect();
-    state = IDLE;
-}
-
 static void on_sleep() {
     sleep_run_from_xosc();
     display_message(&disp, "SLEEP.");
@@ -534,6 +519,27 @@ static void on_msc() {
 static void dummy() {
 }
 
+static void on_serve_tcp() {
+    display_message(&disp, "CONNECT");
+    if (!wifi_connect(true)) {
+        display_message(&disp, "CONN ERR");
+        sleep_ms(1000);
+    } else if (tcpserver_init(&server)) {
+         display_message(&disp, "SERVER ON");
+
+        while (!tcpserver_finished(&server)) {
+            if (tcpserver_requested(&server)) {
+                tcpserver_process(&server);
+            }
+            sleep_ms(1);
+        }
+
+        tcpserver_teardown(&server);
+    }
+    wifi_disconnect();
+    state = IDLE;
+}
+
 static void (*state_handlers[STATES_COUNT])() = {
     on_idle,      /* IDLE */
     on_sleep,     /* SLEEP */
@@ -541,9 +547,9 @@ static void (*state_handlers[STATES_COUNT])() = {
     on_rec_start, /* REC_START */
     dummy,        /* RECORD */
     on_rec_stop,  /* REC_STOP */
-    on_sync_time, /* SYNC_TIME */
     on_sync_data, /* SYNC_DATA */
-    on_msc        /* MSC */
+    on_serve_tcp, /* SERVE_TCP */
+    on_msc,       /* MSC */
 };
 
 // ----------------------------------------------------------------------------
@@ -577,6 +583,10 @@ static void on_right_press(void *user_data) {
         case IDLE:
             state = SLEEP;
             break;
+        case SERVE_TCP:
+            tcpserver_finish(&server);
+            state = IDLE;
+            break;
         default:
             break;
     }
@@ -585,7 +595,7 @@ static void on_right_press(void *user_data) {
 static void on_right_longpress(void *user_data) {
     switch(state) {
         case IDLE:
-            state = SYNC_TIME;
+            state = SERVE_TCP;
             break;
         default:
             break;
@@ -640,7 +650,7 @@ int main() {
         }
 
         cyw43_arch_init_with_country(config.country);
- 
+
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;
         clock1_orig = clocks_hw->sleep_en1;
