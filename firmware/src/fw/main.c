@@ -13,6 +13,7 @@
 #include "pico/sleep.h"
 #include "pico/time.h"
 #include "pico/types.h"
+#include "pico/unique_id.h"
 #include "pico/util/datetime.h"
 #include "hardware/clocks.h"
 #include "hardware/adc.h"
@@ -173,6 +174,16 @@ static int setup_storage() {
     if (fr != FR_OK) {
         return PICO_ERROR_GENERIC;
     }
+
+    char board_id_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
+    pico_get_unique_board_id_string(board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
+    FIL f;
+    uint btw;
+    fr = f_open(&f, ".boardid", FA_OPEN_ALWAYS | FA_WRITE);
+    if (fr == FR_OK || fr == FR_EXIST) {
+        f_write(&f, board_id_str, 2*PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
+    }
+    f_close(&f);
 
     fr = f_mkdir("uploaded");
     if (!(fr == FR_OK || fr == FR_EXIST)) {
