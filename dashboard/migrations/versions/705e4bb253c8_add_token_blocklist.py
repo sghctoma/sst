@@ -1,8 +1,8 @@
 """Add token blocklist
 
-Revision ID: 01246d1f3687
-Revises: 
-Create Date: 2023-07-18 15:45:16.357253
+Revision ID: 705e4bb253c8
+Revises: ea6262808b9d
+Create Date: 2023-12-01 18:37:21.103542
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '01246d1f3687'
-down_revision = None
+revision = '705e4bb253c8'
+down_revision = 'ea6262808b9d'
 branch_labels = None
 depends_on = None
 

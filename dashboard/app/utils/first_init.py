@@ -3,6 +3,11 @@ from os import path
 from urllib.parse import urlparse
 
 from flask import current_app
+from flask_migrate import (
+    current as db_current,
+    stamp as db_stamp,
+    upgrade as db_upgrade,
+)
 
 from app.extensions import db
 from app.models.calibration import CalibrationMethod
@@ -29,7 +34,7 @@ def _generate_rsa_keys(priv_file: str, pub_file: str):
 
 
 def _initiate_database():
-    db.create_all()
+    db_upgrade()
     cm_fraction = CalibrationMethod(
         id=1,
         name="fraction",
@@ -120,3 +125,17 @@ def first_init():
     sqlite_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
     if not path.isfile(urlparse(sqlite_uri).path):
         _initiate_database()
+    elif db_current() is None:
+        '''
+        Flask-Migrate was introduced after version v0.2.0-alpha, and the first
+        migration was created when the token_blocklist table was added. This
+        was a mistake, since a "flask db upgrade" creates only that table when
+        run on an empty database. So the original migrations directory was
+        scrapped and recreated with an initial migration with all the tables
+        in version v0.2.0-alpha, and another one with token_blocklist. Existing
+        v0.2.0-alpha databases do not have a revision yet (no alembic_version
+        table), so in order for them to work nicely, we need to stamp them to
+        the initial migration revision.
+        '''
+        db_stamp(revision='ea6262808b9d')
+        db_upgrade()
