@@ -13,7 +13,8 @@ struct config config = {
     .ntp_server = "pool.ntp.org",
     .sst_server = "sst.sghctoma.com",
     .sst_server_port = 557,
-    .country = CYW43_COUNTRY_HUNGARY
+    .country = CYW43_COUNTRY_HUNGARY,
+    .timezone = "UTC0",
 };
 
 bool load_config() {
@@ -47,10 +48,13 @@ bool load_config() {
             } else if (strcmp(key, "COUNTRY") == 0) {
                 config.country = CYW43_COUNTRY(key[0], key[1], 0);
                 ++count;
+            } else if (strcmp(key, "TIMEZONE") == 0) {
+                strncpy(config.timezone, value, 100);
+                ++count;
             }
         }
     }
     f_close(&config_fil);
   
-    return count == 6;
+    return count == 7;
 }

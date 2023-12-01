@@ -2,7 +2,9 @@
 #include "lwip/apps/sntp.h"
 #include "pico/time.h"
 #include "hardware/rtc.h"
+
 #include "../rtc/ds3231.h"
+#include "../util/config.h"
 
 extern struct ds3231 rtc;
 
@@ -25,7 +27,16 @@ time_t rtc_timestamp() {
         .tm_yday = 0,
     };
 
+    // We want to store UTC values in record files, and we don't have timegm,
+    // so we set UTC0 as timezone string here ...
+    setenv("TZ", "UTC0", 1);
+    tzset();
+
     time_t t = mktime(&utc);
+
+    // ... and we restore the original one after we got the timestamp.
+    setenv("TZ", config.timezone, 1);
+    tzset();
 
     return t;
 }
@@ -69,6 +80,6 @@ void set_system_time_us(uint32_t sec, uint32_t us) {
     };
     rtc_set_datetime(&dt);
     ds3231_set_datetime(&rtc, &dt);
-    start_time_us = (mktime(time) * 1000000 + us) - time_us_64();
+    start_time_us = (epoch * 1000000 + us) - time_us_64();
     ntp_done = true;
 }

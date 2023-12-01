@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "cyw43.h"
 #include "cyw43_country.h"
@@ -471,9 +472,10 @@ static void on_idle() {
         }
 
         static char time_str[] = "00:00";
-        static datetime_t t;
-        rtc_get_datetime(&t);
-        snprintf(time_str, sizeof(time_str), "%02d:%02d", t.hour, t.min);
+        static struct tm tz_tm;
+        time_t t = rtc_timestamp();
+        localtime_r(&t, &tz_tm);
+        snprintf(time_str, sizeof(time_str), "%02d:%02d", tz_tm.tm_hour, tz_tm.tm_min);
 
         ssd1306_clear(&disp);
         ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
@@ -636,7 +638,6 @@ int main() {
     sleep_ms(1); // without this, garbage values are read from the RTC
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
-    setup_ntp(config.ntp_server);
 
     setup_display(&disp);
 
@@ -660,7 +661,10 @@ int main() {
             while(true) { tight_loop_contents(); }
         }
 
+        setup_ntp(config.ntp_server);
         cyw43_arch_init_with_country(config.country);
+        setenv("TZ", config.timezone, 1);
+        tzset();
 
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;
