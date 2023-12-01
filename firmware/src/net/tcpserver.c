@@ -12,7 +12,6 @@
 
 #define READ_BUF_LEN (10 * 1024)
 #define TCP_PORT 1557
-#define BUF_SIZE 2048
 #define POLL_TIME_S 5
 
 #define STATUS_INITIALIZED      1
