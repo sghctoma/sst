@@ -4,10 +4,10 @@ from urllib.parse import urlparse
 
 from flask import current_app
 from flask_migrate import (
-    current as db_current,
     stamp as db_stamp,
     upgrade as db_upgrade,
 )
+from sqlalchemy import inspect
 
 from app.extensions import db
 from app.models.calibration import CalibrationMethod
@@ -125,7 +125,7 @@ def first_init():
     sqlite_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
     if not path.isfile(urlparse(sqlite_uri).path):
         _initiate_database()
-    elif db_current() is None:
+    else:
         '''
         Flask-Migrate was introduced after version v0.2.0-alpha, and the first
         migration was created when the token_blocklist table was added. This
@@ -137,5 +137,7 @@ def first_init():
         table), so in order for them to work nicely, we need to stamp them to
         the initial migration revision.
         '''
-        db_stamp(revision='ea6262808b9d')
-        db_upgrade()
+        inspector = inspect(db.engine)
+        if not inspector.has_table('alembic_version'):
+            db_stamp(revision='ea6262808b9d')
+            db_upgrade()

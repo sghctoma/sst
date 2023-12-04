@@ -23,6 +23,7 @@ RUN apt-get update && apt-get -y install \
 	libopenjp2-7
 
 COPY ./app ./app
+COPY ./migrations ./migrations
 COPY ./dashboard.py ./dashboard.py
 COPY --from=build /usr/src/app/static/main.js ./app/static/
 
