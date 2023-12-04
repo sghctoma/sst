@@ -17,6 +17,29 @@ struct config config = {
     .timezone = "UTC0",
 };
 
+static void get_tzstring(const char *tz) {
+    strncpy(config.timezone, tz, 100);
+
+    FIL zones_fil;
+    FRESULT fr = f_open(&zones_fil, "zones.csv", FA_OPEN_EXISTING | FA_READ);
+    if (fr == FR_OK || fr == FR_EXIST) {
+        char line[128]; // longest line in the  2023c-2 is 65 characters long
+        while (f_gets(line, 256, &zones_fil) != NULL) {
+            char *key = strtok(line, ",\"");
+            char *value = strtok(NULL, ",\"");
+            value[strcspn(value, "\r\n")] = 0;
+            if (key == NULL || value == NULL) {
+                continue;
+            }
+            if (strcmp(key, tz) == 0) {
+                strncpy(config.timezone, value, 100);
+                break;
+            }
+        }
+    }
+    f_close(&zones_fil);
+}
+
 bool load_config() {
     FIL config_fil;
     uint8_t count = 0;
@@ -49,7 +72,7 @@ bool load_config() {
                 config.country = CYW43_COUNTRY(key[0], key[1], 0);
                 ++count;
             } else if (strcmp(key, "TIMEZONE") == 0) {
-                strncpy(config.timezone, value, 100);
+                get_tzstring(value);
                 ++count;
             }
         }
