@@ -1,8 +1,7 @@
 var m = require("mithril")
 
 var timestampToString = function(timestamp) {
-  return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
-    timeZone: "UTC",
+  return new Date(timestamp * 1e3).toLocaleString(undefined, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

@@ -10,8 +10,7 @@ var VideoPlayer = require("./VideoPlayer")
 var SocketIO = require("./SocketIO")
 
 var timestampToString = function(timestamp) {
-  return new Date(timestamp * 1e3).toLocaleString("hu-HU", {
-    timeZone: "UTC",
+  return new Date(timestamp * 1e3).toLocaleString(undefined, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -37,7 +36,7 @@ var Layout = {
         m(".sst-title", "sufni suspension telemetry"),
         Session.current.loaded ? m("div", [
           m("span", {id: "sname"}, Session.current.name),
-          " (" + timestampToString(Session.current.start_time) + " UTC)",
+          " (" + timestampToString(Session.current.start_time) + ")",
         ]) : null,
         m(".toolbar", [
           User.current ? m("span.fa-solid fa-gear toolbar-icon", {
