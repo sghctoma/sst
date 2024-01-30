@@ -20,6 +20,7 @@ from werkzeug.exceptions import HTTPException
 from app.extensions import db, jwt, migrate, sio
 from app.telemetry.session_html import create_cache
 from app.utils.first_init import first_init
+from app.utils.converters import UuidConverter
 
 
 id_queue = queue.Queue()
@@ -49,6 +50,8 @@ def create_app():
 
     app.logger.addHandler(logging.StreamHandler(sys.stdout))
     app.logger.setLevel(logging.INFO)
+
+    app.url_map.converters['uuid'] = UuidConverter
 
     ctx = click.get_current_context(silent=True)
     if not ctx:
