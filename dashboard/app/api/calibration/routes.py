@@ -1,3 +1,5 @@
+import uuid
+
 from http import HTTPStatus as status
 
 from flask import jsonify, request
@@ -15,8 +17,8 @@ def get_all():
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<int:id>', methods=['GET'])
-def get(id: int):
+@bp.route('/<uuid:id>', methods=['GET'])
+def get(id: uuid.UUID):
     entity = db.session.execute(
         db.select(Calibration).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -24,9 +26,9 @@ def get(id: int):
     return jsonify(entity), status.OK
 
 
-@bp.route('/<int:id>', methods=['DELETE'])
+@bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: int):
+def delete(id: uuid.UUID):
     db.session.execute(db.delete(Calibration).filter_by(id=id))
     db.session.commit()
     return '', status.NO_CONTENT

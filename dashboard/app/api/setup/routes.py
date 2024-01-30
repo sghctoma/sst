@@ -1,3 +1,5 @@
+import uuid
+
 from http import HTTPStatus as status
 
 from flask import jsonify, request
@@ -18,8 +20,8 @@ def get_all():
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<int:id>', methods=['GET'])
-def get(id: int):
+@bp.route('/<uuid:id>', methods=['GET'])
+def get(id: uuid.UUID):
     entity = db.session.execute(
         db.select(Setup).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -27,9 +29,9 @@ def get(id: int):
     return jsonify(entity), status.OK
 
 
-@bp.route('/<int:id>', methods=['DELETE'])
+@bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: int):
+def delete(id: uuid.UUID):
     db.session.execute(db.delete(Setup).filter_by(id=id))
     db.session.commit()
     return '', status.NO_CONTENT
@@ -50,13 +52,15 @@ def put():
 @jwt_required()
 def put_combined():
     lnk = request.json['linkage']
-    if type(lnk) == int:
+    try:
+        lnk_id = uuid.UUID(lnk)
         linkage = db.session.execute(
-            db.select(Linkage).filter_by(id=lnk)).scalar_one_or_none()
-    else:
-        linkage = dfd(Linkage, request.json['linkage'])
+            db.select(Linkage).filter_by(id=lnk_id)).scalar_one_or_none()
+    except ValueError:
+        linkage = dfd(Linkage, lnk)
         if not linkage.validate():
             linkage = None
+
     if not linkage:
         return jsonify(msg="Invalid data for linkage!"), status.BAD_REQUEST
 

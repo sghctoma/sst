@@ -1,6 +1,7 @@
 import json
 import msgpack
 import requests
+import uuid
 
 from io import BytesIO
 from http import HTTPStatus as status
@@ -94,8 +95,8 @@ def get_all():
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<int:id>/psst', methods=['GET'])
-def get_psst(id: int):
+@bp.route('/<uuid:id>/psst', methods=['GET'])
+def get_psst(id: uuid.UUID):
     entity = db.session.execute(
         db.select(Session).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -118,8 +119,8 @@ def get_last():
     return jsonify(entity), status.OK
 
 
-@bp.route('/<int:id>', methods=['GET'])
-def get(id: int):
+@bp.route('/<uuid:id>', methods=['GET'])
+def get(id: uuid.UUID):
     entity = db.session.execute(
         db.select(Session).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -127,8 +128,8 @@ def get(id: int):
     return jsonify(entity), status.OK
 
 
-@bp.route('/<int:id>/filter', methods=['GET'])
-def filter(id: int):
+@bp.route('/<uuid:id>/filter', methods=['GET'])
+def filter(id: uuid.UUID):
     entity = db.session.execute(
         db.select(Session).filter_by(id=id)).scalar_one_or_none()
     if not entity:
@@ -173,9 +174,9 @@ def filter(id: int):
     return jsonify(updated_data)
 
 
-@bp.route('/<int:id>', methods=['DELETE'])
+@bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: int):
+def delete(id: uuid.UUID):
     db.session.execute(db.delete(Session).filter_by(id=id))
     db.session.execute(db.delete(SessionHtml).filter_by(session_id=id))
     db.session.commit()
@@ -221,9 +222,9 @@ def put_processed():
     return jsonify(id=entity.id), status.CREATED
 
 
-@bp.route('/<int:id>', methods=['PATCH'])
+@bp.route('/<uuid:id>', methods=['PATCH'])
 @jwt_required()
-def patch(id: int):
+def patch(id: uuid.UUID):
     data = request.json
     db.session.execute(db.update(Session).filter_by(id=id).values(
         name=data['name'],
@@ -233,8 +234,8 @@ def patch(id: int):
     return '', status.NO_CONTENT
 
 
-@bp.route('/<int:id>/bokeh', methods=['PUT'])
-def generate_bokeh(id: int):
+@bp.route('/<uuid:id>/bokeh', methods=['PUT'])
+def generate_bokeh(id: uuid.UUID):
     s = db.session.execute(
         db.select(Session.id).filter_by(id=id)).scalar_one_or_none()
     if not s:
@@ -250,8 +251,8 @@ def generate_bokeh(id: int):
 
 
 @bp.route('/last/bokeh', methods=['GET'], defaults={'session_id': None})
-@bp.route('/<int:session_id>/bokeh', methods=['GET'])
-def session_html(session_id):
+@bp.route('/<uuid:session_id>/bokeh', methods=['GET'])
+def session_html(session_id: uuid.UUID):
     # Not using @jwt_required(optional=True), because we want to be able to
     # load the dashboard even with an invalid token.
     try:
@@ -314,9 +315,9 @@ def session_html(session_id):
     return response
 
 
-@bp.route('/<int:id>/gpx', methods=['PUT'])
+@bp.route('/<uuid:id>/gpx', methods=['PUT'])
 @jwt_required()
-def upload_gpx(id: int):
+def upload_gpx(id: uuid.UUID):
     session = db.session.execute(
         db.select(Session).filter_by(id=id)).scalar_one_or_none()
     if not session:
