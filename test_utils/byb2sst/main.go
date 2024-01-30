@@ -11,16 +11,30 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
 	psst "github.com/sghctoma/sst/gosst/formats/psst"
 )
+
+type UuidExt struct{}
+
+func (x UuidExt) WriteExt(v interface{}) []byte {
+	v2 := v.(*uuid.UUID)
+	return []byte(v2.String())
+}
+
+func (x UuidExt) ReadExt(dst interface{}, src []byte) {
+	tt := dst.(*uuid.UUID)
+	*tt = uuid.MustParse(string(src))
+}
 
 type session struct {
 	Name        string `json:"name"`
@@ -190,7 +204,7 @@ func putSession(session session, url string, token string) error {
 
 	decoder := json.NewDecoder(resp.Body)
 	response := struct {
-		Id      int    `json:"id"`
+		Id      string `json:"id"`
 		Message string `json:"msg"`
 	}{}
 	if err := decoder.Decode(&response); err != nil {
@@ -261,13 +275,19 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	pd, err := psst.ProcessRecording(fork, shock, meta, *linkage, *fcal, *rcal)
+	setup := &psst.SetupData{
+		Linkage:          linkage,
+		FrontCalibration: fcal,
+		RearCalibration:  rcal,
+	}
+	pd, err := psst.ProcessRecording(fork, shock, meta, setup)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	var psstBytes []byte
 	var h codec.MsgpackHandle
+	h.SetBytesExt(reflect.TypeOf(uuid.UUID{}), 1, UuidExt{})
 	enc := codec.NewEncoderBytes(&psstBytes, &h)
 	enc.Encode(pd)
 

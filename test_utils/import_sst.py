@@ -17,7 +17,7 @@ if __name__ == '__main__':
         help="Username")
     parser.add_argument(
         "setup",
-        type=int,
+        type=str,
         help="Setup ID")
     parser.add_argument(
         "-s", "--server",

@@ -15,9 +15,9 @@ if __name__ == '__main__':
         "token",
         help="API token")
     parser.add_argument(
-        "-a", "--gosst-api",
-        default='http://localhost:8080',
-        help="gosst HTTP API URL")
+        "-a", "--http-api",
+        default='http://localhost:5000/api',
+        help="HTTP API URL")
     parser.add_argument(
         "-k", "--insecure",
         action='store_true',
@@ -33,8 +33,8 @@ if __name__ == '__main__':
         data=base64.b64encode(psst_data).decode('ascii')
     )
 
-    requests.put(
+    resp = requests.put(
         cmd_args.gosst_api + '/session/psst',
-        headers={'X-Token': cmd_args.token},
+        headers={'Authorization': f'Bearer {cmd_args.token}'},
         json=session,
         verify=not cmd_args.insecure)

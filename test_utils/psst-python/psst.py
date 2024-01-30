@@ -1,3 +1,5 @@
+import uuid
+
 from dataclasses import dataclass, fields as datafields
 
 
@@ -16,8 +18,11 @@ class Linkage:
 @dataclass
 class Calibration:
     Name: str
-    MethodId: int
+    MethodId: uuid.UUID
     Inputs: dict[str: float]
+
+    def __post_init__(self):
+        self.MethodId = uuid.UUID(self.MethodId)
 
 
 @dataclass

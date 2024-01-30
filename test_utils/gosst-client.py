@@ -4,6 +4,7 @@ import argparse
 import os
 import socket
 import sys
+import uuid
 
 
 parser = argparse.ArgumentParser()
@@ -51,8 +52,8 @@ if response != 6:
     print("session could not be imported!")
     sys.exit(-1)
 
-response = client_socket.recv(4)
-id = int.from_bytes(response, 'little')
+response = client_socket.recv(16)
+id = uuid.UUID(bytes=response)
 print(id)
 
 client_socket.close()
