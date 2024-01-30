@@ -1,5 +1,6 @@
 import msgpack
 import numpy as np
+import uuid
 
 from bokeh.document import Document
 from bokeh.events import DocumentReady
@@ -25,7 +26,7 @@ from app.telemetry.velocity import (
 )
 
 
-def create_cache(session_id: int, lod: int, hst: int):
+def create_cache(session_id: uuid.UUID, lod: int, hst: int):
     front_color, rear_color = Spectral11[1], Spectral11[2]
 
     session = db.session.execute(

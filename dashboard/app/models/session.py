@@ -1,5 +1,6 @@
 import base64
 import msgpack
+import uuid
 
 from dataclasses import dataclass
 
@@ -9,12 +10,14 @@ from app.telemetry.psst import Telemetry, dataclass_from_dict
 
 @dataclass
 class Session(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String)
-    setup: int = db.Column('setup_id', db.Integer, db.ForeignKey('setup.id'))
+    setup: uuid.UUID = db.Column('setup_id', db.Uuid(),
+                                 db.ForeignKey('setup.id'))
     description: str = db.Column(db.String)
     timestamp: int = db.Column(db.Integer, nullable=False)
-    track: int = db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
+    track: uuid.UUID = db.Column('track_id', db.Uuid(),
+                                 db.ForeignKey('track.id'))
     data = db.Column(db.LargeBinary, nullable=False)
 
     @property

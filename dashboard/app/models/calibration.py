@@ -1,5 +1,6 @@
 import json
 import math
+import uuid
 
 from dataclasses import dataclass
 from app.extensions import db
@@ -23,7 +24,7 @@ _std_env = dict(
 
 @dataclass
 class CalibrationMethod(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
     description: str = db.Column(db.String)
     properties_raw = db.Column('data', db.String, nullable=False)
@@ -51,11 +52,11 @@ class CalibrationMethod(db.Model):
 
 @dataclass
 class Calibration(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
-    method_id: int = db.Column(db.Integer,
-                               db.ForeignKey('calibration_method.id'),
-                               nullable=False)
+    method_id: uuid.UUID = db.Column(db.Uuid(),
+                                     db.ForeignKey('calibration_method.id'),
+                                     nullable=False)
     inputs_raw = db.Column('inputs', db.String, nullable=False)
 
     inputs: dict[str: float]

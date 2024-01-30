@@ -1,3 +1,5 @@
+import uuid
+
 from dataclasses import dataclass
 
 from argon2 import PasswordHasher
@@ -13,12 +15,12 @@ def user_identity_lookup(user):
 def user_lookup_callback(_jwt_header, jwt_data):
     identity = jwt_data['sub']
     return db.session.execute(
-        db.select(User).filter_by(id=identity)).scalar_one_or_none()
+        db.select(User).filter_by(id=uuid.UUID(identity))).scalar_one_or_none()
 
 
 @dataclass
 class User(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     username: str = db.Column(db.Text, nullable=False, unique=True)
     hash = db.Column(db.Text, nullable=False)
 
