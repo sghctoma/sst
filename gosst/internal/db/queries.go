@@ -36,6 +36,5 @@ var Linkage = `
 
 var InsertSession = `
 	INSERT
-	INTO session (name, timestamp, description, setup_id, data)
-	VALUES (?, ?, ?, ?, ?)
-	RETURNING id`
+	INTO session (id, name, timestamp, description, setup_id, data)
+	VALUES (?, ?, ?, ?, ?, ?)`

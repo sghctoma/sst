@@ -10,6 +10,7 @@ import (
 	"net"
 	"regexp"
 
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
@@ -34,37 +35,38 @@ func (e *InvalidBoardError) Error() string {
 	return "received malformed board id"
 }
 
-func putSession(db *sql.DB, h codec.Handle, board [10]byte, server, name string, sst_data []byte) (int, error) {
-	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
+func putSession(db *sql.DB, h codec.Handle, board [10]byte, server, name string, sst_data []byte) (uuid.UUID, error) {
+	var setupId, linkageId, frontCalibrationId, rearCalibrationId uuid.UUID
 	boardId := hex.EncodeToString(board[2:])
 	err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
 		// Store unknown ID, so that it can be picked up from the UI
 		db.QueryRow(queries.InsertBoard, boardId, nil)
-		return -1, &NoSuchBoardError{boardId}
+		return uuid.Nil, &NoSuchBoardError{boardId}
 	}
 
 	setup, err := common.GetSetupsForIds(db, linkageId, frontCalibrationId, rearCalibrationId)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 
 	front, rear, meta, err := sst.ProcessRaw(sst_data)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 	meta.Name = name
 	pd, err := psst.ProcessRecording(front, rear, meta, setup)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 
-	lastInsertedId, err := common.InsertSession(db, pd, server, name, "Imported from "+name, setupId)
+	newUuid := uuid.New()
+	err = common.InsertSession(db, newUuid, pd, server, name, "Imported from "+name, setupId)
 	if err != nil {
-		return -1, err
+		return uuid.Nil, err
 	}
 
-	return lastInsertedId, nil
+	return newUuid, nil
 }
 
 type header struct {
@@ -114,7 +116,7 @@ func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 		return
 	}
 
-	var id int
+	var id uuid.UUID
 	if string(header.BoardId[:2]) == "ID" {
 		id, err = putSession(db, h, header.BoardId, server, name, data)
 	} else {
@@ -128,11 +130,7 @@ func handleRequest(conn net.Conn, db *sql.DB, server string, h codec.Handle) {
 		log.Println("[OK] session '", name, "' was successfully imported")
 		// send back the id for the new session
 		// XXX check to see if DAQ unit not reading it is a problem
-		b := make([]byte, 4)
-		b[0] = byte(id)
-		b[1] = byte(id >> 8)
-		b[2] = byte(id >> 16)
-		b[3] = byte(id >> 24)
+		b, _ := id.MarshalBinary()
 		conn.Write(b)
 	}
 }

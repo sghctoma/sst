@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/SeanJxie/polygo"
+	"github.com/google/uuid"
 	"github.com/openacid/slimarray/polyfit"
 	"github.com/pconstantinou/savitzkygolay"
 	"golang.org/x/exp/constraints"
@@ -35,7 +36,7 @@ type LinkageRecord struct {
 }
 
 type Linkage struct {
-	Id               int          `codec:"-" db:"id"           json:"id"`
+	Id               uuid.UUID    `codec:"-" db:"id"           json:"id"`
 	Name             string       `codec:"," db:"name"         json:"name"         binding:"required"`
 	HeadAngle        float64      `codec:"," db:"head_angle"   json:"head_angle"   binding:"required"`
 	RawData          string       `codec:"-" db:"raw_lr_data"  json:"data"         binding:"required"`

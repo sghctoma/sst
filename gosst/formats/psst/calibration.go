@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
+	"github.com/google/uuid"
 	"math"
 )
 
@@ -14,18 +15,18 @@ type calibrationMethodParams struct {
 }
 
 type CalibrationMethod struct {
-	Id          int    `codec:"-" db:"id"            json:"id"`
-	Name        string `codec:"," db:"name"          json:"name"          binding:"required"`
-	Description string `codec:"," db:"description"   json:"description"`
-	RawData     string `codec:"-" db:"data"          json:"-"`
+	Id          uuid.UUID `codec:"-" db:"id"            json:"id"`
+	Name        string    `codec:"," db:"name"          json:"name"          binding:"required"`
+	Description string    `codec:"," db:"description"   json:"description"`
+	RawData     string    `codec:"-" db:"data"          json:"-"`
 	calibrationMethodParams
 	program *vm.Program
 }
 
 type Calibration struct {
-	Id        int                `codec:"-" db:"id"        json:"id"`
+	Id        uuid.UUID          `codec:"-" db:"id"        json:"id"`
 	Name      string             `codec:"," db:"name"      json:"name"      binding:"required"`
-	MethodId  int                `codec:"," db:"method_id" json:"method_id" binding:"required"`
+	MethodId  uuid.UUID          `codec:"," db:"method_id" json:"method_id" binding:"required"`
 	RawInputs string             `codec:"-" db:"inputs"    json:"-"`
 	Inputs    map[string]float64 `codec:","                json:"inputs"    binding:"required"`
 	Method    *CalibrationMethod `codec:"-"                json:"method,omitempty"`
