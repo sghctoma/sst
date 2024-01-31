@@ -139,7 +139,7 @@ def upgrade():
     # There are sessions wiht setup_id "0" (the ones imported from PSST files).
     # These sessions were not fixed with the previous queries, because setup with
     # 0 id does not exist in the database.
-    conn.execute(sa.text("UPDATE session SET setup_id='00000000-0000-0000-0000-000000000000' WHERE setup_id=0"))
+    conn.execute(sa.text("UPDATE session SET setup_id=null WHERE setup_id=0"))
 
     # ### end Alembic commands ###
 
