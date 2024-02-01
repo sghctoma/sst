@@ -3,10 +3,11 @@ import uuid
 from dataclasses import dataclass
 
 from app.extensions import db
+from app.models.synchronizable import Synchronizable
 
 
 @dataclass
-class Setup(db.Model):
+class Setup(db.Model, Synchronizable):
     id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
     linkage_id: uuid.UUID = db.Column(db.Uuid(), db.ForeignKey('linkage.id'),

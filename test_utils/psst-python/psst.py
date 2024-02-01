@@ -95,9 +95,11 @@ def _dataclass_from_dict(klass: type, d: dict):
         return klass(
             **{f: _dataclass_from_dict(fieldtypes[f], d[f]) for f in d})
     except BaseException:
+        if isinstance(d, str) and klass is uuid.UUID:
+            d = uuid.UUID(d)
         return d  # Not a dataclass field
 
 
 def dataclass_from_dict(klass: type, d: dict):
     o = _dataclass_from_dict(klass, d)
-    return o if type(o) == klass else None
+    return o if isinstance(o, klass) else None

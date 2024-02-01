@@ -4,6 +4,7 @@ import uuid
 
 from dataclasses import dataclass
 from app.extensions import db
+from app.models.synchronizable import Synchronizable
 from app.utils.expr import ExpressionParser
 
 
@@ -23,7 +24,7 @@ _std_env = dict(
 
 
 @dataclass
-class CalibrationMethod(db.Model):
+class CalibrationMethod(db.Model, Synchronizable):
     id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
     description: str = db.Column(db.String)
@@ -51,7 +52,7 @@ class CalibrationMethod(db.Model):
 
 
 @dataclass
-class Calibration(db.Model):
+class Calibration(db.Model, Synchronizable):
     id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
     method_id: uuid.UUID = db.Column(db.Uuid(),

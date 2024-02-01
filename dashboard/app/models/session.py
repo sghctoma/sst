@@ -5,11 +5,12 @@ import uuid
 from dataclasses import dataclass
 
 from app.extensions import db
+from app.models.synchronizable import Synchronizable
 from app.telemetry.psst import Telemetry, dataclass_from_dict
 
 
 @dataclass
-class Session(db.Model):
+class Session(db.Model, Synchronizable):
     id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String)
     setup: uuid.UUID = db.Column('setup_id', db.Uuid(),
