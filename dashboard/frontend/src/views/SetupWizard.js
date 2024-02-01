@@ -157,7 +157,7 @@ var SetupWizard = {
       return
     }
 
-    var linkageBody = parseInt(LinkageForm.selected)
+    var linkageBody = LinkageForm.selected
     if (linkageBody === 0) {
       linkageBody = LinkageForm.params
     }
