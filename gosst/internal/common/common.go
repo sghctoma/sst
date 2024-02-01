@@ -126,7 +126,7 @@ func GetSetupsForIds(db *sql.DB, linkageUuid, frontCalibrationUuid, rearCalibrat
 	}, err
 }
 
-func InsertSession(db *sql.DB, newUuid uuid.UUID, pd *psst.Processed, server, name, description string, setupId uuid.UUID) error {
+func InsertSession(db *sql.DB, newUuid uuid.UUID, pd *psst.Processed, server, name, description string, setupUuid uuid.UUID) error {
 	var data []byte
 	var h codec.MsgpackHandle
 	h.SetBytesExt(reflect.TypeOf(uuid.UUID{}), 1, UuidExt{})
@@ -134,6 +134,7 @@ func InsertSession(db *sql.DB, newUuid uuid.UUID, pd *psst.Processed, server, na
 	enc.Encode(pd)
 
 	newId := strings.ReplaceAll(newUuid.String(), "-", "")
+	setupId := strings.ReplaceAll(setupUuid.String(), "-", "")
 	_, err := db.Query(queries.InsertSession, newId, name, pd.Timestamp, description, setupId, data)
 	if err != nil {
 		return err
