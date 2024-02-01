@@ -34,7 +34,7 @@ if __name__ == '__main__':
     )
 
     resp = requests.put(
-        cmd_args.gosst_api + '/session/psst',
+        cmd_args.http_api + '/session/psst',
         headers={'Authorization': f'Bearer {cmd_args.token}'},
         json=session,
         verify=not cmd_args.insecure)
