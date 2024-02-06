@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"regexp"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
@@ -41,7 +42,7 @@ func putSession(db *sql.DB, h codec.Handle, board [10]byte, server, name string,
 	err := db.QueryRow(queries.SetupForBoard, boardId).Scan(&setupId, &linkageId, &frontCalibrationId, &rearCalibrationId)
 	if err != nil {
 		// Store unknown ID, so that it can be picked up from the UI
-		db.QueryRow(queries.InsertBoard, boardId, nil)
+		db.QueryRow(queries.InsertBoard, boardId, nil, time.Now().Unix())
 		return uuid.Nil, &NoSuchBoardError{boardId}
 	}
 

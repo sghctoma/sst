@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/blockloop/scan"
 	"github.com/google/uuid"
@@ -135,7 +136,7 @@ func InsertSession(db *sql.DB, newUuid uuid.UUID, pd *psst.Processed, server, na
 
 	newId := strings.ReplaceAll(newUuid.String(), "-", "")
 	setupId := strings.ReplaceAll(setupUuid.String(), "-", "")
-	_, err := db.Query(queries.InsertSession, newId, name, pd.Timestamp, description, setupId, data)
+	_, err := db.Query(queries.InsertSession, newId, name, pd.Timestamp, description, setupId, data, time.Now().Unix())
 	if err != nil {
 		return err
 	}
