@@ -1,6 +1,6 @@
 import uuid
 
-from dataclasses import dataclass, fields as datafields
+from dataclasses import dataclass
 
 
 @dataclass
@@ -88,12 +88,21 @@ class Telemetry:
         self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]
 
 
-def _dataclass_from_dict(klass: type, d: dict):
+def _dfd(klass: type, d: dict):
     # source: https://stackoverflow.com/a/54769644
     try:
-        fieldtypes = {f.name: f.type for f in datafields(klass)}
-        return klass(
-            **{f: _dataclass_from_dict(fieldtypes[f], d[f]) for f in d})
+        annotations = klass.__annotations__
+        annotated_fields = {
+            f: _dfd(annotations[f], d[f]) for f in annotations if f in d}
+        non_annotated_fields = [f for f in d if f not in klass.__annotations__]
+
+        o = klass(**annotated_fields)
+        # Set any non annotated fields that are present in the dict. These
+        # are set as-is, since we don't have information on their type.
+        for f in non_annotated_fields:
+            setattr(o, f, d[f])
+
+        return o
     except BaseException:
         if isinstance(d, str) and klass is uuid.UUID:
             d = uuid.UUID(d)
@@ -101,5 +110,5 @@ def _dataclass_from_dict(klass: type, d: dict):
 
 
 def dataclass_from_dict(klass: type, d: dict):
-    o = _dataclass_from_dict(klass, d)
+    o = _dfd(klass, d)
     return o if isinstance(o, klass) else None
