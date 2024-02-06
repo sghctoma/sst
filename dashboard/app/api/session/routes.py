@@ -15,6 +15,9 @@ from flask_jwt_extended import (
 from markupsafe import Markup
 
 from app import id_queue
+from app.api.common import (
+    get_entity,
+    delete_entity)
 from app.api.session import bp
 from app.extensions import db
 from app.models.session import Session
@@ -90,15 +93,14 @@ def _update_stroke_based(strokes: Strokes, suspension: Suspension):
 
 @bp.route('', methods=['GET'])
 def get_all():
-    entities = db.session.execute(db.select(Session).order_by(
+    entities = db.session.execute(Session.select().order_by(
         Session.timestamp.desc())).scalars()
     return jsonify(list(entities)), status.OK
 
 
 @bp.route('/<uuid:id>/psst', methods=['GET'])
 def get_psst(id: uuid.UUID):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+    entity = Session.get(id)
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
     data = BytesIO(entity.data)
@@ -112,7 +114,7 @@ def get_psst(id: uuid.UUID):
 
 @bp.route('/last', methods=['GET'])
 def get_last():
-    entity = db.session.execute(db.select(Session).order_by(
+    entity = db.session.execute(Session.select().order_by(
         Session.timestamp.desc()).limit(1)).scalar_one_or_none()
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
@@ -121,17 +123,12 @@ def get_last():
 
 @bp.route('/<uuid:id>', methods=['GET'])
 def get(id: uuid.UUID):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
-    if not entity:
-        return jsonify(msg="Session does not exist!"), status.NOT_FOUND
-    return jsonify(entity), status.OK
+    return get_entity(Session, id)
 
 
 @bp.route('/<uuid:id>/filter', methods=['GET'])
 def filter(id: uuid.UUID):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+    entity = Session.get(id)
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
     d = msgpack.unpackb(entity.data)
@@ -177,7 +174,7 @@ def filter(id: uuid.UUID):
 @bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
 def delete(id: uuid.UUID):
-    db.session.execute(db.delete(Session).filter_by(id=id))
+    delete_entity(Session, id)
     db.session.execute(db.delete(SessionHtml).filter_by(session_id=id))
     db.session.commit()
     return '', status.NO_CONTENT
@@ -236,8 +233,7 @@ def patch(id: uuid.UUID):
 
 @bp.route('/<uuid:id>/bokeh', methods=['PUT'])
 def generate_bokeh(id: uuid.UUID):
-    s = db.session.execute(
-        db.select(Session.id).filter_by(id=id)).scalar_one_or_none()
+    s = Session.get(id)
     if not s:
         return jsonify(msg=f"session #{id} does not exist"), status.BAD_REQUEST
 
@@ -262,11 +258,10 @@ def session_html(session_id: uuid.UUID):
         full_access = False
 
     if not session_id:
-        session = db.session.execute(db.select(Session).order_by(
+        session = db.session.execute(Session.select().order_by(
             Session.timestamp.desc()).limit(1)).scalar_one_or_none()
     else:
-        session = db.session.execute(
-            db.select(Session).filter_by(id=session_id)).scalar_one_or_none()
+        session = Session.get(session_id)
     if not session:
         return jsonify(), status.NOT_FOUND
 
@@ -278,8 +273,7 @@ def session_html(session_id: uuid.UUID):
         '<script type="text/javascript">', '').replace('</script>', ''))
     components_divs = [Markup(d) if d else None for d in session_html.divs]
 
-    track = db.session.execute(
-        db.select(Track).filter_by(id=session.track)).scalar_one_or_none()
+    track = Track.get(session.track)
 
     d = msgpack.unpackb(session.data)
     t = dataclass_from_dict(Telemetry, d)
@@ -318,8 +312,7 @@ def session_html(session_id: uuid.UUID):
 @bp.route('/<uuid:id>/gpx', methods=['PUT'])
 @jwt_required()
 def upload_gpx(id: uuid.UUID):
-    session = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+    session = Session.get(id)
     if not session:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
 

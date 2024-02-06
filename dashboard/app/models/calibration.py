@@ -71,8 +71,7 @@ class Calibration(db.Model, Synchronizable):
         self.inputs_raw = json.dumps(value)
 
     def validate(self) -> bool:
-        cm = db.session.execute(db.select(CalibrationMethod).filter_by(
-            id=self.method_id)).scalar_one_or_none()
+        cm = CalibrationMethod.get(self.method_id)
         if not cm:
             return False
         for k in cm.properties['inputs']:
