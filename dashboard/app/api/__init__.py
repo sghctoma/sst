@@ -23,3 +23,6 @@ bp.register_blueprint(setup_bp, url_prefix='/setup')
 
 from app.api.track import bp as track_bp
 bp.register_blueprint(track_bp, url_prefix='/track')
+
+from app.api.sync import bp as sync_bp
+bp.register_blueprint(sync_bp, url_prefix='/sync')
