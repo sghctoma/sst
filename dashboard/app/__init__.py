@@ -36,7 +36,7 @@ def _sqlite_pragmas(app: Flask):
             event.listen(db.engine, 'connect', _pragma_on_connect)
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_ALGORITHM'] = 'RS256'
@@ -46,7 +46,11 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['GOSST_HTTP_API'] = 'http://localhost:8080'
-    app.config.from_prefixed_env()
+
+    if test_config:
+        app.config.update(test_config)
+    else:
+        app.config.from_prefixed_env()
 
     app.logger.addHandler(logging.StreamHandler(sys.stdout))
     app.logger.setLevel(logging.INFO)
