@@ -90,3 +90,6 @@ gosst/dist
 
 # Compilation database
 compile_commands.json
+
+# coverage cache
+dashboard/.coverage
