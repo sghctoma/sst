@@ -1,3 +1,5 @@
+import uuid
+
 from argon2 import PasswordHasher
 from datetime import datetime, timezone
 from http import HTTPStatus as status
@@ -44,8 +46,9 @@ def refresh():
     db.session.merge(TokenBlocklist(jti=jti, created_at=now))
     db.session.commit()
 
+    id = uuid.UUID(get_jwt_identity())
     user = db.session.execute(
-        db.select(User).filter_by(id=get_jwt_identity())).scalar_one_or_none()
+        db.select(User).filter_by(id=id)).scalar_one_or_none()
     access_token = create_access_token(identity=user)
     refresh_token = create_refresh_token(identity=user)
 
