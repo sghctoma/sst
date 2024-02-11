@@ -356,4 +356,4 @@ def upload_gpx(id: uuid.UUID):
     db.session.commit()
 
     data = dict(full_track=full_track, session_track=session_track)
-    return jsonify(data), 200
+    return jsonify(data), status.OK
