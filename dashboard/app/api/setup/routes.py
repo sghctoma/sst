@@ -72,9 +72,6 @@ def put_combined():
     if not front_calibration and not rear_calibration:
         return jsonify(msg="No calibration given"), status.BAD_REQUEST
 
-    if not linkage:
-        return jsonify(msg="Missing or invalid linkage"), status.BAD_REQUEST
-
     setup = Setup(
         name=request.json['name'],
     )
