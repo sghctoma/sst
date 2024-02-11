@@ -65,7 +65,7 @@ def _extract_range(sample_rate: int) -> (int, int):
 
 def _validate_range(start: int, end: int, count: int) -> bool:
     return (start is not None and end is not None and
-            start >= 0 and end < count)
+            start >= 0 and end < count and start < end)
 
 
 def _update_stroke_based(strokes: Strokes, suspension: Suspension):
