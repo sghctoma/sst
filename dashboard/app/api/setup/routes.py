@@ -48,9 +48,9 @@ def put_combined():
     try:
         lnk_id = uuid.UUID(lnk)
         linkage = Linkage.get(lnk_id)
-    except ValueError:
+    except BaseException:
         linkage = dfd(Linkage, lnk)
-        if not linkage.validate():
+        if linkage and not linkage.validate():
             linkage = None
 
     if not linkage:

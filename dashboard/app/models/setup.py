@@ -16,3 +16,7 @@ class Setup(db.Model, Synchronizable):
         db.Uuid(), db.ForeignKey('calibration.id'))
     rear_calibration_id: uuid.UUID = db.Column(
         db.Uuid(), db.ForeignKey('calibration.id'))
+
+    def validate(self) -> bool:
+        return self.linkage_id and (
+            self.front_calibration_id or self.rear_calibration_id)
