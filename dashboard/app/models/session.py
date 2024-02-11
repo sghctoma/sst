@@ -33,4 +33,4 @@ class Session(db.Model, Synchronizable):
         telemetry = dataclass_from_dict(Telemetry, psst_dict)
         self.data = psst_data
         self.timestamp = telemetry.Timestamp
-        self.setup_id = -1
+        self.setup_id = uuid.UUID('00000000000000000000000000000000')
