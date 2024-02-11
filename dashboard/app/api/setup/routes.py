@@ -73,6 +73,7 @@ def put_combined():
         return jsonify(msg="No calibration given"), status.BAD_REQUEST
 
     setup = Setup(
+        id=uuid.UUID(request.json['id']),
         name=request.json['name'],
     )
     try:
