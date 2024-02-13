@@ -20,7 +20,7 @@ def merge(entity: db.Model) -> db.Model:
 
     # insert if not already present
     if not db_entity:
-        entity = db.session.add(entity)
+        db.session.add(entity)
         entity.client_updated = entity.updated
         entity.updated = int(datetime.now().timestamp())
         db.session.commit()
