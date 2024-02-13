@@ -2,9 +2,9 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import datetime
 
 import pytest
-
 from argon2 import PasswordHasher
 
 from app import create_app
@@ -38,6 +38,8 @@ DB_IDS = dict(
     nonexistent=uuid.UUID('00000000-0000-0000-0000-000000000000'),
 )
 
+db_created_timestamp = None
+
 with open(os.path.join(os.path.dirname(__file__), 'linkage.txt'), 'rb') as f:
     linkage_data = f.read().decode('utf8')
 
@@ -58,13 +60,13 @@ def add_test_data():
     front_calibration = Calibration(
         id=DB_IDS['front_calibration'],
         name='front_calibration',
-        method_id=uuid.UUID('12f4a1b922f74524abcbdaa99a5c1c3a'),
+        method_id=DB_IDS['calibration_method_isosceles'],
         inputs={'arm': 134.9375, 'max': 234.15625}
     )
     rear_calibration = Calibration(
         id=DB_IDS['rear_calibration'],
         name='rear_calibration',
-        method_id=uuid.UUID('9a27abc4125148a2b64989fb315ca2de'),
+        method_id=DB_IDS['calibration_method_triangle'],
         inputs={'arm1': 98.9, 'arm2': 202.8, 'max': 230}
     )
     linkage = Linkage(
@@ -140,6 +142,8 @@ def add_test_data():
 
 @pytest.fixture
 def app():
+    global db_created_timestamp
+
     tmp_dir = tempfile.mkdtemp()
     priv_key = f'{tmp_dir}/private_key.pem'
     pub_key = f'{tmp_dir}/public_key.pem'
@@ -164,6 +168,8 @@ def app():
         user.hash = ph.hash('test')
         db.session.add(user)
         db.session.commit()
+
+        db_created_timestamp = int(datetime.now().timestamp())
 
     yield app
 
