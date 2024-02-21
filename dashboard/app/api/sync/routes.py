@@ -23,7 +23,7 @@ def merge(entity: db.Model) -> db.Model:
         db.session.add(entity)
         entity.client_updated = entity.updated
         entity.updated = int(datetime.now().timestamp())
-        db.session.commit()
+        db.session.flush()
         return entity
 
     if entity.deleted is not None:
@@ -40,7 +40,7 @@ def merge(entity: db.Model) -> db.Model:
             db_entity.updated = int(datetime.now().timestamp())
             db_entity.client_updated = entity.updated
 
-    db.session.commit()
+    db.session.flush()
     return db_entity
 
 
@@ -112,4 +112,5 @@ def push():
         #  TODO: decide if we want to synchronize sessions too
         #        If we do, we must handle the data field, which
         #        is not annotated.
+        db.session.commit()
     return '', status.NO_CONTENT
