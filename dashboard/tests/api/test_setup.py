@@ -110,9 +110,7 @@ def test_put_invalid_data(client, auth, linkage,
 def test_put_combined(client, auth, board, linkage):
     auth.login()
 
-    id = uuid.uuid4()
     setup_json = dict(
-        id=id,
         name="test_setup",
         linkage=linkage,
         front_calibration=fcal_json,
@@ -121,6 +119,8 @@ def test_put_combined(client, auth, board, linkage):
     )
     response = client.put('/api/setup/combined', json=setup_json)
     assert response.status_code == status.CREATED
+
+    id = response.json['id']
 
     response = client.get(f'/api/setup/{id}')
     assert response.json['id'] == str(id)
@@ -138,7 +138,6 @@ def test_put_combined_invalid_input(client, auth, linkage, front_calibration,
     auth.login()
 
     setup_json = dict(
-        id=uuid.uuid4(),
         name="test_setup",
         linkage=linkage,
         front_calibration=front_calibration,
