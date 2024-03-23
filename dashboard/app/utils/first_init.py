@@ -90,9 +90,9 @@ def _initiate_database():
         properties=dict(
             inputs=['arm1', 'arm2', 'max'],
             intermediates=dict(
-                start_angle='acos((arm1**2+arm2**2-max**2)/(2*arm1*arm2))',
+                start_angle='acos((arm1^2+arm2^2-max^2)/(2*arm1*arm2))',
                 factor='2.0 * pi / 4096',
-                arms_sqr_sum='arm1**2 + arm2**2',
+                arms_sqr_sum='arm1^2 + arm2^2',
                 dbl_arm1_arm2='2 * arm1 * arm2',
 
             ),

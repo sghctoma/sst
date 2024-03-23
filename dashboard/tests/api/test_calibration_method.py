@@ -41,9 +41,9 @@ def test_put(client, auth):
         properties=dict(
             inputs=['arm1', 'arm2', 'max'],
             intermediates=dict(
-                start_angle='acos((arm1**2+arm2**2-max**2)/(2*arm1*arm2))',
+                start_angle='acos((arm1^2+arm2^2-max^2)/(2*arm1*arm2))',
                 factor='2.0 * pi / 4096',
-                arms_sqr_sum='arm1**2 + arm2**2',
+                arms_sqr_sum='arm1^2 + arm2^2',
                 dbl_arm1_arm2='2 * arm1 * arm2',
 
             ),
@@ -58,7 +58,15 @@ def test_put(client, auth):
     assert response.json['id'] == str(id)
 
 
-def test_put_invalid_expression(client, auth):
+@pytest.mark.parametrize(
+    ('intermediate', 'expression'),
+    (
+        ('0', 'xxxx'),
+        ('0**2', 'a'),
+        ('0', 'a**2'),
+    )
+)
+def test_put_invalid_expression(client, auth, intermediate, expression):
     auth.login()
 
     cm_json = dict(
@@ -67,8 +75,8 @@ def test_put_invalid_expression(client, auth):
         description="test",
         properties=dict(
             inputs=[],
-            intermediates={},
-            expression='xxxx',
+            intermediates={'a': intermediate},
+            expression=expression,
         )
     )
     response = client.put('/api/calibration-method', json=cm_json)
