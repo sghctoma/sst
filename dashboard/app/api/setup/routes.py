@@ -1,8 +1,15 @@
+import uuid
+
 from http import HTTPStatus as status
 
 from flask import jsonify, request
 from flask_jwt_extended import jwt_required
 
+from app.api.common import (
+    get_entity,
+    get_entities,
+    delete_entity,
+    put_entity)
 from app.api.setup import bp
 from app.extensions import db
 from app.models.board import Board
@@ -14,49 +21,38 @@ from app.telemetry.psst import dataclass_from_dict as dfd
 
 @bp.route('', methods=['GET'])
 def get_all():
-    entities = db.session.execute(db.select(Setup)).scalars()
-    return jsonify(list(entities)), status.OK
+    return get_entities(Setup)
 
 
-@bp.route('/<int:id>', methods=['GET'])
-def get(id: int):
-    entity = db.session.execute(
-        db.select(Setup).filter_by(id=id)).scalar_one_or_none()
-    if not entity:
-        return jsonify(msg="Session does not exist!"), status.NOT_FOUND
-    return jsonify(entity), status.OK
+@bp.route('/<uuid:id>', methods=['GET'])
+def get(id: uuid.UUID):
+    return get_entity(Setup, id)
 
 
-@bp.route('/<int:id>', methods=['DELETE'])
+@bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: int):
-    db.session.execute(db.delete(Setup).filter_by(id=id))
-    db.session.commit()
-    return '', status.NO_CONTENT
+def delete(id: uuid.UUID):
+    return delete_entity(Setup, id)
 
 
 @bp.route('', methods=['PUT'])
 @jwt_required()
 def put():
-    entity = dfd(Setup, request.json)
-    if not entity:
-        return jsonify(msg="Invalid data for Setup"), status.BAD_REQUEST
-    entity = db.session.merge(entity)
-    db.session.commit()
-    return jsonify(id=entity.id), status.CREATED
+    return put_entity(Setup, request.json)
 
 
 @bp.route('/combined', methods=['PUT'])
 @jwt_required()
 def put_combined():
     lnk = request.json['linkage']
-    if type(lnk) == int:
-        linkage = db.session.execute(
-            db.select(Linkage).filter_by(id=lnk)).scalar_one_or_none()
-    else:
-        linkage = dfd(Linkage, request.json['linkage'])
-        if not linkage.validate():
+    try:
+        lnk_id = uuid.UUID(lnk)
+        linkage = Linkage.get(lnk_id)
+    except BaseException:
+        linkage = dfd(Linkage, lnk)
+        if linkage and not linkage.validate():
             linkage = None
+
     if not linkage:
         return jsonify(msg="Invalid data for linkage!"), status.BAD_REQUEST
 
@@ -76,10 +72,8 @@ def put_combined():
     if not front_calibration and not rear_calibration:
         return jsonify(msg="No calibration given"), status.BAD_REQUEST
 
-    if not linkage:
-        return jsonify(msg="Missing or invalid linkage"), status.BAD_REQUEST
-
     setup = Setup(
+        id=uuid.uuid4(),
         name=request.json['name'],
     )
     try:

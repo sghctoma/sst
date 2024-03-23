@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/augustoroman/hexdump"
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -72,12 +73,8 @@ func handleRequest(conn net.Conn) {
 	log.Println("[OK] session '", name, "' was successfully imported")
 	// send back a dummy id
 	// XXX check to see if DAQ unit not reading it is a problem
-	id := 1337
-	b := make([]byte, 4)
-	b[0] = byte(id)
-	b[1] = byte(id >> 8)
-	b[2] = byte(id >> 16)
-	b[3] = byte(id >> 24)
+
+	b, _ := uuid.New().MarshalBinary()
 	conn.Write(b)
 }
 

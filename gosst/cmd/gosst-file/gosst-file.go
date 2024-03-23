@@ -5,13 +5,16 @@ import (
 	"log"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 	"github.com/ugorji/go/codec"
 
 	psst "gosst/formats/psst"
 	sst "gosst/formats/sst"
+	common "gosst/internal/common"
 )
 
 func main() {
@@ -84,6 +87,7 @@ func main() {
 	defer fo.Close()
 
 	var h codec.MsgpackHandle
+	h.SetBytesExt(reflect.TypeOf(uuid.UUID{}), 1, common.UuidExt{})
 	enc := codec.NewEncoder(fo, &h)
 	enc.Encode(pd)
 }

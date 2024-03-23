@@ -1,20 +1,24 @@
 import base64
 import msgpack
+import uuid
 
 from dataclasses import dataclass
 
 from app.extensions import db
+from app.models.synchronizable import Synchronizable
 from app.telemetry.psst import Telemetry, dataclass_from_dict
 
 
 @dataclass
-class Session(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+class Session(db.Model, Synchronizable):
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String)
-    setup: int = db.Column('setup_id', db.Integer, db.ForeignKey('setup.id'))
+    setup: uuid.UUID = db.Column('setup_id', db.Uuid(),
+                                 db.ForeignKey('setup.id'))
     description: str = db.Column(db.String)
     timestamp: int = db.Column(db.Integer, nullable=False)
-    track: int = db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
+    track: uuid.UUID = db.Column('track_id', db.Uuid(),
+                                 db.ForeignKey('track.id'))
     data = db.Column(db.LargeBinary, nullable=False)
 
     @property
@@ -29,4 +33,4 @@ class Session(db.Model):
         telemetry = dataclass_from_dict(Telemetry, psst_dict)
         self.data = psst_data
         self.timestamp = telemetry.Timestamp
-        self.setup_id = -1
+        self.setup_id = uuid.UUID('00000000000000000000000000000000')

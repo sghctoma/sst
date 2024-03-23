@@ -5,15 +5,30 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"strconv"
+	"reflect"
+	"strings"
+	"time"
 
 	"github.com/blockloop/scan"
+	"github.com/google/uuid"
 	"github.com/ugorji/go/codec"
 	_ "modernc.org/sqlite"
 
 	psst "gosst/formats/psst"
 	queries "gosst/internal/db"
 )
+
+type UuidExt struct{}
+
+func (x UuidExt) WriteExt(v interface{}) []byte {
+	v2 := v.(*uuid.UUID)
+	return []byte(v2.String())
+}
+
+func (x UuidExt) ReadExt(dst interface{}, src []byte) {
+	tt := dst.(*uuid.UUID)
+	*tt = uuid.MustParse(string(src))
+}
 
 type BokehFailedError struct{}
 
@@ -38,9 +53,10 @@ func initiateBokehGeneration(url string) error {
 	return nil
 }
 
-func GetLinkage(db *sql.DB, id int) (*psst.Linkage, error) {
+func GetLinkage(db *sql.DB, id uuid.UUID) (*psst.Linkage, error) {
 	var linkage psst.Linkage
-	rows, err := db.Query(queries.Linkage, id)
+	linkageId := strings.ReplaceAll(id.String(), "-", "")
+	rows, err := db.Query(queries.Linkage, linkageId)
 	if err != nil {
 		return nil, err
 	}
@@ -54,9 +70,10 @@ func GetLinkage(db *sql.DB, id int) (*psst.Linkage, error) {
 	return &linkage, nil
 }
 
-func getCalibration(db *sql.DB, id int, maxStroke, maxTravel float64) (*psst.Calibration, error) {
+func getCalibration(db *sql.DB, id uuid.UUID, maxStroke, maxTravel float64) (*psst.Calibration, error) {
 	var calibration psst.Calibration
-	rows, err := db.Query(queries.Calibration, id)
+	calibrationId := strings.ReplaceAll(id.String(), "-", "")
+	rows, err := db.Query(queries.Calibration, calibrationId)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +83,9 @@ func getCalibration(db *sql.DB, id int, maxStroke, maxTravel float64) (*psst.Cal
 	if err := calibration.ProcessRawInputs(); err != nil {
 		return nil, err
 	}
-	rows, err = db.Query(queries.CalibrationMethod, calibration.MethodId)
+
+	calibrationMethodId := strings.ReplaceAll(calibration.MethodId.String(), "-", "")
+	rows, err = db.Query(queries.CalibrationMethod, calibrationMethodId)
 	if err != nil {
 		return nil, err
 	}
@@ -84,18 +103,19 @@ func getCalibration(db *sql.DB, id int, maxStroke, maxTravel float64) (*psst.Cal
 	return &calibration, nil
 }
 
-func GetSetupsForIds(db *sql.DB, linkageId, frontCalibrationId, rearCalibrationId int) (*psst.SetupData, error) {
-	linkage, err := GetLinkage(db, linkageId)
+func GetSetupsForIds(db *sql.DB, linkageUuid, frontCalibrationUuid, rearCalibrationUuid uuid.UUID) (*psst.SetupData, error) {
+
+	linkage, err := GetLinkage(db, linkageUuid)
 	if err != nil {
 		return nil, err
 	}
 
-	frontCalibration, err := getCalibration(db, frontCalibrationId, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
+	frontCalibration, err := getCalibration(db, frontCalibrationUuid, linkage.MaxFrontStroke, linkage.MaxFrontTravel)
 	if err != nil {
 		return nil, err
 	}
 
-	rearCalibration, err := getCalibration(db, rearCalibrationId, linkage.MaxRearStroke, linkage.MaxRearTravel)
+	rearCalibration, err := getCalibration(db, rearCalibrationUuid, linkage.MaxRearStroke, linkage.MaxRearTravel)
 	if err != nil {
 		return nil, err
 	}
@@ -107,22 +127,24 @@ func GetSetupsForIds(db *sql.DB, linkageId, frontCalibrationId, rearCalibrationI
 	}, err
 }
 
-func InsertSession(db *sql.DB, pd *psst.Processed, server, name, description string, setupId int) (int, error) {
+func InsertSession(db *sql.DB, newUuid uuid.UUID, pd *psst.Processed, server, name, description string, setupUuid uuid.UUID) error {
 	var data []byte
 	var h codec.MsgpackHandle
+	h.SetBytesExt(reflect.TypeOf(uuid.UUID{}), 1, UuidExt{})
 	enc := codec.NewEncoderBytes(&data, &h)
 	enc.Encode(pd)
 
-	var lastInsertedId int
-	err := db.QueryRow(queries.InsertSession, name, pd.Timestamp, description, setupId, data).Scan(&lastInsertedId)
+	newId := strings.ReplaceAll(newUuid.String(), "-", "")
+	setupId := strings.ReplaceAll(setupUuid.String(), "-", "")
+	_, err := db.Query(queries.InsertSession, newId, name, pd.Timestamp, description, setupId, data, time.Now().Unix())
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	url := server + "/api/session/" + strconv.Itoa(lastInsertedId) + "/bokeh"
+	url := server + "/api/session/" + newUuid.String() + "/bokeh"
 	if err := initiateBokehGeneration(url); err != nil {
 		log.Println("[WARN] could not initiate Bokeh component generation", err)
 	}
 
-	return lastInsertedId, nil
+	return nil
 }

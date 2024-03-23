@@ -13,9 +13,9 @@ class ExpressionParser:
         ast.Add: op.add,
         ast.Sub: op.sub,
         ast.Mult: op.mul,
-        ast.Div:  op.truediv,
-        ast.Mod:  op.mod,
-        ast.Pow:  op.pow,
+        ast.Div: op.truediv,
+        ast.Mod: op.mod,
+        ast.BitXor: op.pow,
         ast.Not: op.not_,
         ast.And: op.and_,
         ast.Or:  op.or_,
@@ -51,7 +51,7 @@ class ExpressionParser:
     def _validate(self, node):
         if isinstance(node, ast.Expression):
             return self._validate(node.body)
-        if isinstance(node, ast.Num):
+        if isinstance(node, ast.Constant):
             return 1
         if isinstance(node, ast.Name):
             return self._Name(node.id)
@@ -74,7 +74,7 @@ class ExpressionParser:
     def _eval(self, node):
         if isinstance(node, ast.Expression):
             return self._eval(node.body)
-        if isinstance(node, ast.Num):
+        if isinstance(node, ast.Constant):
             return node.n
         if isinstance(node, ast.Name):
             return self._Name(node.id)

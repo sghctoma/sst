@@ -1,3 +1,5 @@
+import uuid
+
 from dataclasses import asdict, dataclass
 
 from app.extensions import db
@@ -5,8 +7,8 @@ from app.extensions import db
 
 @dataclass
 class SessionHtml(db.Model):
-    session_id: int = db.Column(db.Integer, db.ForeignKey('session.id'),
-                                primary_key=True)
+    session_id: uuid.UUID = db.Column(db.Uuid(), db.ForeignKey('session.id'),
+                                      primary_key=True, default=uuid.uuid4)
     script: str = db.Column(db.String, nullable=False)
     travel: str = db.Column(db.String, nullable=False)
     velocity: str = db.Column(db.String, nullable=False)

@@ -87,3 +87,12 @@ dashboard/app/static/main.js.map
 
 # built gosst binaries
 gosst/dist
+
+# Compilation database
+compile_commands.json
+
+# coverage cache
+dashboard/.coverage
+
+# clangd cache
+firmware/.cache

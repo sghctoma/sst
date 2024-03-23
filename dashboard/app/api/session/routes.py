@@ -1,6 +1,7 @@
 import json
 import msgpack
 import requests
+import uuid
 
 from io import BytesIO
 from http import HTTPStatus as status
@@ -14,6 +15,9 @@ from flask_jwt_extended import (
 from markupsafe import Markup
 
 from app import id_queue
+from app.api.common import (
+    get_entity,
+    delete_entity)
 from app.api.session import bp
 from app.extensions import db
 from app.models.session import Session
@@ -61,7 +65,7 @@ def _extract_range(sample_rate: int) -> (int, int):
 
 def _validate_range(start: int, end: int, count: int) -> bool:
     return (start is not None and end is not None and
-            start >= 0 and end < count)
+            start >= 0 and end < count and start < end)
 
 
 def _update_stroke_based(strokes: Strokes, suspension: Suspension):
@@ -89,15 +93,14 @@ def _update_stroke_based(strokes: Strokes, suspension: Suspension):
 
 @bp.route('', methods=['GET'])
 def get_all():
-    entities = db.session.execute(db.select(Session).order_by(
+    entities = db.session.execute(Session.select().order_by(
         Session.timestamp.desc())).scalars()
     return jsonify(list(entities)), status.OK
 
 
-@bp.route('/<int:id>/psst', methods=['GET'])
-def get_psst(id: int):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+@bp.route('/<uuid:id>/psst', methods=['GET'])
+def get_psst(id: uuid.UUID):
+    entity = Session.get(id)
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
     data = BytesIO(entity.data)
@@ -111,26 +114,21 @@ def get_psst(id: int):
 
 @bp.route('/last', methods=['GET'])
 def get_last():
-    entity = db.session.execute(db.select(Session).order_by(
+    entity = db.session.execute(Session.select().order_by(
         Session.timestamp.desc()).limit(1)).scalar_one_or_none()
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
     return jsonify(entity), status.OK
 
 
-@bp.route('/<int:id>', methods=['GET'])
-def get(id: int):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
-    if not entity:
-        return jsonify(msg="Session does not exist!"), status.NOT_FOUND
-    return jsonify(entity), status.OK
+@bp.route('/<uuid:id>', methods=['GET'])
+def get(id: uuid.UUID):
+    return get_entity(Session, id)
 
 
-@bp.route('/<int:id>/filter', methods=['GET'])
-def filter(id: int):
-    entity = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+@bp.route('/<uuid:id>/filter', methods=['GET'])
+def filter(id: uuid.UUID):
+    entity = Session.get(id)
     if not entity:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
     d = msgpack.unpackb(entity.data)
@@ -173,10 +171,10 @@ def filter(id: int):
     return jsonify(updated_data)
 
 
-@bp.route('/<int:id>', methods=['DELETE'])
+@bp.route('/<uuid:id>', methods=['DELETE'])
 @jwt_required()
-def delete(id: int):
-    db.session.execute(db.delete(Session).filter_by(id=id))
+def delete(id: uuid.UUID):
+    delete_entity(Session, id)
     db.session.execute(db.delete(SessionHtml).filter_by(session_id=id))
     db.session.commit()
     return '', status.NO_CONTENT
@@ -214,16 +212,19 @@ def put_processed():
     entity = dataclass_from_dict(Session, session_dict)
     if not entity:
         return jsonify(msg="Invalid data for Session"), status.BAD_REQUEST
-    entity.psst = session_data
+    try:
+        entity.psst = session_data
+    except BaseException:
+        return jsonify(msg="Invalid data for Session"), status.BAD_REQUEST
     entity = db.session.merge(entity)
     db.session.commit()
     generate_bokeh(entity.id)
     return jsonify(id=entity.id), status.CREATED
 
 
-@bp.route('/<int:id>', methods=['PATCH'])
+@bp.route('/<uuid:id>', methods=['PATCH'])
 @jwt_required()
-def patch(id: int):
+def patch(id: uuid.UUID):
     data = request.json
     db.session.execute(db.update(Session).filter_by(id=id).values(
         name=data['name'],
@@ -233,10 +234,9 @@ def patch(id: int):
     return '', status.NO_CONTENT
 
 
-@bp.route('/<int:id>/bokeh', methods=['PUT'])
-def generate_bokeh(id: int):
-    s = db.session.execute(
-        db.select(Session.id).filter_by(id=id)).scalar_one_or_none()
+@bp.route('/<uuid:id>/bokeh', methods=['PUT'])
+def generate_bokeh(id: uuid.UUID):
+    s = Session.get(id)
     if not s:
         return jsonify(msg=f"session #{id} does not exist"), status.BAD_REQUEST
 
@@ -250,8 +250,8 @@ def generate_bokeh(id: int):
 
 
 @bp.route('/last/bokeh', methods=['GET'], defaults={'session_id': None})
-@bp.route('/<int:session_id>/bokeh', methods=['GET'])
-def session_html(session_id):
+@bp.route('/<uuid:session_id>/bokeh', methods=['GET'])
+def session_html(session_id: uuid.UUID):
     # Not using @jwt_required(optional=True), because we want to be able to
     # load the dashboard even with an invalid token.
     try:
@@ -261,11 +261,10 @@ def session_html(session_id):
         full_access = False
 
     if not session_id:
-        session = db.session.execute(db.select(Session).order_by(
+        session = db.session.execute(Session.select().order_by(
             Session.timestamp.desc()).limit(1)).scalar_one_or_none()
     else:
-        session = db.session.execute(
-            db.select(Session).filter_by(id=session_id)).scalar_one_or_none()
+        session = Session.get(session_id)
     if not session:
         return jsonify(), status.NOT_FOUND
 
@@ -277,8 +276,7 @@ def session_html(session_id):
         '<script type="text/javascript">', '').replace('</script>', ''))
     components_divs = [Markup(d) if d else None for d in session_html.divs]
 
-    track = db.session.execute(
-        db.select(Track).filter_by(id=session.track)).scalar_one_or_none()
+    track = Track.get(session.track)
 
     d = msgpack.unpackb(session.data)
     t = dataclass_from_dict(Telemetry, d)
@@ -314,11 +312,10 @@ def session_html(session_id):
     return response
 
 
-@bp.route('/<int:id>/gpx', methods=['PUT'])
+@bp.route('/<uuid:id>/gpx', methods=['PUT'])
 @jwt_required()
-def upload_gpx(id: int):
-    session = db.session.execute(
-        db.select(Session).filter_by(id=id)).scalar_one_or_none()
+def upload_gpx(id: uuid.UUID):
+    session = Session.get(id)
     if not session:
         return jsonify(msg="Session does not exist!"), status.NOT_FOUND
 
@@ -359,4 +356,4 @@ def upload_gpx(id: int):
     db.session.commit()
 
     data = dict(full_track=full_track, session_track=session_track)
-    return jsonify(data), 200
+    return jsonify(data), status.OK

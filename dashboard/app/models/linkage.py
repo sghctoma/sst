@@ -1,14 +1,16 @@
 import io
 import csv
+import uuid
 
 from dataclasses import dataclass
 
 from app.extensions import db
+from app.models.synchronizable import Synchronizable
 
 
 @dataclass
-class Linkage(db.Model):
-    id: int = db.Column(db.Integer, primary_key=True)
+class Linkage(db.Model, Synchronizable):
+    id: uuid.UUID = db.Column(db.Uuid(), primary_key=True, default=uuid.uuid4)
     name: str = db.Column(db.String, nullable=False)
     head_angle: float = db.Column(db.Float, nullable=False)
     front_stroke: float = db.Column(db.Float, nullable=False)

@@ -20,6 +20,7 @@ from werkzeug.exceptions import HTTPException
 from app.extensions import db, jwt, migrate, sio
 from app.telemetry.session_html import create_cache
 from app.utils.first_init import first_init
+from app.utils.converters import UuidConverter
 
 
 id_queue = queue.Queue()
@@ -35,7 +36,7 @@ def _sqlite_pragmas(app: Flask):
             event.listen(db.engine, 'connect', _pragma_on_connect)
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__)
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_ALGORITHM'] = 'RS256'
@@ -45,10 +46,16 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////data/gosst.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['GOSST_HTTP_API'] = 'http://localhost:8080'
-    app.config.from_prefixed_env()
+
+    if test_config:
+        app.config.update(test_config)
+    else:
+        app.config.from_prefixed_env()
 
     app.logger.addHandler(logging.StreamHandler(sys.stdout))
     app.logger.setLevel(logging.INFO)
+
+    app.url_map.converters['uuid'] = UuidConverter
 
     ctx = click.get_current_context(silent=True)
     if not ctx:

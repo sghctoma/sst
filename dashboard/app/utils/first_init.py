@@ -1,3 +1,5 @@
+import uuid
+
 from os import path
 
 from urllib.parse import urlparse
@@ -36,7 +38,7 @@ def _generate_rsa_keys(priv_file: str, pub_file: str):
 def _initiate_database():
     db_upgrade()
     cm_fraction = CalibrationMethod(
-        id=1,
+        id=uuid.UUID('230e04a092ce42189a3c23bf3cde2b05'),
         name="fraction",
         description="Sample is in fraction of maximum suspension stroke.",
         properties=dict(
@@ -46,7 +48,7 @@ def _initiate_database():
         )
     )
     cm_percentage = CalibrationMethod(
-        id=2,
+        id=uuid.UUID('c619045af435427797cb1e2c1fddcfeb'),
         name="percentage",
         description="Sample is in percentage of maximum suspension stroke.",
         properties=dict(
@@ -56,7 +58,7 @@ def _initiate_database():
         )
     )
     cm_linear = CalibrationMethod(
-        id=3,
+        id=uuid.UUID('3e799d5a5652430e900c06a3277ab1dc'),
         name="linear",
         description="Sample is linearly distributed within a given range.",
         properties=dict(
@@ -68,7 +70,7 @@ def _initiate_database():
         )
     )
     cm_as5600_isosceles_triangle = CalibrationMethod(
-        id=4,
+        id=uuid.UUID('12f4a1b922f74524abcbdaa99a5c1c3a'),
         name="as5600-isosceles-triangle",
         description="Triangle setup with the sensor between the base and leg",
         properties=dict(
@@ -82,15 +84,15 @@ def _initiate_database():
         )
     )
     cm_as5600_triangle = CalibrationMethod(
-        id=5,
+        id=uuid.UUID('9a27abc4125148a2b64989fb315ca2de'),
         name="as5600-triangle",
         description="Triangle setup with the sensor between two known sides",
         properties=dict(
             inputs=['arm1', 'arm2', 'max'],
             intermediates=dict(
-                start_angle='acos((arm1**2+arm2**2-max**2)/(2*arm1*arm2))',
+                start_angle='acos((arm1^2+arm2^2-max^2)/(2*arm1*arm2))',
                 factor='2.0 * pi / 4096',
-                arms_sqr_sum='arm1**2 + arm2**2',
+                arms_sqr_sum='arm1^2 + arm2^2',
                 dbl_arm1_arm2='2 * arm1 * arm2',
 
             ),
@@ -107,7 +109,7 @@ def _initiate_database():
     import random
     import string
     from argon2 import PasswordHasher
-    user = User(id=1, username="admin")
+    user = User(id=uuid.uuid4(), username="admin")
     charset = string.ascii_letters + string.digits
     password = ''.join(random.choices(charset, k=26))
     ph = PasswordHasher()
@@ -140,4 +142,4 @@ def first_init():
         inspector = inspect(db.engine)
         if not inspector.has_table('alembic_version'):
             db_stamp(revision='ea6262808b9d')
-            db_upgrade()
+        db_upgrade()

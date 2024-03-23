@@ -127,7 +127,7 @@ var ImportWizard = {
       return
     }
 
-    var linkageId = parseInt(LinkageForm.selected)
+    var linkageId = LinkageForm.selected
     if (linkageId === 0) {
       linkageBody = LinkageForm.params
       try {

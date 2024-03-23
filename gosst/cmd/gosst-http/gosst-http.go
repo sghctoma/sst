@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jessevdk/go-flags"
 
 	_ "modernc.org/sqlite"
@@ -26,19 +27,19 @@ type RequestHandler struct {
 }
 
 type session struct {
-	Name        string `json:"name"           binding:"required"`
-	Description string `json:"description"`
-	Setup       int    `json:"setup"          binding:"required"`
-	RawData     string `json:"data,omitempty" binding:"required"`
+	Name        string    `json:"name"           binding:"required"`
+	Description string    `json:"description"`
+	Setup       uuid.UUID `json:"setup"          binding:"required"`
+	RawData     string    `json:"data,omitempty" binding:"required"`
 }
 
 type normalizedSession struct {
-	Name        string `json:"name"           binding:"required"`
-	Timestamp   int64  `json:"timestamp"      binding:"required"`
-	Description string `json:"description"`
-	SampleRate  uint16 `json:"sample_rate"    binding:"required"`
-	Linkage     int    `json:"linkage"        binding:"required"`
-	RawData     string `json:"data,omitempty" binding:"required"`
+	Name        string    `json:"name"           binding:"required"`
+	Timestamp   int64     `json:"timestamp"      binding:"required"`
+	Description string    `json:"description"`
+	SampleRate  uint16    `json:"sample_rate"    binding:"required"`
+	Linkage     uuid.UUID `json:"linkage"        binding:"required"`
+	RawData     string    `json:"data,omitempty" binding:"required"`
 }
 
 func processNormalized(data string) ([]float64, []float64, error) {
@@ -114,14 +115,15 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
-	var setupId, linkageId, frontCalibrationId, rearCalibrationId int
-	err := this.Db.QueryRow(queries.Setup, session.Setup).Scan(&linkageId, &frontCalibrationId, &rearCalibrationId)
+	var linkageUuid, frontCalibrationUuid, rearCalibrationUuid uuid.UUID
+	setupId := strings.ReplaceAll(session.Setup.String(), "-", "")
+	err := this.Db.QueryRow(queries.Setup, setupId).Scan(&linkageUuid, &frontCalibrationUuid, &rearCalibrationUuid)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	setup, err := common.GetSetupsForIds(this.Db, linkageId, frontCalibrationId, rearCalibrationId)
+	setup, err := common.GetSetupsForIds(this.Db, linkageUuid, frontCalibrationUuid, rearCalibrationUuid)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -145,13 +147,15 @@ func (this *RequestHandler) PutSession(c *gin.Context) {
 		return
 	}
 
-	lastInsertedId, err := common.InsertSession(this.Db, pd, this.ApiServer, session.Name, session.Description, setupId)
+	newUuid := uuid.New()
+	err = common.InsertSession(this.Db, newUuid, pd, this.ApiServer, session.Name, session.Description, session.Setup)
 	if err != nil {
+		log.Fatalln(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
+	c.JSON(http.StatusCreated, gin.H{"id": newUuid})
 }
 
 func (this *RequestHandler) PutNormalizedSession(c *gin.Context) {
@@ -212,13 +216,14 @@ func (this *RequestHandler) PutNormalizedSession(c *gin.Context) {
 		return
 	}
 
-	lastInsertedId, err := common.InsertSession(this.Db, pd, this.ApiServer, session.Name, session.Description, 0)
+	newUuid := uuid.New()
+	err = common.InsertSession(this.Db, newUuid, pd, this.ApiServer, session.Name, session.Description, uuid.Nil)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": lastInsertedId})
+	c.JSON(http.StatusCreated, gin.H{"id": newUuid})
 }
 
 func main() {

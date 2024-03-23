@@ -1,7 +1,6 @@
 FORMATS_SOURCES := $(shell find formats -name "*.go")
 INTERNAL_SOURCES := $(shell find internal -name "*.go")
 CMD_SOURCES := $(shell find cmd -name "*.go")
-LIB_SOURCES := $(shell find lib -name "*.go")
 
 build: cmd
 
