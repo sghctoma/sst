@@ -93,3 +93,6 @@ compile_commands.json
 
 # coverage cache
 dashboard/.coverage
+
+# clangd cache
+firmware/.cache
