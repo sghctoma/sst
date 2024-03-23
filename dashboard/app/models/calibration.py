@@ -43,10 +43,12 @@ class CalibrationMethod(db.Model, Synchronizable):
     def validate(self) -> float:
         env = dict(_std_env)
         for input in self.properties['inputs']:
-            env[input] = 0
+            env[input] = 1
         parser = ExpressionParser(env)
         for k, v in self.properties['intermediates'].items():
-            env[k] = parser.validate(v)
+            if not parser.validate(v):
+                return False
+            env[k] = 1
         parser = ExpressionParser(env)
         return parser.validate(self.properties['expression'])
 
