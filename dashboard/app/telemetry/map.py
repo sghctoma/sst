@@ -115,14 +115,14 @@ def map_figure() -> (figure, CustomJS):
            color=Spectral11[3], alpha=0.5, width=2)
     p.line(x='lon', y='lat', source=ds_session,
            color=Spectral11[10], alpha=0.8, width=5)
-    cs = Circle(name='start_point', x=0, y=0, size=10,
+    cs = Circle(name='start_point', x=0, y=0, radius=10,
                 line_color='black', fill_color='#229954', fill_alpha=0.8)
-    ce = Circle(name='end_point', x=0, y=0, size=10,
+    ce = Circle(name='end_point', x=0, y=0, radius=10,
                 line_color='black', fill_color='#E74C3C', fill_alpha=0.8)
     p.add_glyph(cs)
     p.add_glyph(ce)
 
-    pos_marker = Circle(name="pos_marker", x=0, y=0, size=13,
+    pos_marker = Circle(name="pos_marker", x=0, y=0, radius=13,
                         line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
 

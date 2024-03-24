@@ -60,7 +60,7 @@ def balance_figure(front_strokes: list[Stroke], rear_strokes: list[Stroke],
         output_backend='webgl')
     p.xaxis.ticker = FixedTicker(ticks=list(range(0, 110, 10)))
     p.y_range.flipped = flipped
-    p.circle(
+    p.scatter(
         'travel', 'velocity',
         legend_label="Front",
         size=4,
@@ -72,7 +72,7 @@ def balance_figure(front_strokes: list[Stroke], rear_strokes: list[Stroke],
         line_width=2,
         color=front_color,
         source=front_source)
-    p.circle(
+    p.scatter(
         'travel', 'velocity',
         legend_label="Rear",
         size=4,
