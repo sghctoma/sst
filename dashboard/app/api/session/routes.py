@@ -3,6 +3,7 @@ import msgpack
 import requests
 import uuid
 
+from bokeh import __version__ as bokeh_version
 from io import BytesIO
 from http import HTTPStatus as status
 
@@ -32,6 +33,7 @@ from app.telemetry.psst import (
     Telemetry,
     dataclass_from_dict
 )
+from app.telemetry.session_html import create_cache
 from app.telemetry.travel import update_travel_histogram
 from app.telemetry.velocity import (
     update_velocity_band_stats,
@@ -272,6 +274,18 @@ def session_html(session_id: uuid.UUID):
         session_id=session.id)).scalar_one_or_none()
     if not session_html:
         return jsonify(), status.NOT_FOUND
+
+    # If cached Bokeh document was generated with a previous version of Bokeh,
+    # we need to delete and regenerate the cache.
+    version_string = f'"version":"{bokeh_version}"'
+    if session_html.script.find(version_string) == -1:
+        db.session.execute(db.delete(SessionHtml).filter_by(
+                           session_id=session.id))
+        db.session.commit()
+        create_cache(session.id, 5, 200)
+        session_html = db.session.execute(db.select(SessionHtml).filter_by(
+            session_id=session.id)).scalar_one_or_none()
+
     components_script = Markup(session_html.script.replace(
         '<script type="text/javascript">', '').replace('</script>', ''))
     components_divs = [Markup(d) if d else None for d in session_html.divs]
