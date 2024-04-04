@@ -4,7 +4,6 @@
 #include "tusb.h"
 #include "as5600.h"
 #include "ssd1306.h"
-#include "../ntp/ntp.h"
 #include "../net/tcpclient.h"
 #include "../ui/pushbutton.h"
 

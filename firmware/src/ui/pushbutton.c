@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "hardware/timer.h"
-#include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
 #include "pushbutton.h"

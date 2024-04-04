@@ -24,10 +24,8 @@
  *
  */
 
-#include "bsp/board.h"
 #include "tusb.h"
 
-#include "ff.h"
 #include "hw_config.h"
 #include "sd_card.h"
 

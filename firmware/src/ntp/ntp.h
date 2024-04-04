@@ -1,8 +1,9 @@
 #ifndef _NTP_H
 #define _NTP_H
 
+#include <time.h>
+
 #include "pico/stdlib.h"
-#include "sys/types.h"
 
 #define NTP_TIMEOUT_TIME 2000
 

@@ -1,9 +1,6 @@
 #ifndef _LIST_H
 #define _LIST_H
 
-#include <string.h>
-#include <stdlib.h>
-
 #include "../fw/sst.h"
 
 struct node {

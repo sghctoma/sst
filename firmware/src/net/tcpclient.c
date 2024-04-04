@@ -9,7 +9,6 @@
 
 #include "hw_config.h"
 
-#include "lwipopts.h"
 #include "../net/tcpclient.h"
 #include "../util/config.h"
 

@@ -1,7 +1,6 @@
 #ifndef _TCPCLIENT_H
 #define _TCPCLIENT_H
 
-#include "pico/stdio.h"
 #include "lwip/ip_addr.h"
 
 struct connection {

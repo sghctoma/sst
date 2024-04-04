@@ -1,8 +1,6 @@
 #include <stdint.h>
 
-#include "pico/cyw43_arch.h"
 #include "cyw43_country.h"
-#include "pico/sleep.h"
 
 #include "ff_stdio.h"
 #include "config.h"

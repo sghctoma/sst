@@ -1,7 +1,6 @@
 #ifndef _DS3231_H
 #define _DS3231_H
 
-#include "pico/stdlib.h"
 #include "../pio_i2c/pio_i2c.h"
 
 #ifdef __cplusplus
