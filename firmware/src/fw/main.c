@@ -180,7 +180,7 @@ static int setup_storage() {
     pico_get_unique_board_id_string(board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
     FIL f;
     uint btw;
-    fr = f_open(&f, ".boardid", FA_OPEN_ALWAYS | FA_WRITE);
+    fr = f_open(&f, "BOARDID", FA_OPEN_ALWAYS | FA_WRITE);
     if (fr == FR_OK || fr == FR_EXIST) {
         f_write(&f, board_id_str, 2*PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
     }
