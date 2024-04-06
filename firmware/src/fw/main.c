@@ -194,11 +194,10 @@ static int open_datafile() {
     FIL index_fil;
     FRESULT fr = f_open(&index_fil, "INDEX", FA_OPEN_EXISTING | FA_READ);
     if (fr == FR_OK || fr == FR_EXIST) {
-        uint8_t buf[2];
         uint br;
-        f_read(&index_fil, buf, 2, &br);
+        f_read(&index_fil, &index, 2, &br);
         if (br == 2) {
-            index = ((buf[0] << 8) | buf[1]) + 1;
+            index = index + 1;
         }
     }
     f_close(&index_fil);
@@ -206,12 +205,8 @@ static int open_datafile() {
     fr = f_open(&index_fil, "INDEX", FA_OPEN_ALWAYS | FA_WRITE);
     if (fr == FR_OK) {
         f_lseek(&index_fil, 0);
-        uint8_t buf[2] = {
-            (index >> 8) & 0xff,
-            index & 0xff
-        };
         uint bw;
-        f_write(&index_fil, buf, 2, &bw);
+        f_write(&index_fil, &index, 2, &bw);
         f_close(&index_fil);
     } else {
         return PICO_ERROR_GENERIC;
