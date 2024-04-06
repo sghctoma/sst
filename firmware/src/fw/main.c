@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "as5600.h"
 #include "cyw43_ll.h"
 #include "device/usbd.h"
 #include "pico/platform.h"
@@ -116,6 +117,8 @@ static const uint16_t SAMPLE_RATE = 1000;
 
 static volatile bool have_fork;
 static volatile bool have_shock;
+static volatile bool reversed_fork;
+static volatile bool reversed_shock;
 
 // We are using two buffers. Data acquisition happens on core #1 into the active
 // buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
@@ -135,6 +138,18 @@ struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
+static uint16_t get_angle(i2c_inst_t *i2c, bool have_sensor, bool reversed) {
+    static uint16_t value = 0xffff;
+    if (have_sensor) {
+        value = as5600_get_scaled_angle(i2c);
+        if (reversed) {
+            value = 4096 - value;
+        }
+    }
+
+    return value;
+}
+
 static bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
         count = 0;
@@ -143,17 +158,8 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
         active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
     }
 
-    if (have_fork) {
-        active_buffer[count].fork_angle = as5600_get_scaled_angle(FORK_I2C);
-    } else {
-        active_buffer[count].fork_angle = 0xffff;
-    }
-
-    if (have_shock) {
-        active_buffer[count].shock_angle = as5600_get_scaled_angle(SHOCK_I2C);
-    } else {
-        active_buffer[count].shock_angle = 0xffff;
-    }
+    active_buffer[count].fork_angle = get_angle(FORK_I2C, have_fork, reversed_fork);
+    active_buffer[count].shock_angle = get_angle(SHOCK_I2C, have_shock, reversed_shock);
 
     count += 1;
 
@@ -276,9 +282,8 @@ static void setup_i2c() {
     gpio_pull_up(SHOCK_PIN_SCL);
 }
 
-static bool setup_baseline(i2c_inst_t *i2c) {
+static bool setup_baseline(i2c_inst_t *i2c, uint16_t baseline) {
     if (as5600_connected(i2c) && as5600_detect_magnet(i2c)) {
-        uint16_t baseline = as5600_get_raw_angle(i2c);
         as5600_set_start_position(i2c, baseline);
 
         // Power down tha DAC, we don't need it.
@@ -305,8 +310,24 @@ static bool setup_sensors() {
         sleep_ms(10);
     }
 
-    have_fork = setup_baseline(FORK_I2C);
-    have_shock = setup_baseline(SHOCK_I2C);
+    FIL calibration_fil;
+    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_EXISTING | FA_READ);
+    if (!(fr == FR_OK || fr == FR_EXIST)) {
+        return false;
+    }
+
+    uint br;
+    uint16_t front_baseline, rear_baseline;
+    bool temp;
+    f_read(&calibration_fil, &front_baseline, sizeof(uint16_t), &br);
+    f_read(&calibration_fil, &temp, sizeof(bool), &br);
+    reversed_fork = temp;
+    f_read(&calibration_fil, &rear_baseline, sizeof(uint16_t), &br);
+    f_read(&calibration_fil, &temp, sizeof(bool), &br);
+    reversed_shock = temp;
+
+    have_fork = setup_baseline(FORK_I2C, front_baseline);
+    have_shock = setup_baseline(SHOCK_I2C, rear_baseline);
     return have_fork || have_shock;
 }
 
@@ -336,6 +357,98 @@ static void setup_display(ssd1306_t *disp) {
 
 // ----------------------------------------------------------------------------
 // State handlers
+
+static void on_cal_idle() {
+    // No MSC if there is no USB cable connected, so checking
+    // tud is not necessary.
+    bool battery = on_battery();
+    if (!battery && msc_present()) {
+        soft_reset();
+    }
+
+    static absolute_time_t timeout = {0};
+    if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
+        timeout = make_timeout_time_ms(1000);
+
+        uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
+        static char battery_str[] = " PWR";
+        if (battery) {
+            if (voltage_percentage > 99) {
+                snprintf(battery_str, sizeof(battery_str), "FULL");
+            } else {
+                snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
+            }
+        }
+
+        ssd1306_clear(&disp);
+        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
+        ssd1306_draw_string(&disp,   0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
+        if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+        }
+        if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+            ssd1306_draw_string(&disp, 40, 24, 1, "shock");
+        }
+        ssd1306_show(&disp);
+    }
+}
+
+static void on_cal_exp() {
+    uint16_t front_baseline = 0xffff;
+    uint16_t rear_baseline = 0xffff;
+
+    if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+        front_baseline = as5600_get_raw_angle(FORK_I2C);
+        as5600_set_start_position(FORK_I2C, front_baseline);
+    }
+    if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+        rear_baseline = as5600_get_raw_angle(SHOCK_I2C);
+        as5600_set_start_position(SHOCK_I2C, rear_baseline);
+    }
+    if (front_baseline == 0xffff && rear_baseline == 0xffff) {
+        display_message(&disp, "CAL ERR");
+        sleep_ms(1000);
+        state = CAL_IDLE_1;
+        return;
+    }
+
+    state = CAL_IDLE_2;
+}
+
+static void on_cal_comp() {
+    uint16_t front_baseline = 0xffff;
+    uint16_t rear_baseline = 0xffff;
+
+    // We check rotation direction by comparing the measured value in a compressed
+    // state to 2048. This value means 180 degrees, which would be impossible in a
+    // triangle, so we know direction is reversed.
+    if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+        front_baseline = as5600_get_start_position(FORK_I2C);
+        reversed_fork = as5600_get_scaled_angle(FORK_I2C) > 2048;
+    }
+    if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+        rear_baseline = as5600_get_start_position(SHOCK_I2C);
+        reversed_shock = as5600_get_scaled_angle(SHOCK_I2C) > 2048;
+    }
+
+    FIL calibration_fil;
+    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
+    if (!(fr == FR_OK || fr == FR_EXIST)) {
+        display_message(&disp, "CAL ERR");
+        sleep_ms(1000);
+        state = CAL_IDLE_2;
+        return;
+    }
+
+    uint bw;
+    f_write(&calibration_fil, &front_baseline, sizeof(uint16_t), &bw);
+    f_write(&calibration_fil, (const void *)&reversed_fork, sizeof(bool), &bw);
+    f_write(&calibration_fil, &rear_baseline, sizeof(uint16_t), &bw);
+    f_write(&calibration_fil, (const void *)&reversed_shock, sizeof(bool), &bw);
+    f_close(&calibration_fil);
+
+    state = IDLE;
+}
 
 static void on_rec_start() {
     count = 0;
@@ -519,6 +632,7 @@ static void on_msc() {
 }
 
 static void dummy() {
+    tight_loop_contents();
 }
 
 static void on_serve_tcp() {
@@ -552,6 +666,10 @@ static void (*state_handlers[STATES_COUNT])() = {
     on_sync_data, /* SYNC_DATA */
     on_serve_tcp, /* SERVE_TCP */
     on_msc,       /* MSC */
+    on_cal_idle,  /* CAL_IDLE_1 */
+    on_cal_exp,   /* CAL_EXP */
+    on_cal_idle,  /* CAL_IDLE_2 */
+    on_cal_comp,  /* CAL_COMP */
 };
 
 // ----------------------------------------------------------------------------
@@ -559,6 +677,12 @@ static void (*state_handlers[STATES_COUNT])() = {
 
 static void on_left_press(void *user_data) {
     switch(state) {
+        case CAL_IDLE_1:
+            state = CAL_EXP;
+            break;
+        case CAL_IDLE_2:
+            state = CAL_COMP;
+            break;
         case IDLE:
             state = REC_START;
             break;
@@ -659,7 +783,12 @@ int main() {
         clock0_orig = clocks_hw->sleep_en0;
         clock1_orig = clocks_hw->sleep_en1;
 
-        state = IDLE;
+        FRESULT fr = f_stat("CALIBRATION", NULL);
+        if (fr == FR_OK) {
+            state = IDLE;
+        } else {
+            state = CAL_IDLE_1;
+        }
     }
 
     while (true) {

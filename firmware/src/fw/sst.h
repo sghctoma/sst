@@ -17,8 +17,12 @@ enum state {
     SYNC_DATA,
     SERVE_TCP,
     MSC,
+    CAL_IDLE_1,
+    CAL_EXP,
+    CAL_IDLE_2,
+    CAL_COMP,
 };
-#define STATES_COUNT 9
+#define STATES_COUNT 13
 
 struct header {
     char magic[3];
