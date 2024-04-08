@@ -15,7 +15,7 @@ var SessionDayItem = {
 
 var SessionListItem = {
   view: function(vnode) {
-    return m("div", {style: "display: block;"}, [
+    return m("div", {style: "display: flex; justify-content: space-between; align-items: center;"}, [
       m(".tooltip", {style: "display: inline-block; margin: 5px; margin-left: 15px;"}, [
         m(m.route.Link, {
               style: "display: inline-block;",

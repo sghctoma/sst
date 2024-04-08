@@ -222,7 +222,6 @@ input[type="file"]::file-selector-button:hover {
 
 .delete-button {
   display: inline-block;
-	float: right;
   font-size: 14px;
   padding: 0.1em 0.3em;
   border: transparent;
