@@ -61,7 +61,7 @@ func ProcessRaw(sst_data []byte) (front, rear []uint16, meta psst.Meta, err erro
 	frontBaseline = records[0].ForkAngle
 	for _, r := range records[1:] {
 		if r.ForkAngle > frontBaseline {
-			if r.ForkAngle > 0x0050 {
+			if r.ForkAngle-frontBaseline > 0x0050 {
 				frontError = r.ForkAngle
 			}
 			break
@@ -71,7 +71,7 @@ func ProcessRaw(sst_data []byte) (front, rear []uint16, meta psst.Meta, err erro
 	rearBaseline = records[0].ShockAngle
 	for _, r := range records[1:] {
 		if r.ShockAngle > rearBaseline {
-			if r.ShockAngle > 0x0050 {
+			if r.ShockAngle-rearBaseline > 0x0050 {
 				rearError = r.ShockAngle
 			}
 			break
