@@ -14,6 +14,7 @@
 #include "pico/unique_id.h"
 #include "hardware/clocks.h"
 #include "hardware/adc.h"
+#include "hardware/gpio.h"
 #include "hardware/rtc.h"
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
@@ -108,6 +109,18 @@ static bool wifi_connect(bool do_ntp) {
 static void wifi_disconnect() {
     cyw43_arch_disable_sta_mode();
     sleep_ms(100);
+}
+
+static void calibrate_if_needed() {
+    gpio_init(BUTTON_LEFT);
+    gpio_pull_up(BUTTON_LEFT);
+
+    FRESULT fr = f_stat("CALIBRATION", NULL);
+    if (fr != FR_OK || !gpio_get(BUTTON_LEFT)) {
+        state = CAL_IDLE_1;
+    } else {
+        state = IDLE;
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -758,9 +771,6 @@ int main() {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
-        create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
-        create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
-
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -783,12 +793,10 @@ int main() {
         clock0_orig = clocks_hw->sleep_en0;
         clock1_orig = clocks_hw->sleep_en1;
 
-        FRESULT fr = f_stat("CALIBRATION", NULL);
-        if (fr == FR_OK) {
-            state = IDLE;
-        } else {
-            state = CAL_IDLE_1;
-        }
+        calibrate_if_needed();
+
+        create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
+        create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
     }
 
     while (true) {

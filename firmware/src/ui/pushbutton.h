@@ -6,7 +6,7 @@
 struct button {
     uint gpio;
     bool state;
-	bool enabled;
+    bool enabled;
     alarm_id_t alarm;
     void *user_data;
     void (*onpress)(void *user_data);
