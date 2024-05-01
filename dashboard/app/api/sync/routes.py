@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models.board import Board
 from app.models.calibration import CalibrationMethod, Calibration
 from app.models.linkage import Linkage
+from app.models.session import Session
 from app.models.setup import Setup
 from app.telemetry.psst import dataclass_from_dict as dfd
 
@@ -53,18 +54,26 @@ def pull_entities(klass: type, since: int):
         entities = db.session.execute(db.select(klass).where(
             db.or_(was_updated, was_deleted))).scalars()
 
-    # Normally, we dont want the sync timestamps to present in API answers, so
-    # these fields are not annotated in the models. We need them here though,
-    # so we are adding them manually.
     entities_list = []
     for entity in list(entities):
         new_entity = {}
         for k, _ in entity.__annotations__.items():
             new_entity[k] = getattr(entity, k)
+
+        # Normally, we dont want the sync timestamps to present in API answers,
+        # so these fields are not annotated in the models. We need them here
+        # though, so we are adding them manually.
         new_entity['updated'] = entity.updated
         new_entity['client_updated'] = entity.client_updated
         new_entity['deleted'] = entity.deleted
+
+        # The data field of Sessions is not annotated either, we have to
+        # include it manually for non-deleted sessions.
+        if klass is Session and entity.deleted is None:
+            new_entity['psst_encoded'] = entity.psst_encoded
+
         entities_list.append(new_entity)
+
     return entities_list
 
 
@@ -86,16 +95,14 @@ def pull():
         since = None
 
     with db.session.begin_nested():
-        #  TODO: decide if we want to synchronize sessions too
-        #        If we do, we must handle the data field, which
-        #        is not annotated.
         sync_data = {
             Board.__table__.name: pull_entities(Board, since),
             CalibrationMethod.__table__.name: pull_entities(CalibrationMethod,
                                                             since),
             Calibration.__table__.name: pull_entities(Calibration, since),
             Linkage.__table__.name: pull_entities(Linkage, since),
-            Setup.__table__.name: pull_entities(Setup, since)}
+            Setup.__table__.name: pull_entities(Setup, since),
+            Session.__table__.name: pull_entities(Session, since)}
     return jsonify(sync_data), status.OK
 
 
@@ -109,8 +116,6 @@ def push():
         push_entities(Calibration, entities_json)
         push_entities(Linkage, entities_json)
         push_entities(Setup, entities_json)
-        #  TODO: decide if we want to synchronize sessions too
-        #        If we do, we must handle the data field, which
-        #        is not annotated.
+        push_entities(Session, entities_json)
         db.session.commit()
     return '', status.NO_CONTENT
