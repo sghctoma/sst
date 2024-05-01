@@ -102,6 +102,30 @@ def test_pull(client, auth):
     assert len(response.json['setup']) == 1
     assert response.json['setup'][0]['id'] == str(DB_IDS['setup'])
 
+    assert 'session' in response.json
+    assert len(response.json['session']) == 2
+    s_ids = [s['id'] for s in response.json['session']]
+    assert str(DB_IDS['session']) in s_ids
+    assert str(DB_IDS['session2']) in s_ids
+
+
+def test_pull_deleted_session(app, client, auth):
+    auth.login()
+
+    with app.app_context():
+        CalibrationMethod.delete(DB_IDS['session'])
+
+    response = client.get('/api/sync/pull')
+    assert response.status_code == status.OK
+
+    assert 'session' in response.json
+    assert len(response.json['session']) == 2
+    for s in response.json['session']:
+        if s['id'] == DB_IDS['session']:
+            assert 'psst_encoded' not in s
+        else:
+            assert 'psst_encoded' in s
+
 
 def test_pull_since(app, client, auth):
     auth.login()
