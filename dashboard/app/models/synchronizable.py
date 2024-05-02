@@ -7,9 +7,11 @@ from app.telemetry.psst import dataclass_from_dict as dfd
 
 
 class Synchronizable(object):
-    updated = db.Column(db.Integer, server_default=db.func.unixepoch(),
+    updated = db.Column(db.Integer, nullable=False,
+                        server_default=db.func.unixepoch(),
                         onupdate=lambda: int(datetime.now().timestamp()))
-    client_updated = db.Column(db.Integer, server_default=db.text('0'))
+    client_updated = db.Column(db.Integer, nullable=False,
+                               server_default=db.text('0'))
     deleted = db.Column(db.Integer)
 
     @classmethod
