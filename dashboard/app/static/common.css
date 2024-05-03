@@ -276,7 +276,7 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   min-height: 340px;
   background: #15191c;
-  padding-bottom: 25px;
+  padding-bottom: 10px;
 }
 
 .description-title {
@@ -309,6 +309,30 @@ input[type="file"]::file-selector-button:hover {
   border-radius: 3px;
   margin: 5px;
   margin-top: 2px;
+}
+
+.notes-setting {
+  padding-left: 3px;
+  padding-right: 3px;
+}
+
+.notes-setting > input {
+  font-size: 14px;
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+
+.notes-rowheader {
+  text-align: center;
+}
+
+.notes-columnheader {
+  text-align: right;
+  padding-right: 10px;
+  width: 80px;
 }
 
 .video-map {

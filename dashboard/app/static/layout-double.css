@@ -6,7 +6,6 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: max-content;
-  background-color: rgb(64,64,64);  
 }
 .front-travel-hist { grid-column: 1;     grid-row: 1; }
 .rear-travel-hist  { grid-column: 2;     grid-row: 1; }
@@ -17,7 +16,6 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: max-content;
-  background-color: rgb(64,64,64);  
 }
 .front-velocity-hist { grid-column: 1; grid-row: 1; }
 .rear-velocity-hist  { grid-column: 2; grid-row: 1; }
@@ -25,7 +23,6 @@
 .balance {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  background-color: rgb(64,64,64);  
 }
 .balance-compression { grid-column: 1; grid-row: 1; }
 .balance-rebound     { grid-column: 2; grid-row: 1; }
@@ -52,7 +49,6 @@
     display: grid;
     grid-template-columns: repeat(1, 1fr);
     grid-template-rows: 400px 200px 400px 200px;
-    background-color: rgb(64,64,64);  
   }
   .front-travel-hist { grid-column: 1; grid-row: 1; }
   .front-fft         { grid-column: 1; grid-row: 2; }

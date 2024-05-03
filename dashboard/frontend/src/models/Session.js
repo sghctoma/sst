@@ -72,7 +72,7 @@ var Session = {
       m.redraw()
     })
   },
-  change: function(name, description) {
+  change: function(name, description, suspension_settings) {
     Object.values(Session.list).forEach(day => {
       day.forEach(session => {
         if (session.id == Session.current.id) {
@@ -83,6 +83,16 @@ var Session = {
     })
     Session.current.name = name
     Session.current.description = description
+    Session.current.front_springrate = suspension_settings.front_springrate
+    Session.current.rear_springrate = suspension_settings.rear_springrate
+    Session.current.front_hsc = suspension_settings.front_hsc
+    Session.current.rear_hsc = suspension_settings.rear_hsc
+    Session.current.front_lsc = suspension_settings.front_lsc
+    Session.current.rear_lsc = suspension_settings.rear_lsc
+    Session.current.front_lsr = suspension_settings.front_lsr
+    Session.current.rear_lsr = suspension_settings.rear_lsr
+    Session.current.front_hsr = suspension_settings.front_hsr
+    Session.current.rear_hsr = suspension_settings.rear_hsr
     m.redraw()
   },
   current: {loaded: false},
@@ -99,17 +109,17 @@ var Session = {
       })
     })
   },
-  patch: function(name, description) {
+  patch: function(name, description, suspension_settings) {
     return m.request({
       method: "PATCH",
       url: "/api/session/" + Session.current.id,
       headers: {
         "X-CSRF-TOKEN": SST.getCookie("csrf_access_token"),
       },
-      body: {"name": name, "desc": description},
+      body: {"name": name, "desc": description, ...suspension_settings},
     })
     .then(function(result) {
-      Session.change(name, description)
+      Session.change(name, description, suspension_settings)
     })
   },
   importGPX: async function(event) {

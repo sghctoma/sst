@@ -6,7 +6,6 @@
   display: grid;
   grid-template-columns: repeat(1, 1fr);
   grid-template-rows: 400px 200px;
-  background-color: rgb(64,64,64);  
 }
 .travel-hist { grid-column: 1; grid-row: 1; }
 .fft         { grid-column: 1; grid-row: 2; }
@@ -15,7 +14,6 @@
   display: grid;
   grid-template-columns: repeat(1, 1fr);
   grid-auto-rows: max-content;
-  background-color: rgb(64,64,64);  
 }
 
   .velocity-hist { grid-column: 1; grid-row: 1; }
