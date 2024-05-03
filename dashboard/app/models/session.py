@@ -20,6 +20,16 @@ class Session(db.Model, Synchronizable):
     track: uuid.UUID = db.Column('track_id', db.Uuid(),
                                  db.ForeignKey('track.id'))
     data = db.Column(db.LargeBinary, nullable=False)
+    front_springrate: str = db.Column(db.String)
+    rear_springrate: str = db.Column(db.String)
+    front_hsc: int = db.Column(db.Integer)
+    rear_hsc: int = db.Column(db.Integer)
+    front_lsc: int = db.Column(db.Integer)
+    rear_lsc: int = db.Column(db.Integer)
+    front_lsr: int = db.Column(db.Integer)
+    rear_lsr: int = db.Column(db.Integer)
+    front_hsr: int = db.Column(db.Integer)
+    rear_hsr: int = db.Column(db.Integer)
 
     @property
     def psst_encoded(self) -> str:

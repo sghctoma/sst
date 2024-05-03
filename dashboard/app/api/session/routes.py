@@ -230,7 +230,17 @@ def patch(id: uuid.UUID):
     data = request.json
     db.session.execute(db.update(Session).filter_by(id=id).values(
         name=data['name'],
-        description=data['desc']
+        description=data['desc'],
+        front_springrate=data['front_springrate'],
+        rear_springrate=data['rear_springrate'],
+        front_hsc=data['front_hsc'],
+        rear_hsc=data['rear_hsc'],
+        front_lsc=data['front_lsc'],
+        rear_lsc=data['rear_lsc'],
+        front_lsr=data['front_lsr'],
+        rear_lsr=data['rear_lsr'],
+        front_hsr=data['front_hsr'],
+        rear_hsr=data['rear_hsr'],
     ))
     db.session.commit()
     return '', status.NO_CONTENT
@@ -312,6 +322,16 @@ def session_html(session_id: uuid.UUID):
         id=session.id,
         name=session.name,
         description=session.description,
+        front_springrate=session.front_springrate,
+        rear_springrate=session.rear_springrate,
+        front_hsc=session.front_hsc,
+        rear_hsc=session.rear_hsc,
+        front_lsc=session.front_lsc,
+        rear_lsc=session.rear_lsc,
+        front_lsr=session.front_lsr,
+        rear_lsr=session.rear_lsr,
+        front_hsr=session.front_hsr,
+        rear_hsr=session.rear_hsr,
         start_time=session.timestamp,
         end_time=end_time,
         suspension_count=suspension_count,
