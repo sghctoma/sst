@@ -8,6 +8,7 @@ from app.models.board import Board
 from app.models.calibration import Calibration, CalibrationMethod
 from app.models.linkage import Linkage
 from app.models.setup import Setup
+from app.models.session import Session
 from app.telemetry.psst import dataclass_from_dict as dfd
 from conftest import DB_IDS
 
@@ -107,24 +108,6 @@ def test_pull(client, auth):
     s_ids = [s['id'] for s in response.json['session']]
     assert str(DB_IDS['session']) in s_ids
     assert str(DB_IDS['session2']) in s_ids
-
-
-def test_pull_deleted_session(app, client, auth):
-    auth.login()
-
-    with app.app_context():
-        CalibrationMethod.delete(DB_IDS['session'])
-
-    response = client.get('/api/sync/pull')
-    assert response.status_code == status.OK
-
-    assert 'session' in response.json
-    assert len(response.json['session']) == 2
-    for s in response.json['session']:
-        if s['id'] == DB_IDS['session']:
-            assert 'psst_encoded' not in s
-        else:
-            assert 'psst_encoded' in s
 
 
 def test_pull_since(app, client, auth):

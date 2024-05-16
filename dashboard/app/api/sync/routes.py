@@ -67,11 +67,6 @@ def pull_entities(klass: type, since: int):
         new_entity['client_updated'] = entity.client_updated
         new_entity['deleted'] = entity.deleted
 
-        # The data field of Sessions is not annotated either, we have to
-        # include it manually for non-deleted sessions.
-        if klass is Session and entity.deleted is None:
-            new_entity['psst_encoded'] = entity.psst_encoded
-
         entities_list.append(new_entity)
 
     return entities_list

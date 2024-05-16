@@ -32,16 +32,6 @@ class Session(db.Model, Synchronizable):
     rear_hsr: int = db.Column(db.Integer)
 
     @property
-    def psst_encoded(self) -> str:
-        return base64.b64encode(self.data).decode('utf-8')
-
-    # This differs from the psst() setter in that it does not touch any other
-    # fields, just sets the raw data directly. Used during synchronization.
-    @psst_encoded.setter
-    def psst_encoded(self, data: str):
-        self.data = base64.b64decode(data)
-
-    @property
     def psst(self) -> bytes:
         return self.data
 

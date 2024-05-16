@@ -190,6 +190,24 @@ def test_patch(auth, client):
     assert response.json['description'] == 'new_description'
 
 
+def test_patch_psst(auth, client):
+    auth.login()
+
+    # get the original session
+    response = client.get(f'/api/session/{DB_IDS["session"]}')
+    session = response.json
+
+    # check if patching really changes the 'data' field
+    client.patch(f'/api/session/{DB_IDS["session"]}/psst', data='XXXX')
+    response = client.get(f'/api/session/{DB_IDS["session"]}/psst')
+    assert response.data == b'XXXX'
+
+    # check if any other fields are unchanged
+    response = client.get(f'/api/session/{DB_IDS["session"]}')
+    new_session = response.json
+    assert session == new_session
+
+
 @pytest.mark.parametrize(
     ('id', 'message'),
     (

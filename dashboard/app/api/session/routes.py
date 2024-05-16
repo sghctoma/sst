@@ -250,6 +250,27 @@ def patch(id: uuid.UUID):
     return '', status.NO_CONTENT
 
 
+@bp.route('/<uuid:id>/psst', methods=['PATCH'])
+@jwt_required()
+def patch_psst(id: uuid.UUID):
+    session = Session.get(id)
+    if not session:
+        return jsonify(), status.NOT_FOUND
+
+    # This API endpoint should only be used during the synchronization process
+    # to eliminate the need for sending potentially too large HTTP requests.
+    # It is called for each modified session after an /api/sync/pull call. We
+    # don't want the 'updated' field set by that call overwritten here, so we
+    # set the updated value explicitly.
+    db.session.execute(db.update(Session).filter_by(id=id).values(
+        data=request.data,
+        updated=session.updated,
+    ))
+    db.session.commit()
+    generate_bokeh(id)
+    return '', status.NO_CONTENT
+
+
 @bp.route('/<uuid:id>/bokeh', methods=['PUT'])
 def generate_bokeh(id: uuid.UUID):
     s = Session.get(id)
