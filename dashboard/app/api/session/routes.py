@@ -229,18 +229,22 @@ def put_processed():
 def patch(id: uuid.UUID):
     data = request.json
     db.session.execute(db.update(Session).filter_by(id=id).values(
-        name=data['name'],
-        description=data['desc'],
-        front_springrate=data['front_springrate'],
-        rear_springrate=data['rear_springrate'],
-        front_hsc=data['front_hsc'],
-        rear_hsc=data['rear_hsc'],
-        front_lsc=data['front_lsc'],
-        rear_lsc=data['rear_lsc'],
-        front_lsr=data['front_lsr'],
-        rear_lsr=data['rear_lsr'],
-        front_hsr=data['front_hsr'],
-        rear_hsr=data['rear_hsr'],
+        name=data['name'] if 'name' in data else None,
+        description=data['desc'] if 'desc' in data else None,
+        front_springrate=(data['front_springrate']
+                          if 'front_springrate' in data
+                          else None),
+        rear_springrate=(data['rear_springrate']
+                         if 'rear_springrate' in data
+                         else None),
+        front_hsc=data['front_hsc'] if 'front_hsc' in data else None,
+        rear_hsc=data['rear_hsc'] if 'rear_hsc' in data else None,
+        front_lsc=data['front_lsc'] if 'front_lsc' in data else None,
+        rear_lsc=data['rear_lsc'] if 'rear_lsc' in data else None,
+        front_lsr=data['front_lsr'] if 'front_lsr' in data else None,
+        rear_lsr=data['rear_lsr'] if 'rear_lsr' in data else None,
+        front_hsr=data['front_hsr'] if 'front_hsr' in data else None,
+        rear_hsr=data['rear_hsr'] if 'rear_hsr' in data else None,
     ))
     db.session.commit()
     return '', status.NO_CONTENT
