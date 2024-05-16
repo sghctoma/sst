@@ -19,7 +19,7 @@ class Session(db.Model, Synchronizable):
     timestamp: int = db.Column(db.Integer, nullable=False)
     track: uuid.UUID = db.Column('track_id', db.Uuid(),
                                  db.ForeignKey('track.id'))
-    data = db.Column(db.LargeBinary, nullable=False)
+    data = db.Column(db.LargeBinary)
     front_springrate: str = db.Column(db.String)
     rear_springrate: str = db.Column(db.String)
     front_hsc: int = db.Column(db.Integer)
