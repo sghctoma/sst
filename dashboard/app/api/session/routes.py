@@ -100,6 +100,13 @@ def get_all():
     return jsonify(list(entities)), status.OK
 
 
+@bp.route('/incomplete', methods=['GET'])
+def get_incomplete():
+    query = db.select(Session.id).filter_by(deleted=None, data=None)
+    entities = db.session.execute(query).scalars()
+    return jsonify(list(entities)), status.OK
+
+
 @bp.route('/<uuid:id>/psst', methods=['GET'])
 def get_psst(id: uuid.UUID):
     entity = Session.get(id)

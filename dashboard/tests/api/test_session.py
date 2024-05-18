@@ -7,6 +7,8 @@ import pytest
 from flask import current_app
 from http import HTTPStatus as status
 
+from app.extensions import db
+from app.models.session import Session
 from conftest import DB_IDS, session_data, track_gpx
 
 
@@ -14,6 +16,15 @@ def test_get_all(client):
     response = client.get('/api/session')
     ids = [c['id'] for c in response.json]
     assert str(DB_IDS['session']) in ids
+
+
+def test_get_incomplete(app, client):
+    with app.app_context():
+        session = Session.get(DB_IDS['session'])
+        session.data = None
+        db.session.commit()
+    response = client.get('/api/session/incomplete')
+    assert str(DB_IDS['session']) in response.json
 
 
 def test_get_psst(client):
