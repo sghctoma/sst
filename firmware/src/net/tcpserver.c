@@ -381,6 +381,27 @@ static bool process_dirinfo_request(struct tcpserver *server) {
     return true;
 }
 
+static bool tcpserver_process(struct tcpserver *server) {
+    if (server->requested_file == 0) {
+        return process_dirinfo_request(server);
+    } else if (process_sst_file_request(server)) {
+        TCHAR path_old[10];
+        TCHAR path_new[19];
+        sprintf(path_old, "%05d.SST", server->requested_file);
+        sprintf(path_new, "uploaded/%s", path_old);
+        f_rename(path_old, path_new);
+        return true;
+    }
+
+    return false;
+}
+
+static void tcpserver_teardown(struct tcpserver *server) {
+    tcp_server_close(server);
+    mdns_resp_del_service (netif_default, server->mdns_slot);
+    mdns_resp_remove_netif (netif_default);
+}
+
 // ----------------------------------------------------------------------------
 // MDNS functions
 static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
@@ -418,35 +439,16 @@ bool tcpserver_init(struct tcpserver *server) {
     return true;
 }
 
-void tcpserver_teardown(struct tcpserver *server) {
-    tcp_server_close(server);
-    mdns_resp_del_service (netif_default, server->mdns_slot);
-    mdns_resp_remove_netif (netif_default);
-}
-
-bool tcpserver_process(struct tcpserver *server) {
-    if (server->requested_file == 0) {
-        return process_dirinfo_request(server);
-    } else if (process_sst_file_request(server)) {
-        TCHAR path_old[10];
-        TCHAR path_new[19];
-        sprintf(path_old, "%05d.SST", server->requested_file);
-        sprintf(path_new, "uploaded/%s", path_old);
-        f_rename(path_old, path_new);
-        return true;
+bool tcpserver_serve(struct tcpserver *server) {
+    while (server->status != STATUS_FINISHED) {
+        if (server->status == STATUS_FILE_REQUESTED) {
+            tcpserver_process(server);
+        }
+        sleep_ms(1);
     }
-
-    return false;
+    tcpserver_teardown(server);
 }
 
 void inline tcpserver_finish(struct tcpserver *server) {
     server->status = STATUS_FINISHED;
-}
-
-bool inline tcpserver_finished(struct tcpserver *server) {
-    return server->status == STATUS_FINISHED;    
-}
-
-bool inline tcpserver_requested(struct tcpserver *server) {
-    return server->status == STATUS_FILE_REQUESTED;    
 }

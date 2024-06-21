@@ -654,16 +654,8 @@ static void on_serve_tcp() {
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else if (tcpserver_init(&server)) {
-         display_message(&disp, "SERVER ON");
-
-        while (!tcpserver_finished(&server)) {
-            if (tcpserver_requested(&server)) {
-                tcpserver_process(&server);
-            }
-            sleep_ms(1);
-        }
-
-        tcpserver_teardown(&server);
+        display_message(&disp, "SERVER ON");
+        tcpserver_serve(&server);
     }
     wifi_disconnect();
     state = IDLE;

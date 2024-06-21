@@ -16,10 +16,7 @@ struct tcpserver {
 };
 
 bool tcpserver_init(struct tcpserver *server);
-void tcpserver_teardown(struct tcpserver *server);
-bool tcpserver_process(struct tcpserver *server);
+bool tcpserver_serve(struct tcpserver *server);
 void tcpserver_finish(struct tcpserver *server);
-bool tcpserver_finished(struct tcpserver *server);
-bool tcpserver_requested(struct tcpserver *server);
 
 #endif /* _TCPSERVER_H */
