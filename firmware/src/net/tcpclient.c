@@ -214,38 +214,42 @@ bool send_file(const char *filename) {
     static uint8_t buffer[READ_BUF_LEN];
     uint br = READ_BUF_LEN;
     FSIZE_t total_read = 0;
-    while (br == READ_BUF_LEN) {
-        fr = f_read(&f, buffer, READ_BUF_LEN, &br);
-        if (fr != FR_OK) {
-            tcp_result(conn, -1);
-            return false;
-        }
-        total_read += br;
+    bool needs_retry = false;
 
-        // XXX Upload is painfully slow here if I don't nudge the LED PIN here.
-        //     Must be some timing issue with LwIP that I am not ready to 
-        //     debug... A single call to cyw43_arch_gpio_put would be enough
-        //     to speed things up significantly (5-6x speedup), but might as
-        //     well blink to show progress.
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-
-        while (tcp_sndbuf(conn->pcb) < br) {
-            // XXX Lots of errors in Release mode if we have a too short sleep
-            //     here.
-            sleep_ms(20);
-        }
-        
+    while (true) {
+        // Determine how many bytes to send in this turn. This should be the
+        // minimum of the available send buffer size and the maximum read
+        // length.
         cyw43_arch_lwip_begin();
-        tcp_write(conn->pcb, buffer, br, TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
+        u16_t to_read = tcp_sndbuf(conn->pcb);
+        cyw43_arch_lwip_end();
+        if (to_read > READ_BUF_LEN) {
+            to_read = READ_BUF_LEN;
+        }
+
+        // Read data from the SST file.
+        if (!needs_retry) {
+            fr = f_read(&f, buffer, to_read, &br);
+            if (fr != FR_OK) {
+                tcp_result(conn, -1);
+                return false;
+            }
+            total_read += br;
+        }
+
+        // Write data to TCP stream
+        cyw43_arch_lwip_begin();
+        err_t err = tcp_write(conn->pcb, buffer, br,
+                              TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
+        needs_retry = err != ERR_OK;
+        tcp_output(conn->pcb);
         cyw43_arch_lwip_end();
 
-        if (total_read == finfo.fsize && NULL != conn->pcb) {
-            cyw43_arch_lwip_begin();
-            tcp_output(conn->pcb);
-            cyw43_arch_lwip_end();
+        if (total_read == finfo.fsize) {
             break;
         }
+
+        sleep_ms(1);
     }
 
     f_close(&f);

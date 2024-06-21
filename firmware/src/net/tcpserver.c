@@ -199,38 +199,42 @@ static bool process_sst_file_request(struct tcpserver *server) {
     static uint8_t buffer[READ_BUF_LEN];
     uint br = READ_BUF_LEN;
     FSIZE_t total_read = 0;
-    while (br == READ_BUF_LEN) {
-        fr = f_read(&f, buffer, READ_BUF_LEN, &br);
-        if (fr != FR_OK) {
-            tcp_server_result(server, -1);
-            return false;
-        }
-        total_read += br;
+    bool needs_retry = false;
 
-        // XXX Upload is painfully slow if I don't nudge the LED PIN here.
-        //     Must be some timing issue with LwIP that I am not ready to 
-        //     debug... A single call to cyw43_arch_gpio_put would be enough
-        //     to speed things up significantly (5-6x speedup), but might as
-        //     well blink to show progress.
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-
-        while (tcp_sndbuf(server->client_pcb) < br) {
-            // XXX Lots of errors in Release mode if we have a too short sleep
-            //     here.
-            sleep_ms(20);
-        }
-    
+    while (true) {
+        // Determine how many bytes to send in this turn. This should be the
+        // minimum of the available send buffer size and the maximum read
+        // length.
         cyw43_arch_lwip_begin();
-        tcp_write(server->client_pcb, buffer, br, TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
+        u16_t to_read = tcp_sndbuf(server->client_pcb);
+        cyw43_arch_lwip_end();
+        if (to_read > READ_BUF_LEN) {
+            to_read = READ_BUF_LEN;
+        }
+
+        // Read data from the SST file.
+        if (!needs_retry) {
+            fr = f_read(&f, buffer, to_read, &br);
+            if (fr != FR_OK) {
+                tcp_server_result(server, -1);
+                return false;
+            }
+            total_read += br;
+        }
+
+        // Write data to TCP stream
+        cyw43_arch_lwip_begin();
+        err_t err = tcp_write(server->client_pcb, buffer, br,
+                              TCP_WRITE_FLAG_COPY | (total_read < finfo.fsize ? TCP_WRITE_FLAG_MORE : 0));
+        needs_retry = err != ERR_OK;
+        tcp_output(server->client_pcb);
         cyw43_arch_lwip_end();
 
-        if (total_read == finfo.fsize && NULL != server->client_pcb) {
-            cyw43_arch_lwip_begin();
-            tcp_output(server->client_pcb);
-            cyw43_arch_lwip_end();
+        if (total_read == finfo.fsize) {
             break;
         }
+
+        sleep_ms(1);
     }
 
     f_close(&f);
@@ -336,37 +340,31 @@ static bool process_dirinfo_request(struct tcpserver *server) {
 
     // send metadata of each SST file
     struct node *n = to_import->head;
+    bool needs_retry = false;
     while (n != NULL) {
-        // These will be dummy values if reading them fails, so that the combined size
-        // we sent earlier would be correct.
-        time_t timestamp = get_timestamp(n->data);
-        FSIZE_t size = get_size(n->data);
-
-        // XXX Upload is painfully slow here if I don't nudge the LED PIN here.
-        //     Must be some timing issue with LwIP that I am not ready to 
-        //     debug... A single call to cyw43_arch_gpio_put would be enough
-        //     to speed things up significantly (5-6x speedup), but might as
-        //     well blink to show progress.
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-
-        while (tcp_sndbuf(server->client_pcb) < file_data_size) {
-            // XXX Lots of errors in Release mode if we have a too short sleep
-            //     here.
-            sleep_ms(20);
+        static char record[25];
+        if (!needs_retry) {
+            // These will be dummy values if reading them fails, so that the combined size
+            // we sent earlier would be correct.
+            FSIZE_t size = get_size(n->data);
+            time_t timestamp = get_timestamp(n->data);
+            memcpy(record, n->data, FILENAME_LENGTH - 1);
+            memcpy(record + FILENAME_LENGTH - 1, &size, sizeof(FSIZE_t));
+            memcpy(record + FILENAME_LENGTH - 1 + sizeof(FSIZE_t), &timestamp, sizeof(time_t));
         }
 
         cyw43_arch_lwip_begin();
-        tcp_write(server->client_pcb, n->data, FILENAME_LENGTH - 1, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
-        tcp_write(server->client_pcb, &size, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
-        tcp_write(server->client_pcb, &timestamp, sizeof(time_t), TCP_WRITE_FLAG_COPY | (n->next != NULL ? TCP_WRITE_FLAG_MORE : 0));
-
-        if (n->next == NULL) {
-            tcp_output(server->client_pcb);
-        }
+        err_t err = tcp_write(server->client_pcb, &record, file_data_size,
+                              TCP_WRITE_FLAG_COPY | (n->next != NULL ? TCP_WRITE_FLAG_MORE : 0));
+        needs_retry = err != ERR_OK;
+        tcp_output(server->client_pcb);
         cyw43_arch_lwip_end();
 
-        n = n->next;
+        if (!needs_retry) {
+            n = n->next;
+        }
+
+        sleep_ms(1);
     }
     list_delete(to_import);
 
