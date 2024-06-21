@@ -68,7 +68,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
 }
 
 static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb) {
-    return tcp_server_result(arg, -1); // no response is an error?
+    return ERR_OK;
 }
 
 static void tcp_server_err(void *arg, err_t err) {
