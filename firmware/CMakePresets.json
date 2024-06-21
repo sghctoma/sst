@@ -11,8 +11,9 @@
       "displayName": "I2C display, SDIO MicroSD card",
       "hidden": false,
       "description": "Default configuration with I2C display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build/default",
+      "binaryDir": "${sourceDir}/build/release/default",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "DISP_PROTO": "PIO_I2C",
         "SPI_MICROSD": ""
       }
@@ -22,8 +23,9 @@
       "displayName": "SPI display, SDIO MicroSD card",
       "hidden": false,
       "description": "Configuration with SPI display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build/spi_display",
+      "binaryDir": "${sourceDir}/build/release/spi_display",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "DISP_PROTO": "SPI",
         "SPI_MICROSD": ""
       }
@@ -33,8 +35,9 @@
       "displayName": "I2C display, SPI MicroSD card",
       "hidden": false,
       "description": "Configuration with I2C display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build/spi_microsd",
+      "binaryDir": "${sourceDir}/build/release/spi_microsd",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "DISP_PROTO": "PIO_I2C",
         "SPI_MICROSD": "ON"
       }
@@ -44,8 +47,57 @@
       "displayName": "SPI display, SPI MicroSD card",
       "hidden": false,
       "description": "Configuration with SPI display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build/spi_display_microsd",
+      "binaryDir": "${sourceDir}/build/release/spi_display_microsd",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "DISP_PROTO": "SPI",
+        "SPI_MICROSD": "ON"
+      }
+    },
+    {
+      "name": "default_debug",
+      "displayName": "I2C display, SDIO MicroSD card",
+      "hidden": false,
+      "description": "Default configuration with I2C display and SDIO MicroSD card. (Debug)",
+      "binaryDir": "${sourceDir}/build/debug/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DISP_PROTO": "PIO_I2C",
+        "SPI_MICROSD": ""
+      }
+    },
+    {
+      "name": "spi_display_debug",
+      "displayName": "SPI display, SDIO MicroSD card",
+      "hidden": false,
+      "description": "Configuration with SPI display and SDIO MicroSD card. (Debug)",
+      "binaryDir": "${sourceDir}/build/debug/spi_display",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DISP_PROTO": "SPI",
+        "SPI_MICROSD": ""
+      }
+    },
+    {
+      "name": "spi_microsd_debug",
+      "displayName": "I2C display, SPI MicroSD card",
+      "hidden": false,
+      "description": "Configuration with I2C display and SPI MicroSD card. (Debug)",
+      "binaryDir": "${sourceDir}/build/debug/spi_microsd",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "DISP_PROTO": "PIO_I2C",
+        "SPI_MICROSD": "ON"
+      }
+    },
+    {
+      "name": "spi_display_microsd_debug",
+      "displayName": "SPI display, SPI MicroSD card",
+      "hidden": false,
+      "description": "Configuration with SPI display and SPI MicroSD card. (Debug)",
+      "binaryDir": "${sourceDir}/build/debug/spi_display_microsd",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "DISP_PROTO": "SPI",
         "SPI_MICROSD": "ON"
       }
