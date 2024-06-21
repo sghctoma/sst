@@ -32,10 +32,6 @@ static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     struct tcpserver *server = (struct tcpserver*)arg;
     server->sent_len += len;
 
-    if (server->sent_len == server->data_len) {
-        server->status = STATUS_FILE_SENT;
-    }
-
     return ERR_OK;
 }
 
@@ -52,6 +48,10 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         tcp_recved(tpcb, p->tot_len);
         
         if (s < 0 || s == STATUS_FINISHED) {
+            // close the server
+            tcp_server_result(arg, s);
+        } else if (s == STATUS_FILE_SENT) {
+            // close the client connection
             tcp_server_result(arg, s);
         } else if (s == STATUS_FILE_REQUESTED) {
             int id;
