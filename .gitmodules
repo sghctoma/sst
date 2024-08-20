@@ -1,11 +1,11 @@
 [submodule "pico/sufni-suspension-telemetry/lib/pico-as5600"]
 	path = firmware/external/pico-as5600
 	url = https://github.com/sghctoma/pico-as5600
-[submodule "pico/sufni-suspension-telemetry/lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
-	path = firmware/external/no-OS-FatFS-SD-SPI-RPi-Pico
-	url = https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico
-	branch = sdio
 [submodule "firmware/lib/pico-ssd1306"]
 	path = firmware/external/pico-ssd1306
 	url = https://github.com/sghctoma/pico-ssd1306
 	branch = multi-submodule
+[submodule "firmware/external/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico"]
+	path = firmware/external/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+	url = https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
+	branch = dev

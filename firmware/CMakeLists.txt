@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.21.1)
 
+set(PICO_BOARD pico_w)
+
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
 project(sufni-suspension-telemetry)
-
-set(PICO_BOARD pico_w)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -31,7 +31,7 @@ pico_generate_pio_header(sufni-suspension-telemetry
     ${CMAKE_CURRENT_LIST_DIR}/src/pio_i2c/i2c.pio
 )
 
-add_subdirectory(external/no-OS-FatFS-SD-SPI-RPi-Pico/src firmware/external/no-OS-FatFS-SD-SPI-RPi-Pico/src)
+add_subdirectory(external/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src firmware/external/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src)
 add_subdirectory(external/pico-as5600 firmware/external/pico-as5600)
 add_subdirectory(external/pico-ssd1306 firmware/external/pico-ssd1306)
 
@@ -66,7 +66,7 @@ target_link_libraries(sufni-suspension-telemetry
     hardware_i2c
     hardware_pio
     hardware_rtc
-    FatFs_SPI
+    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
     as5600
     ssd1306
 )

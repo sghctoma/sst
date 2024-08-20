@@ -12,7 +12,7 @@
 #include "pico/time.h"
 #include "pico/types.h"
 #include "pico/unique_id.h"
-#include "hardware/clocks.h"
+#include "pico/runtime_init.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/rtc.h"
@@ -22,7 +22,6 @@
 #include "hardware/watchdog.h"
 #include "bsp/board.h"
 #include "ff.h"
-#include "hw_config.h"
 
 // For scb_hw so we can enable deep sleep
 #include "hardware/structs/scb.h"
@@ -183,8 +182,8 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
 // Data storage
 
 static int setup_storage() {
-    sd_card_t *sd = sd_get_by_num(0);
-    FRESULT fr = f_mount(&sd->fatfs, sd->pcName, 1);
+    FATFS fs;
+    FRESULT fr = f_mount(&fs, "", 1);
     if (fr != FR_OK) {
         return PICO_ERROR_GENERIC;
     }
@@ -629,7 +628,7 @@ static void on_waking() {
     scb_hw->scr = scb_orig;
     clocks_hw->sleep_en0 = clock0_orig;
     clocks_hw->sleep_en1 = clock1_orig;
-    clocks_init();
+    runtime_init_clocks();
 
     ssd1306_poweron(&disp);
     enable_button(BUTTON_LEFT);
