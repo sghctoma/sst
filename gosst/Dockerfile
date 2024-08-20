@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS build
+FROM golang:1.22-alpine AS build
 
 WORKDIR /go/src/gosst
 
@@ -9,7 +9,7 @@ RUN go mod download
 COPY . .
 RUN go install -v ./cmd/...
 
-FROM alpine:3.18 as gosst-tcp
+FROM alpine:3.20 as gosst-tcp
 WORKDIR /app
 COPY --from=build /go/bin/gosst-tcp gosst-tcp
 CMD ["./gosst-tcp", \
@@ -18,7 +18,7 @@ CMD ["./gosst-tcp", \
      "--port", "557", \
      "--server", "http://dashboard:5000"]
 
-FROM alpine:3.18 as gosst-http
+FROM alpine:3.20 as gosst-http
 WORKDIR /app
 COPY --from=build /go/bin/gosst-http gosst-http
 CMD ["./gosst-http", \

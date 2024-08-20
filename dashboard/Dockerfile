@@ -1,6 +1,6 @@
 # -- build image
 
-FROM node:21.0-bookworm-slim as build
+FROM node:22.0-bookworm-slim as build
 
 WORKDIR /usr/src/app
 COPY frontend/ /usr/src/app/
