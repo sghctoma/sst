@@ -203,6 +203,11 @@ static int setup_storage() {
         return PICO_ERROR_GENERIC;
     }
 
+    fr = f_mkdir("trash");
+    if (!(fr == FR_OK || fr == FR_EXIST)) {
+        return PICO_ERROR_GENERIC;
+    }
+
     return 0;
 }
 

@@ -382,6 +382,13 @@ static bool process_dirinfo_request(struct tcpserver *server) {
 static bool tcpserver_process(struct tcpserver *server) {
     if (server->requested_file == 0) {
         return process_dirinfo_request(server);
+    } else if (server->requested_file < 0) {
+        TCHAR path_old[10];
+        TCHAR path_new[16];
+        sprintf(path_old, "%05d.SST", -server->requested_file);
+        sprintf(path_new, "trash/%s", path_old);
+        f_rename(path_old, path_new);
+        return true;
     } else if (process_sst_file_request(server)) {
         TCHAR path_old[10];
         TCHAR path_new[19];
