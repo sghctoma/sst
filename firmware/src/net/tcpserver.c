@@ -18,8 +18,9 @@
 #define STATUS_CLIENT_CONNECTED 2
 #define STATUS_FILE_REQUESTED   3
 #define STATUS_HEADER_OK        4
-#define STATUS_FILE_SENT        5
+#define STATUS_FILE_RECEIVED    5
 #define STATUS_FINISHED         6
+#define STATUS_FILE_TRASHED    10
 
 static pico_unique_board_id_t board_id;
 
@@ -50,7 +51,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         if (s < 0 || s == STATUS_FINISHED) {
             // close the server
             tcp_server_result(arg, s);
-        } else if (s == STATUS_FILE_SENT) {
+        } else if (s == STATUS_FILE_RECEIVED) {
             // close the client connection
             tcp_server_result(arg, s);
         } else if (s == STATUS_FILE_REQUESTED) {
@@ -240,7 +241,7 @@ static bool process_sst_file_request(struct tcpserver *server) {
     f_close(&f);
 
     // wait for client to acknowledge file was received
-    while (server->status != STATUS_FILE_SENT) {
+    while (server->status != STATUS_FILE_RECEIVED) {
         if (server->status < 0) {
             return false;
         }
@@ -369,7 +370,37 @@ static bool process_dirinfo_request(struct tcpserver *server) {
     list_delete(to_import);
 
     // wait for client to acknowledge file was received
-    while (server->status != STATUS_FILE_SENT) {
+    while (server->status != STATUS_FILE_RECEIVED) {
+        if (server->status < 0) {
+            return false;
+        }
+        sleep_ms(1);
+    }
+
+    return true;
+}
+
+// SST file trash handler
+static bool process_sst_file_trash(struct tcpserver *server) {
+    TCHAR path_old[10];
+    TCHAR path_new[16];
+    sprintf(path_old, "%05d.SST", -server->requested_file);
+    sprintf(path_new, "trash/%s", path_old);
+    f_rename(path_old, path_new);
+
+    // send file trashed status
+    static int status = STATUS_FILE_TRASHED;
+    cyw43_arch_lwip_begin();
+    tcp_write(server->client_pcb, &status,  sizeof(int), TCP_WRITE_FLAG_COPY); 
+    tcp_output(server->client_pcb);
+    cyw43_arch_lwip_end();
+
+    // wait for client to acknowledge the status update was received.
+    // NOTE: This is handled this way so that the TCP connection is closed by
+    //       the server during file deletion too. It would be simpler if the
+    //       client closed it, but I think the consistency is worth an extra
+    //       byte of network traffic.
+    while (server->status != STATUS_FILE_RECEIVED) {
         if (server->status < 0) {
             return false;
         }
@@ -383,12 +414,7 @@ static bool tcpserver_process(struct tcpserver *server) {
     if (server->requested_file == 0) {
         return process_dirinfo_request(server);
     } else if (server->requested_file < 0) {
-        TCHAR path_old[10];
-        TCHAR path_new[16];
-        sprintf(path_old, "%05d.SST", -server->requested_file);
-        sprintf(path_new, "trash/%s", path_old);
-        f_rename(path_old, path_new);
-        return true;
+        return process_sst_file_trash(server);
     } else if (process_sst_file_request(server)) {
         TCHAR path_old[10];
         TCHAR path_new[19];
