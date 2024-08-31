@@ -35,7 +35,6 @@ static spi_t spi = {
     .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
     .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
     .baud_rate = BAUD_RATE,
-    .DMA_IRQ_num = DMA_IRQ_1,
 };
 
 /* SPI Interface */
