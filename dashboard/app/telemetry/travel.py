@@ -75,15 +75,11 @@ def travel_figure(telemetry: Telemetry, lod: int,
     p.legend.level = 'overlay'
 
     left_unselected = BoxAnnotation(
-        top=None,     # XXX workaround for Bokeh issue
-        bottom=None,  # https://github.com/bokeh/bokeh/issues/13432
         left=p.x_range.start,
         right=p.x_range.start,
         fill_alpha=0.8,
         fill_color='#000000')
     right_unselected = BoxAnnotation(
-        top=None,     # XXX workaround for Bokeh issue
-        bottom=None,  # https://github.com/bokeh/bokeh/issues/13432
         left=p.x_range.end,
         right=p.x_range.end,
         fill_alpha=0.8,
@@ -231,8 +227,6 @@ def _add_travel_stat_labels(strokes: Strokes, max_travel: float,
 def _add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
     for airtime in airtimes:
         b = BoxAnnotation(
-            top=None,     # XXX workaround for Bokeh issue
-            bottom=None,  # https://github.com/bokeh/bokeh/issues/13432
             left=airtime.Start,
             right=airtime.End,
             fill_color=Spectral11[-2],
