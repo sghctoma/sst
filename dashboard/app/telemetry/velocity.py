@@ -230,7 +230,10 @@ def velocity_histogram_figure(strokes: Strokes, velocity: list[float],
         bottom=-hst,
         left=0,
         fill_color='#FFFFFF',
-        fill_alpha=0.1)
+        fill_alpha=0.1,
+        movable='none',
+        resizable='none',
+        propagate_hover=True)
     p.add_layout(lowspeed_box)
     _add_velocity_stat_labels(p, strokes, mx)
 

@@ -78,12 +78,18 @@ def travel_figure(telemetry: Telemetry, lod: int,
         left=p.x_range.start,
         right=p.x_range.start,
         fill_alpha=0.8,
-        fill_color='#000000')
+        fill_color='#000000',
+        movable='none',
+        resizable='none',
+        propagate_hover=True)
     right_unselected = BoxAnnotation(
         left=p.x_range.end,
         right=p.x_range.end,
         fill_alpha=0.8,
-        fill_color='#000000')
+        fill_color='#000000',
+        movable='none',
+        resizable='none',
+        propagate_hover=True)
     p.add_layout(left_unselected)
     p.add_layout(right_unselected)
 
@@ -230,7 +236,10 @@ def _add_airtime_labels(p_travel: figure, airtimes: list[Airtime]):
             left=airtime.Start,
             right=airtime.End,
             fill_color=Spectral11[-2],
-            fill_alpha=0.2)
+            fill_alpha=0.2,
+            movable='none',
+            resizable='none',
+            propagate_hover=True)
         p_travel.add_layout(b)
         airtime_label = Label(
             x=airtime.Start + (airtime.End - airtime.Start) / 2,
