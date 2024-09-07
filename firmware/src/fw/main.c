@@ -165,7 +165,7 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
 
 static bool start_sensors() {
     absolute_time_t timeout = make_timeout_time_ms(3000);
-    while (!(fork_sensor.check_availability(&fork_sensor) || shock_sensor.check_availability(&shock_sensor) )) {
+    while (!(fork_sensor.check_availability(&fork_sensor) || shock_sensor.check_availability(&shock_sensor))) {
         if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
             return false;
         }
@@ -196,9 +196,8 @@ static bool start_sensors() {
 
 // ----------------------------------------------------------------------------
 // Data storage
-
 static int setup_storage() {
-    FATFS fs;
+    static FATFS fs;
     FRESULT fr = f_mount(&fs, "", 1);
     if (fr != FR_OK) {
         return PICO_ERROR_GENERIC;
@@ -708,7 +707,7 @@ int main() {
             display_message(&disp, "CARD ERR");
             while(true) { tight_loop_contents(); }
         }
-        
+
         if (!load_config()) {
             display_message(&disp, "CONF ERR");
             while(true) { tight_loop_contents(); }
