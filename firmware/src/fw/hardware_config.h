@@ -64,12 +64,22 @@
 // ----------------------------------------------------------------------------
 // Fork and shock sensors
 
+#ifdef FORK_LINEAR
+#define FORK_ADC         0
+#define FORK_PIN_ADC     26
+#else
 #define FORK_I2C         i2c0
 #define FORK_PIN_SDA     8
 #define FORK_PIN_SCL     9
+#endif // FORK_LINEAR
 
+#ifdef SHOCK_LINEAR
+#define SHOCK_ADC        2
+#define SHOCK_PIN_ADC    28
+#else
 #define SHOCK_I2C        i2c1
 #define SHOCK_PIN_SDA    14
 #define SHOCK_PIN_SCL    15
+#endif // SHOCK_LINEAR
 
 #endif // _HARDWARE_CONFIG_H

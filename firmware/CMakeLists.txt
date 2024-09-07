@@ -25,6 +25,7 @@ add_executable(sufni-suspension-telemetry
     src/ui/pushbutton.c
     src/util/config.c
     src/util/list.c
+    src/sensor/rotational.c
 )
 
 pico_generate_pio_header(sufni-suspension-telemetry

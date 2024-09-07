@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "as5600.h"
 #include "cyw43_ll.h"
 #include "device/usbd.h"
 #include "pico/platform.h"
@@ -18,7 +17,6 @@
 #include "hardware/rtc.h"
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
-#include "hardware/i2c.h"
 #include "hardware/watchdog.h"
 #include "bsp/board.h"
 #include "ff.h"
@@ -32,6 +30,7 @@
 #include "../rtc//ds3231.h"
 #include "../util/list.h"
 #include "../util/config.h"
+#include "../sensor/sensor.h"
 
 #include "hardware_config.h"
 
@@ -47,6 +46,9 @@ static FIL recording;
 static struct tcpserver server;
 
 struct ds3231 rtc;
+
+extern struct sensor fork_sensor;
+extern struct sensor shock_sensor;
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -127,11 +129,6 @@ static void calibrate_if_needed() {
 
 static const uint16_t SAMPLE_RATE = 1000;
 
-static volatile bool have_fork;
-static volatile bool have_shock;
-static volatile bool reversed_fork;
-static volatile bool reversed_shock;
-
 // We are using two buffers. Data acquisition happens on core #1 into the active
 // buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
 // on core #2.
@@ -150,18 +147,6 @@ struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
-static uint16_t get_angle(i2c_inst_t *i2c, bool have_sensor, bool reversed) {
-    static uint16_t value = 0xffff;
-    if (have_sensor) {
-        value = as5600_get_scaled_angle(i2c);
-        if (reversed) {
-            value = 4096 - value;
-        }
-    }
-
-    return value;
-}
-
 static bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
         count = 0;
@@ -170,12 +155,43 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
         active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
     }
 
-    active_buffer[count].fork_angle = get_angle(FORK_I2C, have_fork, reversed_fork);
-    active_buffer[count].shock_angle = get_angle(SHOCK_I2C, have_shock, reversed_shock);
+    active_buffer[count].fork_angle = fork_sensor.measure(&fork_sensor);
+    active_buffer[count].shock_angle = shock_sensor.measure(&shock_sensor);
 
     count += 1;
 
     return state == RECORD; // keep repeating if we are still recording
+}
+
+static bool start_sensors() {
+    absolute_time_t timeout = make_timeout_time_ms(3000);
+    while (!(fork_sensor.check_availability(&fork_sensor) || shock_sensor.check_availability(&shock_sensor) )) {
+        if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
+            return false;
+        }
+        sleep_ms(10);
+    }
+
+    FIL calibration_fil;
+    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_EXISTING | FA_READ);
+    if (!(fr == FR_OK || fr == FR_EXIST)) {
+        return false;
+    }
+
+    uint br;
+    uint16_t baseline;
+    bool inverted;
+    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
+    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
+    fork_sensor.start(&fork_sensor, baseline, inverted);
+
+    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
+    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
+    shock_sensor.start(&shock_sensor, baseline, inverted);
+
+    f_close(&calibration_fil);
+
+    return fork_sensor.available || shock_sensor.available;
 }
 
 // ----------------------------------------------------------------------------
@@ -285,69 +301,6 @@ static void data_storage_core1() {
 // ----------------------------------------------------------------------------
 // Setup functions
 
-static void setup_i2c() {
-    i2c_init(FORK_I2C, 1000000);
-    gpio_set_function(FORK_PIN_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(FORK_PIN_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(FORK_PIN_SDA);
-    gpio_pull_up(FORK_PIN_SCL);
-
-    i2c_init(SHOCK_I2C, 1000000);
-    gpio_set_function(SHOCK_PIN_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(SHOCK_PIN_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(SHOCK_PIN_SDA);
-    gpio_pull_up(SHOCK_PIN_SCL);
-}
-
-static bool setup_baseline(i2c_inst_t *i2c, uint16_t baseline) {
-    if (as5600_connected(i2c) && as5600_detect_magnet(i2c)) {
-        as5600_set_start_position(i2c, baseline);
-
-        // Power down tha DAC, we don't need it.
-        as5600_conf_set_output(i2c, OUTPUT_PWM);
-        // Helps with those 1-quanta-high rapid spikes.
-        as5600_conf_set_hysteresis(i2c, HYSTERESIS_2_LSB);
-        // 0.55 ms step response delay, 0.03 RMS output noise.
-        as5600_conf_set_slow_filter(i2c, SLOW_FILTER_4x);
-        // TODO: experiment with fast filter.
-        as5600_conf_set_fast_filter_threshold(i2c, FAST_FILTER_THRESHOLD_6_LSB);
-        return true;
-    } else {
-        return false;
-    }
-}
-
-static bool setup_sensors() {
-    absolute_time_t timeout = make_timeout_time_ms(3000);
-    while (!((as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) ||
-            (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)))) {
-        if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
-            return false;
-        }
-        sleep_ms(10);
-    }
-
-    FIL calibration_fil;
-    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_EXISTING | FA_READ);
-    if (!(fr == FR_OK || fr == FR_EXIST)) {
-        return false;
-    }
-
-    uint br;
-    uint16_t front_baseline, rear_baseline;
-    bool temp;
-    f_read(&calibration_fil, &front_baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &temp, sizeof(bool), &br);
-    reversed_fork = temp;
-    f_read(&calibration_fil, &rear_baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &temp, sizeof(bool), &br);
-    reversed_shock = temp;
-
-    have_fork = setup_baseline(FORK_I2C, front_baseline);
-    have_shock = setup_baseline(SHOCK_I2C, rear_baseline);
-    return have_fork || have_shock;
-}
-
 static void setup_display(ssd1306_t *disp) {
 #ifdef SPI_DISPLAY
     spi_init(DISPLAY_SPI, 1000000);
@@ -400,10 +353,10 @@ static void on_cal_idle() {
         ssd1306_clear(&disp);
         ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
         ssd1306_draw_string(&disp,   0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
-        if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+        if (fork_sensor.check_availability(&fork_sensor)) {
             ssd1306_draw_string(&disp,  0, 24, 1, "fork");
         }
-        if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+        if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
         }
         ssd1306_show(&disp);
@@ -411,18 +364,10 @@ static void on_cal_idle() {
 }
 
 static void on_cal_exp() {
-    uint16_t front_baseline = 0xffff;
-    uint16_t rear_baseline = 0xffff;
+    fork_sensor.calibrate_expanded(&fork_sensor);
+    shock_sensor.calibrate_expanded(&shock_sensor);
 
-    if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
-        front_baseline = as5600_get_raw_angle(FORK_I2C);
-        as5600_set_start_position(FORK_I2C, front_baseline);
-    }
-    if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
-        rear_baseline = as5600_get_raw_angle(SHOCK_I2C);
-        as5600_set_start_position(SHOCK_I2C, rear_baseline);
-    }
-    if (front_baseline == 0xffff && rear_baseline == 0xffff) {
+    if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
         display_message(&disp, "CAL ERR");
         sleep_ms(1000);
         state = CAL_IDLE_1;
@@ -433,20 +378,8 @@ static void on_cal_exp() {
 }
 
 static void on_cal_comp() {
-    uint16_t front_baseline = 0xffff;
-    uint16_t rear_baseline = 0xffff;
-
-    // We check rotation direction by comparing the measured value in a compressed
-    // state to 2048. This value means 180 degrees, which would be impossible in a
-    // triangle, so we know direction is reversed.
-    if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
-        front_baseline = as5600_get_start_position(FORK_I2C);
-        reversed_fork = as5600_get_scaled_angle(FORK_I2C) > 2048;
-    }
-    if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
-        rear_baseline = as5600_get_start_position(SHOCK_I2C);
-        reversed_shock = as5600_get_scaled_angle(SHOCK_I2C) > 2048;
-    }
+    fork_sensor.calibrate_compressed(&fork_sensor);
+    shock_sensor.calibrate_compressed(&shock_sensor);
 
     FIL calibration_fil;
     FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
@@ -458,10 +391,10 @@ static void on_cal_comp() {
     }
 
     uint bw;
-    f_write(&calibration_fil, &front_baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&reversed_fork, sizeof(bool), &bw);
-    f_write(&calibration_fil, &rear_baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&reversed_shock, sizeof(bool), &bw);
+    f_write(&calibration_fil, &fork_sensor.baseline, sizeof(uint16_t), &bw);
+    f_write(&calibration_fil, (const void *)&fork_sensor.inverted, sizeof(bool), &bw);
+    f_write(&calibration_fil, &shock_sensor.baseline, sizeof(uint16_t), &bw);
+    f_write(&calibration_fil, (const void *)&shock_sensor.inverted, sizeof(bool), &bw);
     f_close(&calibration_fil);
 
     state = IDLE;
@@ -473,7 +406,7 @@ static void on_rec_start() {
     multicore_fifo_drain();
     
     display_message(&disp, "INIT SENS");
-    if (!setup_sensors()) {
+    if (!start_sensors()) {
         display_message(&disp, "NO SENS");
         sleep_ms(1000);
         state = IDLE;
@@ -482,7 +415,7 @@ static void on_rec_start() {
 
     state = RECORD;
     char msg[8];
-    sprintf(msg, "REC:%s|%s", have_fork ? "F" : ".", have_shock ? "S" : ".");
+    sprintf(msg, "REC:%s|%s", fork_sensor.available ? "F" : ".", shock_sensor.available ? "S" : ".");
     display_message(&disp, msg);
 
     multicore_fifo_push_blocking(OPEN);
@@ -599,10 +532,10 @@ static void on_idle() {
         ssd1306_clear(&disp);
         ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
         ssd1306_draw_string(&disp,   0, 0, 2, time_str);
-        if (as5600_connected(FORK_I2C) && as5600_detect_magnet(FORK_I2C)) {
+        if (fork_sensor.check_availability(&fork_sensor)) {
             ssd1306_draw_string(&disp,  0, 24, 1, "fork");
         }
-        if (as5600_connected(SHOCK_I2C) && as5600_detect_magnet(SHOCK_I2C)) {
+        if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
         }
         ssd1306_show(&disp);
@@ -741,11 +674,12 @@ static void on_right_longpress(void *user_data) {
 // Entry point 
 
 int main() {
-    setup_i2c();
     board_init();
     tusb_init();
     rtc_init();
     adc_init();
+    fork_sensor.init(&fork_sensor);
+    shock_sensor.init(&shock_sensor);
 #ifndef NDEBUG
     stdio_uart_init();
 #endif
