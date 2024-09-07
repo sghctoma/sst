@@ -74,7 +74,7 @@ target_link_libraries(sufni-suspension-telemetry
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(sufni-suspension-telemetry PUBLIC
-        -DSNTP_DEBUG=LWIP_DBG_ON)
+        -DSNTP_DEBUG=LWIP_DBG_ON -DUSE_PRINTF=1 -DUSE_DBG_PRINTF=1)
     pico_enable_stdio_uart(sufni-suspension-telemetry 1)
 endif()
 
