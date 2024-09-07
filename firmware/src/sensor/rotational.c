@@ -5,18 +5,6 @@
 #include "../fw/hardware_config.h"
 #include <stdint.h>
 
-static uint16_t get_angle(i2c_inst_t *i2c, bool have_sensor, bool reversed) {
-    static uint16_t value = 0xffff;
-    if (have_sensor) {
-        value = as5600_get_scaled_angle(i2c);
-        if (reversed) {
-            value = 4096 - value;
-        }
-    }
-
-    return value;
-}
-
 static void rotational_sensor_init(struct sensor *sensor) {
     i2c_init(sensor->comm.i2c.instance, 1000000);
     gpio_set_function(sensor->comm.i2c.sda_gpio, GPIO_FUNC_I2C);
