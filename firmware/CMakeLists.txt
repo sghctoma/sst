@@ -26,6 +26,7 @@ add_executable(sufni-suspension-telemetry
     src/util/config.c
     src/util/list.c
     src/sensor/rotational.c
+    src/sensor/linear.c
 )
 
 pico_generate_pio_header(sufni-suspension-telemetry
