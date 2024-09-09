@@ -49,6 +49,18 @@ if(${SPI_MICROSD})
     )
 endif()
 
+if(${FORK_LINEAR})
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DFORK_LINEAR
+    )
+endif()
+
+if(${SHOCK_LINEAR})
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DSHOCK_LINEAR
+    )
+endif()
+
 target_include_directories(sufni-suspension-telemetry PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/src/msc
     ${CMAKE_CURRENT_LIST_DIR}/src/net
