@@ -9,6 +9,7 @@ static void linear_sensor_init(struct sensor *sensor) {
 }
 
 static bool linear_sensor_check_availabilityt(struct sensor *sensor) {
+    sensor->available = true;
     return true; // XXX: AFAIK there is no way to check this for the ADC.
 }
 
