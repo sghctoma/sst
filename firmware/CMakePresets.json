@@ -1,106 +1,532 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 21,
-    "patch": 1
-  },
-  "configurePresets": [
-    {
-      "name": "default",
-      "displayName": "I2C display, SDIO MicroSD card",
-      "hidden": false,
-      "description": "Default configuration with I2C display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build/release/default",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DISP_PROTO": "PIO_I2C",
-        "SPI_MICROSD": ""
-      }
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 21,
+        "patch": 1
     },
-    {
-      "name": "spi_display",
-      "displayName": "SPI display, SDIO MicroSD card",
-      "hidden": false,
-      "description": "Configuration with SPI display and SDIO MicroSD card.",
-      "binaryDir": "${sourceDir}/build/release/spi_display",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DISP_PROTO": "SPI",
-        "SPI_MICROSD": ""
-      }
-    },
-    {
-      "name": "spi_microsd",
-      "displayName": "I2C display, SPI MicroSD card",
-      "hidden": false,
-      "description": "Configuration with I2C display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build/release/spi_microsd",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DISP_PROTO": "PIO_I2C",
-        "SPI_MICROSD": "ON"
-      }
-    },
-    {
-      "name": "spi_display_microsd",
-      "displayName": "SPI display, SPI MicroSD card",
-      "hidden": false,
-      "description": "Configuration with SPI display and SPI MicroSD card.",
-      "binaryDir": "${sourceDir}/build/release/spi_display_microsd",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DISP_PROTO": "SPI",
-        "SPI_MICROSD": "ON"
-      }
-    },
-    {
-      "name": "default_debug",
-      "displayName": "I2C display, SDIO MicroSD card",
-      "hidden": false,
-      "description": "Default configuration with I2C display and SDIO MicroSD card. (Debug)",
-      "binaryDir": "${sourceDir}/build/debug/default",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "DISP_PROTO": "PIO_I2C",
-        "SPI_MICROSD": ""
-      }
-    },
-    {
-      "name": "spi_display_debug",
-      "displayName": "SPI display, SDIO MicroSD card",
-      "hidden": false,
-      "description": "Configuration with SPI display and SDIO MicroSD card. (Debug)",
-      "binaryDir": "${sourceDir}/build/debug/spi_display",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "DISP_PROTO": "SPI",
-        "SPI_MICROSD": ""
-      }
-    },
-    {
-      "name": "spi_microsd_debug",
-      "displayName": "I2C display, SPI MicroSD card",
-      "hidden": false,
-      "description": "Configuration with I2C display and SPI MicroSD card. (Debug)",
-      "binaryDir": "${sourceDir}/build/debug/spi_microsd",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "DISP_PROTO": "PIO_I2C",
-        "SPI_MICROSD": "ON"
-      }
-    },
-    {
-      "name": "spi_display_microsd_debug",
-      "displayName": "SPI display, SPI MicroSD card",
-      "hidden": false,
-      "description": "Configuration with SPI display and SPI MicroSD card. (Debug)",
-      "binaryDir": "${sourceDir}/build/debug/spi_display_microsd",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "DISP_PROTO": "SPI",
-        "SPI_MICROSD": "ON"
-      }
-    }
-  ]
+    "configurePresets": [
+        {
+            "name": "base-release",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/release/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "DISP_PROTO": "PIO_I2C",
+                "SPI_MICROSD": "",
+                "FORK_LINEAR": "",
+                "SHOCK_LINEAR": ""
+            }
+        },
+        {
+            "name": "base-debug",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/debug/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "DISP_PROTO": "PIO_I2C",
+                "SPI_MICROSD": "",
+                "FORK_LINEAR": "",
+                "SHOCK_LINEAR": ""
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-linear_shock",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-as5600_shock",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-linear_shock",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-as5600_shock",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C"
+            }
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "PIO_I2C"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-linear_shock",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-as5600_shock",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-linear_shock",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-as5600_shock",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI"
+            }
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "SPI_MICROSD": "ON",
+                "DISP_PROTO": "SPI"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-linear_shock",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-as5600_fork-linear_shock",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-i2c_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "default",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C"
+            }
+        },
+        {
+            "name": "default-debug",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "PIO_I2C"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-linear_shock",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "FORK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-linear_shock",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, linear shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI",
+                "SHOCK_LINEAR": "ON"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "hidden": false,
+            "inherits": "base-release",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI"
+            }
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor (debug)",
+            "hidden": false,
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "DISP_PROTO": "SPI"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "spi_card-i2c_disp-linear_fork-linear_shock",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-i2c_disp-linear_fork-linear_shock"
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-i2c_disp-linear_fork-linear_shock-debug"
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-as5600_shock",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-i2c_disp-linear_fork-as5600_shock"
+        },
+        {
+            "name": "spi_card-i2c_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-i2c_disp-linear_fork-as5600_shock-debug"
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-linear_shock",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-i2c_disp-as5600_fork-linear_shock"
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-i2c_disp-as5600_fork-linear_shock-debug"
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-as5600_shock",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-i2c_disp-as5600_fork-as5600_shock"
+        },
+        {
+            "name": "spi_card-i2c_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-i2c_disp-as5600_fork-as5600_shock-debug"
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-linear_shock",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-spi_disp-linear_fork-linear_shock"
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-spi_disp-linear_fork-linear_shock-debug"
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-as5600_shock",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-spi_disp-linear_fork-as5600_shock"
+        },
+        {
+            "name": "spi_card-spi_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-spi_disp-linear_fork-as5600_shock-debug"
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-linear_shock",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-spi_disp-as5600_fork-linear_shock"
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "spi_card-spi_disp-as5600_fork-linear_shock-debug"
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-as5600_shock",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-spi_disp-as5600_fork-as5600_shock"
+        },
+        {
+            "name": "spi_card-spi_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SPI MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "spi_card-spi_disp-as5600_fork-as5600_shock-debug"
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-linear_shock",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-linear_fork-linear_shock"
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-linear_fork-linear_shock-debug"
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-linear_fork-as5600_shock"
+        },
+        {
+            "name": "sdio_card-i2c_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-linear_fork-as5600_shock-debug"
+        },
+        {
+            "name": "sdio_card-i2c_disp-as5600_fork-linear_shock",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-as5600_fork-linear_shock"
+        },
+        {
+            "name": "sdio_card-i2c_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-i2c_disp-as5600_fork-linear_shock-debug"
+        },
+        {
+            "name": "default",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "default"
+        },
+        {
+            "name": "default-debug",
+            "displayName": "SDIO MicroSD, I2C display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "default-debug"
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-linear_shock",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-spi_disp-linear_fork-linear_shock"
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-spi_disp-linear_fork-linear_shock-debug"
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-spi_disp-linear_fork-as5600_shock"
+        },
+        {
+            "name": "sdio_card-spi_disp-linear_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, linear fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-spi_disp-linear_fork-as5600_shock-debug"
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-linear_shock",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-spi_disp-as5600_fork-linear_shock"
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-linear_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, linear shock sensor",
+            "configurePreset": "sdio_card-spi_disp-as5600_fork-linear_shock-debug"
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-as5600_shock",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-spi_disp-as5600_fork-as5600_shock"
+        },
+        {
+            "name": "sdio_card-spi_disp-as5600_fork-as5600_shock-debug",
+            "displayName": "SDIO MicroSD, SPI display, AS5600 fork sensor, AS5600 shock sensor",
+            "configurePreset": "sdio_card-spi_disp-as5600_fork-as5600_shock-debug"
+        }
+    ]
 }
