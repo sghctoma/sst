@@ -25,6 +25,8 @@ add_executable(sufni-suspension-telemetry
     src/ui/pushbutton.c
     src/util/config.c
     src/util/list.c
+    src/sensor/rotational.c
+    src/sensor/linear.c
 )
 
 pico_generate_pio_header(sufni-suspension-telemetry
@@ -44,6 +46,18 @@ endif()
 if(${SPI_MICROSD})
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSPI_MICROSD
+    )
+endif()
+
+if(${FORK_LINEAR})
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DFORK_LINEAR
+    )
+endif()
+
+if(${SHOCK_LINEAR})
+    target_compile_options(sufni-suspension-telemetry PUBLIC
+        -DSHOCK_LINEAR
     )
 endif()
 
@@ -73,7 +87,7 @@ target_link_libraries(sufni-suspension-telemetry
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(sufni-suspension-telemetry PUBLIC
-        -DSNTP_DEBUG=LWIP_DBG_ON)
+        -DSNTP_DEBUG=LWIP_DBG_ON -DUSE_PRINTF=1 -DUSE_DBG_PRINTF=1)
     pico_enable_stdio_uart(sufni-suspension-telemetry 1)
 endif()
 

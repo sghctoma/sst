@@ -69,6 +69,18 @@ def _initiate_database():
             expression='(sample - min_measurement) * factor',
         )
     )
+    cm_linear_potmeter = CalibrationMethod(
+        id=uuid.UUID('347cf9a82df54ef8b63936b36357f08f'),
+        name="linear-potmeter",
+        description="Sample is the ADC value read from a linear potentiometer",
+        properties=dict(
+            inputs=['stroke', 'resolution'],
+            intermediates=dict(
+                factor='stroke / (2^resolution)',
+            ),
+            expression='sample * factor',
+        ),
+    )
     cm_as5600_isosceles_triangle = CalibrationMethod(
         id=uuid.UUID('12f4a1b922f74524abcbdaa99a5c1c3a'),
         name="as5600-isosceles-triangle",
@@ -103,6 +115,7 @@ def _initiate_database():
     db.session.add(cm_fraction)
     db.session.add(cm_percentage)
     db.session.add(cm_linear)
+    db.session.add(cm_linear_potmeter)
     db.session.add(cm_as5600_isosceles_triangle)
     db.session.add(cm_as5600_triangle)
 
