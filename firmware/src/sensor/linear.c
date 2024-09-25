@@ -8,7 +8,7 @@ static void linear_sensor_init(struct sensor *sensor) {
     adc_gpio_init(sensor->comm.adc.gpio);
 }
 
-static bool linear_sensor_check_availabilityt(struct sensor *sensor) {
+static bool linear_sensor_check_availability(struct sensor *sensor) {
     sensor->available = true;
     return true; // XXX: AFAIK there is no way to check this for the ADC.
 }
@@ -35,7 +35,7 @@ static void linear_sensor_calibrate_compressed(struct sensor *sensor) {
 struct sensor fork_sensor = {
     .comm.adc = {FORK_ADC, FORK_PIN_ADC},
     .init = linear_sensor_init,
-    .check_availability = linear_sensor_check_availabilityt,
+    .check_availability = linear_sensor_check_availability,
     .start = linear_sensor_start,
     .calibrate_expanded = linear_sensor_calibrate_expanded,
     .calibrate_compressed = linear_sensor_calibrate_compressed,
@@ -47,7 +47,7 @@ struct sensor fork_sensor = {
 struct sensor shock_sensor = {
     .comm.adc = {SHOCK_ADC, SHOCK_PIN_ADC},
     .init = linear_sensor_init,
-    .check_availability = linear_sensor_check_availabilityt,
+    .check_availability = linear_sensor_check_availability,
     .start = linear_sensor_start,
     .calibrate_expanded = linear_sensor_calibrate_expanded,
     .calibrate_compressed = linear_sensor_calibrate_compressed,

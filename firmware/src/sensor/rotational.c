@@ -13,7 +13,7 @@ static void rotational_sensor_init(struct sensor *sensor) {
     gpio_pull_up(sensor->comm.i2c.scl_gpio);        
 }
 
-static bool rotational_sensor_check_availabilityt(struct sensor *sensor) {
+static bool rotational_sensor_check_availability(struct sensor *sensor) {
     sensor->available = as5600_connected(sensor->comm.i2c.instance) &&
                         as5600_detect_magnet(sensor->comm.i2c.instance);
     return sensor->available;
@@ -73,7 +73,7 @@ static void rotational_sensor_calibrate_compressed(struct sensor *sensor) {
 struct sensor fork_sensor = {
     .comm.i2c = {FORK_I2C, FORK_PIN_SCL, FORK_PIN_SDA},
     .init = rotational_sensor_init,
-    .check_availability = rotational_sensor_check_availabilityt,
+    .check_availability = rotational_sensor_check_availability,
     .start = rotational_sensor_start,
     .calibrate_expanded = rotational_sensor_calibrate_expanded,
     .calibrate_compressed = rotational_sensor_calibrate_compressed,
@@ -85,7 +85,7 @@ struct sensor fork_sensor = {
 struct sensor shock_sensor = {
     .comm.i2c = {SHOCK_I2C, SHOCK_PIN_SCL, SHOCK_PIN_SDA},
     .init = rotational_sensor_init,
-    .check_availability = rotational_sensor_check_availabilityt,
+    .check_availability = rotational_sensor_check_availability,
     .start = rotational_sensor_start,
     .calibrate_expanded = rotational_sensor_calibrate_expanded,
     .calibrate_compressed = rotational_sensor_calibrate_compressed,
