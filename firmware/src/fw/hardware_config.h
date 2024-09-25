@@ -74,8 +74,8 @@
 #endif // FORK_LINEAR
 
 #ifdef SHOCK_LINEAR
-#define SHOCK_ADC        2
-#define SHOCK_PIN_ADC    28
+#define SHOCK_ADC        1
+#define SHOCK_PIN_ADC    27
 #else
 #define SHOCK_I2C        i2c1
 #define SHOCK_PIN_SDA    14
