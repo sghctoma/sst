@@ -92,6 +92,7 @@ var LinkageForm = {
       m(InputField, {
         name: "Rear stroke",
         type: "number",
+        step: 0.5,
         value: LinkageForm.params.rear_stroke,
         oninput: (e) => (LinkageForm.params.rear_stroke = parseFloat(e.target.value)),
         validate: (value) => LinkageForm.validateRange(value, 0, 200),
