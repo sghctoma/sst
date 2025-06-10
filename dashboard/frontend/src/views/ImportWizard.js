@@ -21,7 +21,7 @@ var GeneralForm = {
     var isValid = true
     isValid = isValid && GeneralForm.params.name
     isValid = isValid && GeneralForm.params.timestamp
-    isValid = isValid && GeneralForm.params.sample_rate > 200 && GeneralForm.params.sample_rate < 20000
+    isValid = isValid && GeneralForm.params.sample_rate >= 200 && GeneralForm.params.sample_rate < 20000
     isValid = isValid && GeneralForm.params.data
     return isValid
   },
