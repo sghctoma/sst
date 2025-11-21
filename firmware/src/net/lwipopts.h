@@ -1,7 +1,6 @@
 #ifndef _LWIPOPTS_EXAMPLE_COMMONH_H
 #define _LWIPOPTS_EXAMPLE_COMMONH_H
 
-
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
@@ -90,6 +89,11 @@
 #define SNTP_SERVER_DNS 1
 #define SNTP_STARTUP_DELAY 0
 #define SNTP_COMP_ROUNDTRIP 1
+
+// Forward declarations for custom time functions defined in ntp.c
+#include <stdint.h>
+uint64_t get_system_time_us(void);
+void set_system_time_us(uint32_t sec, uint32_t us);
 
 #define SNTP_GET_SYSTEM_TIME(sec, us) \
     do{uint64_t time = get_system_time_us();\
