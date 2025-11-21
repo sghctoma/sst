@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.21.1)
 
 if(NOT DEFINED PICO_BOARD)
-    message(FATAL_ERROR "PICO_BOARD must be set. Use -DPICO_BOARD=pico_w or -DPICO_BOARD=pico2_w")
+    set(PICO_BOARD pico_w)
+    message(STATUS "PICO_BOARD not set, defaulting to pico_w")
 endif()
 
 include(pico_sdk_import.cmake)
