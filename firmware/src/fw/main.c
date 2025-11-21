@@ -14,7 +14,7 @@
 #include "pico/runtime_init.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
-#include "hardware/rtc.h"
+#include "pico/aon_timer.h"
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
 #include "hardware/watchdog.h"
@@ -545,8 +545,10 @@ static void on_sleep() {
     sleep_run_from_xosc();
     display_message(&disp, "SLEEP.");
 
+#if PICO_RP2040
     clocks_hw->sleep_en0 = CLOCKS_SLEEP_EN0_CLK_RTC_RTC_BITS;
     clocks_hw->sleep_en1 = 0x0;
+#endif
     display_message(&disp, "SLEEP..");
 
     scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
@@ -675,7 +677,6 @@ static void on_right_longpress(void *user_data) {
 int main() {
     board_init();
     tusb_init();
-    rtc_init();
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
@@ -686,13 +687,18 @@ int main() {
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA+1);
 
-    datetime_t dt;
+    struct tm tm_now;
     ds3231_init(&rtc, I2C_PIO, I2C_SM,
                 pio_i2c_write_blocking,
                 pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
-    ds3231_get_datetime(&rtc, &dt);
-    rtc_set_datetime(&dt);
+    ds3231_get_datetime(&rtc, &tm_now);
+    
+    if (!aon_timer_start_calendar(&tm_now)) {
+        setup_display(&disp);
+        display_message(&disp, "AON ERR");
+        while(true) { tight_loop_contents(); }
+    }
 
     setup_display(&disp);
 
