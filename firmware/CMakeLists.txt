@@ -76,6 +76,7 @@ target_link_libraries(sufni-suspension-telemetry
     pico_lwip_sntp
     pico_lwip_netif
     pico_lwip_mdns
+    pico_aon_timer
     hardware_adc
     hardware_sleep
     tinyusb_board
@@ -91,10 +92,6 @@ target_link_libraries(sufni-suspension-telemetry
 if(PICO_BOARD STREQUAL "pico2_w")
     target_link_libraries(sufni-suspension-telemetry
         hardware_powman
-    )
-else()
-    target_link_libraries(sufni-suspension-telemetry
-        hardware_rtc
     )
 endif()
 
