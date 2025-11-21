@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21.1)
 
-set(PICO_BOARD pico_w)
+if(NOT DEFINED PICO_BOARD)
+    message(FATAL_ERROR "PICO_BOARD must be set. Use -DPICO_BOARD=pico_w or -DPICO_BOARD=pico2_w")
+endif()
 
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
@@ -79,11 +81,21 @@ target_link_libraries(sufni-suspension-telemetry
     tinyusb_device
     hardware_i2c
     hardware_pio
-    hardware_rtc
     no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
     as5600
     ssd1306
 )
+
+# Platform-specific libraries
+if(PICO_BOARD STREQUAL "pico2_w")
+    target_link_libraries(sufni-suspension-telemetry
+        hardware_powman
+    )
+else()
+    target_link_libraries(sufni-suspension-telemetry
+        hardware_rtc
+    )
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(sufni-suspension-telemetry PUBLIC
