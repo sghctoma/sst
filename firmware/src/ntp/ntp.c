@@ -1,7 +1,7 @@
 #include "ntp.h"
 #include "lwip/apps/sntp.h"
 #include "pico/time.h"
-#include "hardware/rtc.h"
+#include "pico/aon_timer.h"
 
 #include "../rtc/ds3231.h"
 #include "../util/config.h"
@@ -12,27 +12,17 @@ static volatile uint64_t start_time_us = 0;
 static volatile bool ntp_done = false;
 
 time_t rtc_timestamp() {
-    datetime_t rtc;
-    rtc_get_datetime(&rtc);
-
-    struct tm utc = {
-        .tm_year = rtc.year - 1900,
-        .tm_mon = rtc.month - 1,
-        .tm_mday = rtc.day,
-        .tm_hour = rtc.hour,
-        .tm_min = rtc.min,
-        .tm_sec = rtc.sec,
-        .tm_isdst = -1,
-        .tm_wday = 0,
-        .tm_yday = 0,
-    };
+    struct tm tm_now;
+    if (!aon_timer_get_time_calendar(&tm_now)) {
+        return 0;
+    }
 
     // We want to store UTC values in record files, and we don't have timegm,
     // so we set UTC0 as timezone string here ...
     setenv("TZ", "UTC0", 1);
     tzset();
 
-    time_t t = mktime(&utc);
+    time_t t = mktime(&tm_now);
 
     // ... and we restore the original one after we got the timestamp.
     setenv("TZ", config.timezone, 1);
@@ -58,7 +48,11 @@ bool sync_rtc_to_ntp() {
 void setup_ntp(const char* server) {
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server);
-    start_time_us = rtc_timestamp() * 1000000;
+    if (aon_timer_is_running()) {
+        start_time_us = rtc_timestamp() * 1000000;
+    } else {
+        start_time_us = 0;
+    }
 }
 
 uint64_t get_system_time_us() {
@@ -68,18 +62,10 @@ uint64_t get_system_time_us() {
 
 void set_system_time_us(uint32_t sec, uint32_t us) {
     time_t epoch = sec;
-    struct tm *time = gmtime(&epoch);
-    datetime_t dt = {
-        .year  = time->tm_year + 1900,
-        .month = time->tm_mon + 1,
-        .day   = time->tm_mday,
-        .dotw  = 0,
-        .hour  = time->tm_hour,
-        .min   = time->tm_min,
-        .sec   = time->tm_sec,
-    };
-    rtc_set_datetime(&dt);
-    ds3231_set_datetime(&rtc, &dt);
+    struct tm *tm_utc = gmtime(&epoch);
+    
+    aon_timer_set_time_calendar(tm_utc);
+    ds3231_set_datetime(&rtc, tm_utc);
     start_time_us = (epoch * 1000000 + us) - time_us_64();
     ntp_done = true;
 }
