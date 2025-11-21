@@ -551,7 +551,11 @@ static void on_sleep() {
 #endif
     display_message(&disp, "SLEEP..");
 
+#if PICO_RP2040
     scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
+#else
+    scb_hw->scr = scb_orig | M33_SCR_SLEEPDEEP_BITS;
+#endif
     display_message(&disp, "SLEEP...");
 
     disable_button(BUTTON_LEFT, false);
