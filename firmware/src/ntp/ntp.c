@@ -1,7 +1,7 @@
 #include "ntp.h"
+#include "hardware/rtc.h"
 #include "lwip/apps/sntp.h"
 #include "pico/time.h"
-#include "hardware/rtc.h"
 
 #include "../rtc/ds3231.h"
 #include "../util/config.h"
@@ -46,16 +46,14 @@ bool sync_rtc_to_ntp() {
     sntp_init();
 
     absolute_time_t timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
-    while (!ntp_done && absolute_time_diff_us(get_absolute_time(), timeout_time) > 0) {
-        tight_loop_contents();
-    }
+    while (!ntp_done && absolute_time_diff_us(get_absolute_time(), timeout_time) > 0) { tight_loop_contents(); }
 
     sntp_stop();
 
     return ntp_done;
 }
 
-void setup_ntp(const char* server) {
+void setup_ntp(const char *server) {
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server);
     start_time_us = rtc_timestamp() * 1000000;
@@ -70,13 +68,13 @@ void set_system_time_us(uint32_t sec, uint32_t us) {
     time_t epoch = sec;
     struct tm *time = gmtime(&epoch);
     datetime_t dt = {
-        .year  = time->tm_year + 1900,
+        .year = time->tm_year + 1900,
         .month = time->tm_mon + 1,
-        .day   = time->tm_mday,
-        .dotw  = 0,
-        .hour  = time->tm_hour,
-        .min   = time->tm_min,
-        .sec   = time->tm_sec,
+        .day = time->tm_mday,
+        .dotw = 0,
+        .hour = time->tm_hour,
+        .min = time->tm_min,
+        .sec = time->tm_sec,
     };
     rtc_set_datetime(&dt);
     ds3231_set_datetime(&rtc, &dt);

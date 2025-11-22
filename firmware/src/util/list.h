@@ -13,7 +13,7 @@ struct list {
     struct node *tail;
 };
 
-struct list * list_create();
+struct list *list_create();
 void list_push(struct list *list, const char data[FILENAME_LENGTH]);
 void list_delete(struct list *list);
 

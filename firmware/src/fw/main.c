@@ -2,35 +2,35 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "bsp/board.h"
 #include "cyw43_ll.h"
 #include "device/usbd.h"
-#include "pico/platform.h"
-#include "pico/multicore.h"
+#include "ff.h"
+#include "hardware/adc.h"
+#include "hardware/gpio.h"
+#include "hardware/rosc.h"
+#include "hardware/rtc.h"
+#include "hardware/timer.h"
+#include "hardware/watchdog.h"
 #include "pico/cyw43_arch.h"
+#include "pico/multicore.h"
+#include "pico/platform.h"
+#include "pico/runtime_init.h"
 #include "pico/sleep.h"
 #include "pico/time.h"
 #include "pico/types.h"
 #include "pico/unique_id.h"
-#include "pico/runtime_init.h"
-#include "hardware/adc.h"
-#include "hardware/gpio.h"
-#include "hardware/rtc.h"
-#include "hardware/rosc.h"
-#include "hardware/timer.h"
-#include "hardware/watchdog.h"
-#include "bsp/board.h"
-#include "ff.h"
 
 // For scb_hw so we can enable deep sleep
 #include "hardware/structs/scb.h"
 
-#include "sst.h"
-#include "../ntp//ntp.h"
 #include "../net/tcpserver.h"
+#include "../ntp//ntp.h"
 #include "../rtc//ds3231.h"
-#include "../util/list.h"
-#include "../util/config.h"
 #include "../sensor/sensor.h"
+#include "../util/config.h"
+#include "../util/list.h"
+#include "sst.h"
 
 #include "hardware_config.h"
 
@@ -60,8 +60,8 @@ static void display_message(ssd1306_t *disp, char *message) {
 }
 
 static void soft_reset() {
-      watchdog_enable(1, 1);
-      while(1);
+    watchdog_enable(1, 1);
+    while (1);
 }
 
 static bool on_battery() {
@@ -73,13 +73,11 @@ static bool on_battery() {
 
 static float read_voltage() {
     cyw43_thread_enter();
-    sleep_ms(1); // NOTE ADC3 readings are way too high without this sleep.
+    sleep_ms(1);         // NOTE ADC3 readings are way too high without this sleep.
     adc_gpio_init(29);   // GPIO29 measures VSYS/3
     adc_select_input(3); // GPIO29 is ADC #3
     uint32_t vsys = 0;
-    for(int i = 0; i < 3; i++) {
-        vsys += adc_read();
-    }
+    for (int i = 0; i < 3; i++) { vsys += adc_read(); }
     cyw43_thread_exit();
     const float conversion_factor = 3.3f / (1 << 12);
     float ret = vsys * conversion_factor;
@@ -136,11 +134,11 @@ static const uint16_t SAMPLE_RATE = 1000;
 // When the active buffer is filled on core #1,
 //  - the buffer's pointer is sent to core #2 via the Pico's multicore FIFO
 //  - the other buffer's address is read from the FIFO, and set as active buffer.
-//  
+//
 // Core #2 waits until an address is sent from core #1, and
 //  - dumps the content at that address to the card
-//  - sends the buffer address to core #1 via FIFO 
-// 
+//  - sends the buffer address to core #1 via FIFO
+//
 
 struct record databuffer1[BUFFER_SIZE];
 struct record databuffer2[BUFFER_SIZE];
@@ -209,7 +207,7 @@ static int setup_storage() {
     uint btw;
     fr = f_open(&f, "BOARDID", FA_OPEN_ALWAYS | FA_WRITE);
     if (fr == FR_OK || fr == FR_EXIST) {
-        f_write(&f, board_id_str, 2*PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
+        f_write(&f, board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
     }
     f_close(&f);
 
@@ -273,7 +271,7 @@ static void data_storage_core1() {
     struct record *buffer;
     while (true) {
         cmd = (enum command)multicore_fifo_pop_blocking();
-        switch(cmd) {
+        switch (cmd) {
             case OPEN:
                 multicore_fifo_drain();
                 index = open_datafile();
@@ -283,13 +281,13 @@ static void data_storage_core1() {
             case DUMP:
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
                 multicore_fifo_push_blocking((uintptr_t)buffer);
-                f_write(&recording, buffer, sizeof(struct record)*BUFFER_SIZE, NULL);
+                f_write(&recording, buffer, sizeof(struct record) * BUFFER_SIZE, NULL);
                 f_sync(&recording);
                 break;
             case FINISH:
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-                f_write(&recording, buffer, sizeof(struct record)*size, NULL);
+                f_write(&recording, buffer, sizeof(struct record) * size, NULL);
                 f_sync(&recording);
                 f_close(&recording);
                 break;
@@ -318,7 +316,7 @@ static void setup_display(ssd1306_t *disp) {
     ssd1306_proto_t p = {DISPLAY_ADDRESS, I2C_PIO, I2C_SM, pio_i2c_write_blocking};
     ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, p);
 #endif // SPI_DISPLAY
-            
+
     ssd1306_flip(disp, DISPLAY_FLIPPED);
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -350,10 +348,10 @@ static void on_cal_idle() {
         }
 
         ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
-        ssd1306_draw_string(&disp,   0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
+        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
+        ssd1306_draw_string(&disp, 0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
         if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
         }
         if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
@@ -403,7 +401,7 @@ static void on_rec_start() {
     count = 0;
     active_buffer = databuffer1;
     multicore_fifo_drain();
-    
+
     display_message(&disp, "INIT SENS");
     if (!start_sensors()) {
         display_message(&disp, "NO SENS");
@@ -421,13 +419,13 @@ static void on_rec_start() {
     int index = (int)multicore_fifo_pop_blocking();
     if (index < 0) {
         display_message(&disp, "FILE ERR");
-        while(true) { tight_loop_contents(); }
+        while (true) { tight_loop_contents(); }
     }
 
     // Start data acquisition timer
-    if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
+    if (!add_repeating_timer_us(-1000000 / SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
         display_message(&disp, "TIMER ERR");
-        while(true) { tight_loop_contents(); }
+        while (true) { tight_loop_contents(); }
     }
 }
 
@@ -483,7 +481,7 @@ static void on_sync_data() {
             sprintf(status, "%u / %u", curr, all);
             sprintf(failed, "failed: %u", err);
             ssd1306_clear(&disp);
-            ssd1306_draw_string(&disp, 0,  0, 2, status);
+            ssd1306_draw_string(&disp, 0, 0, 2, status);
             ssd1306_draw_string(&disp, 0, 24, 1, failed);
             ssd1306_show(&disp);
 
@@ -529,10 +527,10 @@ static void on_idle() {
         snprintf(time_str, sizeof(time_str), "%02d:%02d", tz_tm.tm_hour, tz_tm.tm_min);
 
         ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
-        ssd1306_draw_string(&disp,   0, 0, 2, time_str);
+        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
+        ssd1306_draw_string(&disp, 0, 0, 2, time_str);
         if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
         }
         if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
@@ -580,9 +578,7 @@ static void on_msc() {
     tud_task();
 }
 
-static void dummy() {
-    tight_loop_contents();
-}
+static void dummy() { tight_loop_contents(); }
 
 static void on_serve_tcp() {
     display_message(&disp, "CONNECT");
@@ -617,7 +613,7 @@ static void (*state_handlers[STATES_COUNT])() = {
 // Button handlers
 
 static void on_left_press(void *user_data) {
-    switch(state) {
+    switch (state) {
         case CAL_IDLE_1:
             state = CAL_EXP;
             break;
@@ -636,7 +632,7 @@ static void on_left_press(void *user_data) {
 }
 
 static void on_left_longpress(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SYNC_DATA;
             break;
@@ -646,7 +642,7 @@ static void on_left_longpress(void *user_data) {
 }
 
 static void on_right_press(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SLEEP;
             break;
@@ -660,7 +656,7 @@ static void on_right_press(void *user_data) {
 }
 
 static void on_right_longpress(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SERVE_TCP;
             break;
@@ -670,7 +666,7 @@ static void on_right_longpress(void *user_data) {
 }
 
 // ----------------------------------------------------------------------------
-// Entry point 
+// Entry point
 
 int main() {
     board_init();
@@ -684,12 +680,10 @@ int main() {
 #endif
 
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
-    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA+1);
+    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
     datetime_t dt;
-    ds3231_init(&rtc, I2C_PIO, I2C_SM,
-                pio_i2c_write_blocking,
-                pio_i2c_read_blocking);
+    ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
@@ -705,12 +699,12 @@ int main() {
         int err = (int)multicore_fifo_pop_blocking();
         if (err < 0) {
             display_message(&disp, "CARD ERR");
-            while(true) { tight_loop_contents(); }
+            while (true) { tight_loop_contents(); }
         }
 
         if (!load_config()) {
             display_message(&disp, "CONF ERR");
-            while(true) { tight_loop_contents(); }
+            while (true) { tight_loop_contents(); }
         }
 
         setup_ntp(config.ntp_server);
@@ -728,10 +722,7 @@ int main() {
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
     }
 
-    while (true) {
-        state_handlers[state]();
-    }
+    while (true) { state_handlers[state](); }
 
     return 0;
 }
-
