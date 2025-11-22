@@ -2,8 +2,12 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "cyw43_ll.h"
+#ifndef USB_UART_DEBUG
 #include "device/usbd.h"
+#include "bsp/board.h"
+#endif
+
+#include "cyw43_ll.h"
 #include "pico/platform.h"
 #include "pico/multicore.h"
 #include "pico/cyw43_arch.h"
@@ -18,7 +22,6 @@
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
 #include "hardware/watchdog.h"
-#include "bsp/board.h"
 #include "ff.h"
 
 // For scb_hw so we can enable deep sleep
@@ -87,15 +90,19 @@ static float read_voltage() {
 }
 
 static bool msc_present() {
-    // Wait for a maximum of 1 second for USB MSC to initialize
-    uint32_t t = time_us_32();
-    while (!tud_ready()) {
-        if (time_us_32() - t > 1000000) {
-            return false;
+    #ifdef USB_UART_DEBUG
+        return false;
+    #else
+        // Wait for a maximum of 1 second for USB MSC to initialize
+        uint32_t t = time_us_32();
+        while (!tud_ready()) {
+            if (time_us_32() - t > 1000000) {
+                return false;
+            }
+            tud_task();
         }
-        tud_task();
-    }
-    return true;
+        return true;
+    #endif
 }
 
 static bool wifi_connect(bool do_ntp) {
@@ -673,8 +680,14 @@ static void on_right_longpress(void *user_data) {
 // Entry point 
 
 int main() {
-    board_init();
-    tusb_init();
+    #ifndef USB_UART_DEBUG
+        board_init();
+        tusb_init();
+    #else
+        stdio_usb_init();
+        sleep_ms(3000); // Give time for the tty to get enumerated on the host
+    #endif
+    
     rtc_init();
     adc_init();
     fork_sensor.init(&fork_sensor);
@@ -696,10 +709,13 @@ int main() {
 
     setup_display(&disp);
 
+    #ifndef USB_UART_DEBUG
     if (msc_present()) {
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
+    #endif
+
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -726,7 +742,10 @@ int main() {
 
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
+
+    #ifndef USB_UART_DEBUG
     }
+    #endif
 
     while (true) {
         state_handlers[state]();
