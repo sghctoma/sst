@@ -9,6 +9,7 @@
 #include "ff.h"
 
 #include "../util/list.h"
+#include "../util/log.h"
 
 #define READ_BUF_LEN (10 * 1024)
 #define TCP_PORT 1557
@@ -81,10 +82,12 @@ static void tcp_server_err(void *arg, err_t err) {
 static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err) {
     struct tcpserver *server = (struct tcpserver*)arg;
     if (err != ERR_OK || client_pcb == NULL) {
+        LOG("TCP", "Client connection failed: %d\n", err);
         tcp_server_result(arg, err);
         return ERR_VAL;
     }
 
+    LOG("TCP", "Client connected\n");
     server->client_pcb = client_pcb;
     tcp_arg(client_pcb, server);
     tcp_sent(client_pcb, tcp_server_sent);
@@ -449,6 +452,7 @@ static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
 bool tcpserver_init(struct tcpserver *server) {
     pico_get_unique_board_id(&board_id);
 
+    LOG("TCP", "Initializing server\n");
     if (server->mdns_initialized) {
         mdns_resp_restart(netif_default);
     } else {
@@ -461,25 +465,31 @@ bool tcpserver_init(struct tcpserver *server) {
     mdns_resp_announce(netif_default);
 
     if (!tcp_server_open(server)) {
+        LOG("TCP", "Failed to open server\n");
         tcp_server_result(server, -1);
         return false;
     }
 
+    LOG("TCP", "Server listening on port %d, IP: %s\n", 
+        TCP_PORT, ip4addr_ntoa(netif_ip4_addr(netif_default)));
     server->status = STATUS_INITIALIZED;
     
     return true;
 }
 
 bool tcpserver_serve(struct tcpserver *server) {
+    LOG("TCP", "Server started, waiting for requests\n");
     while (server->status != STATUS_FINISHED) {
         if (server->status == STATUS_FILE_REQUESTED) {
             tcpserver_process(server);
         }
         sleep_ms(1);
     }
+    LOG("TCP", "Server stopping\n");
     tcpserver_teardown(server);
 }
 
 void inline tcpserver_finish(struct tcpserver *server) {
+    LOG("TCP", "Server finish requested\n");
     server->status = STATUS_FINISHED;
 }
