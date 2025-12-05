@@ -2,8 +2,12 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "cyw43_ll.h"
+#ifndef USB_UART_DEBUG
 #include "device/usbd.h"
+#include "bsp/board.h"
+#endif
+
+#include "cyw43_ll.h"
 #include "pico/platform.h"
 #include "pico/multicore.h"
 #include "pico/cyw43_arch.h"
@@ -18,7 +22,6 @@
 #include "hardware/rosc.h"
 #include "hardware/timer.h"
 #include "hardware/watchdog.h"
-#include "bsp/board.h"
 #include "ff.h"
 
 // For scb_hw so we can enable deep sleep
@@ -30,6 +33,7 @@
 #include "../rtc//ds3231.h"
 #include "../util/list.h"
 #include "../util/config.h"
+#include "../util/log.h"
 #include "../sensor/sensor.h"
 
 #include "hardware_config.h"
@@ -87,27 +91,40 @@ static float read_voltage() {
 }
 
 static bool msc_present() {
-    // Wait for a maximum of 1 second for USB MSC to initialize
-    uint32_t t = time_us_32();
-    while (!tud_ready()) {
-        if (time_us_32() - t > 1000000) {
-            return false;
+    #ifdef USB_UART_DEBUG
+        return false;
+    #else
+        // Wait for a maximum of 1 second for USB MSC to initialize
+        uint32_t t = time_us_32();
+        while (!tud_ready()) {
+            if (time_us_32() - t > 1000000) {
+                return false;
+            }
+            tud_task();
         }
-        tud_task();
-    }
-    return true;
+        return true;
+    #endif
 }
 
 static bool wifi_connect(bool do_ntp) {
+    LOG("WiFi", "Enabling STA mode\n");
     cyw43_arch_enable_sta_mode();
+    LOG("WiFi", "Connecting to SSID: %s\n", config.ssid);
     bool ret = cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
-    if (ret && do_ntp) {
-        sync_rtc_to_ntp();
+    if (ret) {
+        LOG("WiFi", "Connected successfully\n");
+        if (do_ntp) {
+            LOG("WiFi", "Syncing RTC to NTP\n");
+            sync_rtc_to_ntp();
+        }
+    } else {
+        LOG("WiFi", "Connection failed\n");
     }
     return ret;
 }
 
 static void wifi_disconnect() {
+    LOG("WiFi", "Disconnecting\n");
     cyw43_arch_disable_sta_mode();
     sleep_ms(100);
 }
@@ -117,9 +134,16 @@ static void calibrate_if_needed() {
     gpio_pull_up(BUTTON_LEFT);
 
     FRESULT fr = f_stat("CALIBRATION", NULL);
-    if (fr != FR_OK || !gpio_get(BUTTON_LEFT)) {
+    bool button_pressed = !gpio_get(BUTTON_LEFT);
+    LOG("CAL", "CALIBRATION file %s, button %s\n", 
+        fr == FR_OK ? "exists" : "missing",
+        button_pressed ? "pressed" : "not pressed");
+    
+    if (fr != FR_OK || button_pressed) {
+        LOG("CAL", "Entering calibration mode\n");
         state = CAL_IDLE_1;
     } else {
+        LOG("CAL", "Skipping calibration\n");
         state = IDLE;
     }
 }
@@ -184,13 +208,14 @@ static bool start_sensors() {
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     fork_sensor.start(&fork_sensor, baseline, inverted);
+    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted, fork_sensor.available);
 
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     shock_sensor.start(&shock_sensor, baseline, inverted);
+    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted, shock_sensor.available);
 
     f_close(&calibration_fil);
-
     return fork_sensor.available || shock_sensor.available;
 }
 
@@ -200,8 +225,10 @@ static int setup_storage() {
     static FATFS fs;
     FRESULT fr = f_mount(&fs, "", 1);
     if (fr != FR_OK) {
+        LOG("STORAGE", "Failed to mount filesystem: %d\n", fr);
         return PICO_ERROR_GENERIC;
     }
+    LOG("STORAGE", "Filesystem mounted\n");
 
     char board_id_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
     pico_get_unique_board_id_string(board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
@@ -252,6 +279,7 @@ static int open_datafile() {
 
     char filename[10];
     sprintf(filename, "%05u.SST", index);
+    LOG("STORAGE", "Creating file: %s\n", filename);
     fr = f_open(&recording, filename, FA_CREATE_NEW | FA_WRITE);
     if (fr != FR_OK) {
         return fr;
@@ -349,6 +377,16 @@ static void on_cal_idle() {
             }
         }
 
+        // Print sensor values
+        if (fork_sensor.check_availability(&fork_sensor)) {
+            uint16_t fork_val = fork_sensor.measure(&fork_sensor);
+            LOG("SENSOR", "Fork: 0x%04x\n", fork_val);
+        }
+        if (shock_sensor.check_availability(&shock_sensor)) {
+            uint16_t shock_val = shock_sensor.measure(&shock_sensor);
+            LOG("SENSOR", "Shock: 0x%04x\n", shock_val);
+        }
+
         ssd1306_clear(&disp);
         ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
         ssd1306_draw_string(&disp,   0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
@@ -363,26 +401,39 @@ static void on_cal_idle() {
 }
 
 static void on_cal_exp() {
+    LOG("CAL", "Calibrating expanded position\n");
     fork_sensor.calibrate_expanded(&fork_sensor);
     shock_sensor.calibrate_expanded(&shock_sensor);
 
+    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", 
+        fork_sensor.baseline, shock_sensor.baseline);
+
     if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
+        LOG("CAL", "Error: Both sensors failed calibration\n");
         display_message(&disp, "CAL ERR");
         sleep_ms(1000);
         state = CAL_IDLE_1;
         return;
     }
 
+    LOG("CAL", "Expanded calibration complete\n");
     state = CAL_IDLE_2;
 }
 
 static void on_cal_comp() {
+    LOG("CAL", "Calibrating compressed position\n");
     fork_sensor.calibrate_compressed(&fork_sensor);
     shock_sensor.calibrate_compressed(&shock_sensor);
+
+    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", 
+        fork_sensor.baseline, fork_sensor.inverted);
+    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", 
+        shock_sensor.baseline, shock_sensor.inverted);
 
     FIL calibration_fil;
     FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
     if (!(fr == FR_OK || fr == FR_EXIST)) {
+        LOG("CAL", "Error: Failed to open CALIBRATION file\n");
         display_message(&disp, "CAL ERR");
         sleep_ms(1000);
         state = CAL_IDLE_2;
@@ -396,16 +447,19 @@ static void on_cal_comp() {
     f_write(&calibration_fil, (const void *)&shock_sensor.inverted, sizeof(bool), &bw);
     f_close(&calibration_fil);
 
+    LOG("CAL", "Calibration saved successfully\n");
     state = IDLE;
 }
 
 static void on_rec_start() {
+    LOG("REC", "Starting recording session\n");
     count = 0;
     active_buffer = databuffer1;
     multicore_fifo_drain();
     
     display_message(&disp, "INIT SENS");
     if (!start_sensors()) {
+        LOG("REC", "No sensors available\n");
         display_message(&disp, "NO SENS");
         sleep_ms(1000);
         state = IDLE;
@@ -420,9 +474,11 @@ static void on_rec_start() {
     multicore_fifo_push_blocking(OPEN);
     int index = (int)multicore_fifo_pop_blocking();
     if (index < 0) {
+        LOG("REC", "Failed to open data file\n");
         display_message(&disp, "FILE ERR");
         while(true) { tight_loop_contents(); }
     }
+    LOG("REC", "Recording to file index %d\n", index);
 
     // Start data acquisition timer
     if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
@@ -432,6 +488,7 @@ static void on_rec_start() {
 }
 
 static void on_rec_stop() {
+    LOG("REC", "Stopping recording, samples: %u\n", count);
     state = IDLE;
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
@@ -442,8 +499,10 @@ static void on_rec_stop() {
 }
 
 static void on_sync_data() {
+    LOG("SYNC", "Starting data sync\n");
     display_message(&disp, "CONNECT");
     if (!wifi_connect(true)) {
+        LOG("SYNC", "Could not connect wifi\n");
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else {
@@ -462,6 +521,7 @@ static void on_sync_data() {
             fr = f_findnext(&dj, &fno);
         }
         f_closedir(&dj);
+        LOG("SYNC", "Found %u files to sync\n", all);
 
         // send all files on the list via TCP, and move them
         // to the "uploaded" directory
@@ -474,10 +534,13 @@ static void on_sync_data() {
 
         while (n != NULL) {
             ++curr;
+            LOG("SYNC", "Sending file: %s (%u/%u)\n", (char*)n->data, curr, all);
             if (send_file(n->data)) {
+                LOG("SYNC", "File sent successfully\n");
                 sprintf(path_new, "uploaded/%s", n->data);
                 f_rename(n->data, path_new);
             } else {
+                LOG("SYNC", "File send failed\n");
                 ++err;
             }
             sprintf(status, "%u / %u", curr, all);
@@ -492,6 +555,7 @@ static void on_sync_data() {
             n = n->next;
         }
         list_delete(to_import);
+        LOG("SYNC", "Sync complete: %u succeeded, %u failed\n", all - err, err);
 
         // leave results on the display for a bit
         sleep_ms(3000);
@@ -542,6 +606,7 @@ static void on_idle() {
 }
 
 static void on_sleep() {
+    LOG("POWER", "Entering sleep mode\n");
     sleep_run_from_xosc();
     display_message(&disp, "SLEEP.");
 
@@ -560,6 +625,7 @@ static void on_sleep() {
 }
 
 static void on_waking() {
+    LOG("POWER", "Waking from sleep\n");
     rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
 
     scb_hw->scr = scb_orig;
@@ -673,8 +739,15 @@ static void on_right_longpress(void *user_data) {
 // Entry point 
 
 int main() {
-    board_init();
-    tusb_init();
+
+    #ifndef USB_UART_DEBUG
+        board_init();
+        tusb_init();
+    #else
+        stdio_usb_init();
+        sleep_ms(3000); // Give time for the tty to get enumerated on the host
+    #endif
+    
     rtc_init();
     adc_init();
     fork_sensor.init(&fork_sensor);
@@ -687,19 +760,27 @@ int main() {
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA+1);
 
     datetime_t dt;
+    LOG("DS3231", "Initializing RTC\n");
     ds3231_init(&rtc, I2C_PIO, I2C_SM,
                 pio_i2c_write_blocking,
                 pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
+    LOG("DS3231", "Reading datetime\n");
     ds3231_get_datetime(&rtc, &dt);
     rtc_set_datetime(&dt);
+    LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n",
+        dt.year, dt.month, dt.day, dt.hour, dt.min, dt.sec);
 
     setup_display(&disp);
 
+    #ifndef USB_UART_DEBUG
     if (msc_present()) {
+        LOG("INIT", "Entering MSC mode\n");
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
+    #endif
+
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -707,16 +788,20 @@ int main() {
             display_message(&disp, "CARD ERR");
             while(true) { tight_loop_contents(); }
         }
+        LOG("INIT", "Storage initialized\n");
 
         if (!load_config()) {
             display_message(&disp, "CONF ERR");
             while(true) { tight_loop_contents(); }
         }
+        LOG("INIT", "Config loaded\n");
 
         setup_ntp(config.ntp_server);
         cyw43_arch_init_with_country(config.country);
         setenv("TZ", config.timezone, 1);
         tzset();
+        LOG("INIT", "WiFi initialized, country=%d, timezone=%s\n", 
+            config.country, config.timezone);
 
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;
@@ -726,7 +811,10 @@ int main() {
 
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
+
+    #ifndef USB_UART_DEBUG
     }
+    #endif
 
     while (true) {
         state_handlers[state]();
