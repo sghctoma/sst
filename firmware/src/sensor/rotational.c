@@ -1,8 +1,8 @@
 #include "hardware/i2c.h"
 
-#include "sensor.h"
-#include "as5600.h"
 #include "../fw/hardware_config.h"
+#include "as5600.h"
+#include "sensor.h"
 #include <stdint.h>
 
 static void rotational_sensor_init(struct sensor *sensor) {
@@ -10,12 +10,11 @@ static void rotational_sensor_init(struct sensor *sensor) {
     gpio_set_function(sensor->comm.i2c.sda_gpio, GPIO_FUNC_I2C);
     gpio_set_function(sensor->comm.i2c.scl_gpio, GPIO_FUNC_I2C);
     gpio_pull_up(sensor->comm.i2c.sda_gpio);
-    gpio_pull_up(sensor->comm.i2c.scl_gpio);        
+    gpio_pull_up(sensor->comm.i2c.scl_gpio);
 }
 
 static bool rotational_sensor_check_availability(struct sensor *sensor) {
-    sensor->available = as5600_connected(sensor->comm.i2c.instance) &&
-                        as5600_detect_magnet(sensor->comm.i2c.instance);
+    sensor->available = as5600_connected(sensor->comm.i2c.instance) && as5600_detect_magnet(sensor->comm.i2c.instance);
     return sensor->available;
 }
 
@@ -25,7 +24,7 @@ static bool rotational_sensor_start(struct sensor *sensor, uint16_t baseline, bo
     }
 
     sensor->inverted = inverted;
-    
+
     as5600_set_start_position(sensor->comm.i2c.instance, baseline);
     // Power down tha DAC, we don't need it.
     as5600_conf_set_output(sensor->comm.i2c.instance, OUTPUT_PWM);
@@ -66,7 +65,7 @@ static void rotational_sensor_calibrate_compressed(struct sensor *sensor) {
         // triangle, so we know direction is reversed.
         sensor->baseline = as5600_get_start_position(sensor->comm.i2c.instance);
         sensor->inverted = as5600_get_scaled_angle(sensor->comm.i2c.instance) > 2048;
-    }   
+    }
 }
 
 #ifndef FORK_LINEAR

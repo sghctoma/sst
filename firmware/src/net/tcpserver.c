@@ -1,19 +1,19 @@
-#include <stdio.h>
 #include "tcpserver.h"
-#include "lwip/tcp.h"
-#include "lwip/tcpbase.h"
+#include "ff.h"
 #include "lwip/apps/mdns.h"
 #include "lwip/netif.h"
+#include "lwip/tcp.h"
+#include "lwip/tcpbase.h"
 #include "pico/time.h"
 #include "pico/unique_id.h"
-#include "ff.h"
+#include <stdio.h>
 
 #include "../util/list.h"
 #include "../util/log.h"
 
 #define READ_BUF_LEN (10 * 1024)
-#define TCP_PORT 1557
-#define POLL_TIME_S 5
+#define TCP_PORT     1557
+#define POLL_TIME_S  5
 
 #define STATUS_INITIALIZED      1
 #define STATUS_CLIENT_CONNECTED 2
@@ -21,7 +21,7 @@
 #define STATUS_HEADER_OK        4
 #define STATUS_FILE_RECEIVED    5
 #define STATUS_FINISHED         6
-#define STATUS_FILE_TRASHED    10
+#define STATUS_FILE_TRASHED     10
 
 static pico_unique_board_id_t board_id;
 
@@ -31,14 +31,14 @@ static pico_unique_board_id_t board_id;
 static err_t tcp_server_result(void *arg, int status);
 
 static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     server->sent_len += len;
 
     return ERR_OK;
 }
 
 err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     if (NULL == p) {
         return tcp_server_result(arg, -1);
     }
@@ -48,7 +48,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         int s;
         pbuf_copy_partial(p, &s, 4, 0);
         tcp_recved(tpcb, p->tot_len);
-        
+
         if (s < 0 || s == STATUS_FINISHED) {
             // close the server
             tcp_server_result(arg, s);
@@ -69,9 +69,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     return ERR_OK;
 }
 
-static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb) {
-    return ERR_OK;
-}
+static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb) { return ERR_OK; }
 
 static void tcp_server_err(void *arg, err_t err) {
     if (err != ERR_ABRT) {
@@ -80,7 +78,7 @@ static void tcp_server_err(void *arg, err_t err) {
 }
 
 static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     if (err != ERR_OK || client_pcb == NULL) {
         LOG("TCP", "Client connection failed: %d\n", err);
         tcp_server_result(arg, err);
@@ -103,7 +101,7 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
 // TCP helper functions
 
 static bool tcp_server_open(void *arg) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
     if (!pcb) {
         return false;
@@ -129,7 +127,7 @@ static bool tcp_server_open(void *arg) {
 }
 
 static err_t tcp_server_close(void *arg) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     err_t err = ERR_OK;
     if (server->client_pcb != NULL) {
         tcp_arg(server->client_pcb, NULL);
@@ -144,18 +142,18 @@ static err_t tcp_server_close(void *arg) {
         }
         server->client_pcb = NULL;
     }
-    
+
     if (server->status == STATUS_FINISHED && server->server_pcb) {
         tcp_arg(server->server_pcb, NULL);
         tcp_close(server->server_pcb);
         server->server_pcb = NULL;
     }
-    
+
     return err;
 }
 
 static err_t tcp_server_result(void *arg, int status) {
-    struct tcpserver *server = (struct tcpserver*)arg;
+    struct tcpserver *server = (struct tcpserver *)arg;
     server->status = status;
     return tcp_server_close(arg);
 }
@@ -177,7 +175,7 @@ static bool process_sst_file_request(struct tcpserver *server) {
 
     // calculate total size
     server->data_len = sizeof(FSIZE_t) + finfo.fsize;
-    
+
     // send size
     cyw43_arch_lwip_begin();
     tcp_write(server->client_pcb, &finfo.fsize, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY);
@@ -313,20 +311,18 @@ static bool process_dirinfo_request(struct tcpserver *server) {
 
     // calculate total size
     static FSIZE_t file_data_size = ((FILENAME_LENGTH - 1) + sizeof(FSIZE_t) + sizeof(time_t));
-    FSIZE_t dirinfo_size =
-        PICO_UNIQUE_BOARD_ID_SIZE_BYTES + // board identifier
-        sizeof(uint16_t) +                // sample rate
-        all * file_data_size;             // file info (name, size, timestamp) for all SSTs
-    server->data_len =
-        sizeof(FSIZE_t) +                 // directory info size
-        dirinfo_size;                     // directory info
+    FSIZE_t dirinfo_size = PICO_UNIQUE_BOARD_ID_SIZE_BYTES + // board identifier
+                           sizeof(uint16_t) +                // sample rate
+                           all * file_data_size;             // file info (name, size, timestamp) for all SSTs
+    server->data_len = sizeof(FSIZE_t) +                     // directory info size
+                       dirinfo_size;                         // directory info
 
     // send size
     cyw43_arch_lwip_begin();
-    tcp_write(server->client_pcb, &dirinfo_size,  sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY); 
+    tcp_write(server->client_pcb, &dirinfo_size, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY);
     tcp_output(server->client_pcb);
     cyw43_arch_lwip_end();
-   
+
     // wait for client to accept and validate size
     while (server->status != STATUS_HEADER_OK) {
         if (server->status < 0) {
@@ -338,7 +334,8 @@ static bool process_dirinfo_request(struct tcpserver *server) {
     // send board id and sample rate
     cyw43_arch_lwip_begin();
     static uint16_t SAMPLE_RATE = 1000;
-    tcp_write(server->client_pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
+    tcp_write(server->client_pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES,
+              TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(server->client_pcb, &SAMPLE_RATE, sizeof(uint16_t), TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     cyw43_arch_lwip_end();
 
@@ -394,7 +391,7 @@ static bool process_sst_file_trash(struct tcpserver *server) {
     // send file trashed status
     static int status = STATUS_FILE_TRASHED;
     cyw43_arch_lwip_begin();
-    tcp_write(server->client_pcb, &status,  sizeof(int), TCP_WRITE_FLAG_COPY); 
+    tcp_write(server->client_pcb, &status, sizeof(int), TCP_WRITE_FLAG_COPY);
     tcp_output(server->client_pcb);
     cyw43_arch_lwip_end();
 
@@ -432,8 +429,8 @@ static bool tcpserver_process(struct tcpserver *server) {
 
 static void tcpserver_teardown(struct tcpserver *server) {
     tcp_server_close(server);
-    mdns_resp_del_service (netif_default, server->mdns_slot);
-    mdns_resp_remove_netif (netif_default);
+    mdns_resp_del_service(netif_default, server->mdns_slot);
+    mdns_resp_remove_netif(netif_default);
 }
 
 // ----------------------------------------------------------------------------
@@ -441,7 +438,7 @@ static void tcpserver_teardown(struct tcpserver *server) {
 static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
     err_t res;
     LWIP_UNUSED_ARG(txt_userdata);
-    
+
     res = mdns_resp_add_service_txtitem(service, NULL, 0);
     LWIP_ERROR("mdns add service txt failed\n", (res == ERR_OK), return);
 }
@@ -452,7 +449,8 @@ static void mdns_srv_txt(struct mdns_service *service, void *txt_userdata) {
 bool tcpserver_init(struct tcpserver *server) {
     pico_get_unique_board_id(&board_id);
 
-    LOG("TCP", "Initializing server\n");
+    
+  ("TCP", "Initializing server\n");
     if (server->mdns_initialized) {
         mdns_resp_restart(netif_default);
     } else {
@@ -460,8 +458,8 @@ bool tcpserver_init(struct tcpserver *server) {
         server->mdns_initialized = true;
     }
     mdns_resp_add_netif(netif_default, "sufni_telemetry_daq");
-    server->mdns_slot = mdns_resp_add_service(netif_default, "sufnidaq", "_gosst",
-        DNSSD_PROTO_TCP, 1557, mdns_srv_txt, NULL);
+    server->mdns_slot =
+        mdns_resp_add_service(netif_default, "sufnidaq", "_gosst", DNSSD_PROTO_TCP, 1557, mdns_srv_txt, NULL);
     mdns_resp_announce(netif_default);
 
     if (!tcp_server_open(server)) {
@@ -473,7 +471,7 @@ bool tcpserver_init(struct tcpserver *server) {
     LOG("TCP", "Server listening on port %d, IP: %s\n", 
         TCP_PORT, ip4addr_ntoa(netif_ip4_addr(netif_default)));
     server->status = STATUS_INITIALIZED;
-    
+
     return true;
 }
 

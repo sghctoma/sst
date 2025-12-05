@@ -1,8 +1,8 @@
 #ifndef _TCPSERVER_H
 #define _TCPSERVER_H
 
-#include "pico/cyw43_arch.h"
 #include "lwip/tcp.h"
+#include "pico/cyw43_arch.h"
 
 struct tcpserver {
     struct tcp_pcb *server_pcb;

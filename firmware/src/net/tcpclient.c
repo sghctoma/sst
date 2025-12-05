@@ -1,11 +1,11 @@
-#include "lwip/ip_addr.h"
-#include "lwip/tcpbase.h"
-#include "pico/unique_id.h"
-#include "pico/cyw43_arch.h"
-#include "pico/time.h"
 #include "lwip/dns.h"
+#include "lwip/ip_addr.h"
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
+#include "lwip/tcpbase.h"
+#include "pico/cyw43_arch.h"
+#include "pico/time.h"
+#include "pico/unique_id.h"
 
 #include "hw_config.h"
 
@@ -13,16 +13,17 @@
 #include "../util/config.h"
 
 #define READ_BUF_LEN (10 * 1024)
-#define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
-                           // so length is always 10.
+#define FILENAME_LENGTH                                                                                                \
+    10 // filename is always in 00000.SST format,
+       // so length is always 10.
 #define POLL_TIME_S 5
 
-#define STATUS_INIT        1
-#define STATUS_DNS_FOUND   2
-#define STATUS_CONNECTED   3
-#define STATUS_HEADER_OK   4
-#define STATUS_DATA_SENT   5
-#define STATUS_SUCCESS     6
+#define STATUS_INIT      1
+#define STATUS_DNS_FOUND 2
+#define STATUS_CONNECTED 3
+#define STATUS_HEADER_OK 4
+#define STATUS_DATA_SENT 5
+#define STATUS_SUCCESS   6
 
 static err_t tcp_client_close(void *arg) {
     struct connection *conn = (struct connection *)arg;
@@ -80,7 +81,7 @@ static void tcp_client_err(void *arg, err_t err) {
 }
 
 err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-    struct connection *conn= (struct connection *)arg;
+    struct connection *conn = (struct connection *)arg;
     if (NULL == p) {
         return tcp_result(arg, -1);
     }
@@ -89,7 +90,7 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     if (p->tot_len > 0) {
         int8_t s = *(int8_t *)p->payload;
         tcp_recved(tpcb, p->tot_len);
-        
+
         if (s < 0 || s == STATUS_SUCCESS) {
             tcp_result(arg, s);
         } else {
@@ -111,11 +112,11 @@ static void dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) 
 
 static bool tcp_client_open(void *arg) {
     struct connection *conn = (struct connection *)arg;
-    
+
     cyw43_arch_lwip_begin();
-    err_t err = dns_gethostbyname(config.sst_server , &conn->remote_addr, dns_found, conn);
+    err_t err = dns_gethostbyname(config.sst_server, &conn->remote_addr, dns_found, conn);
     cyw43_arch_lwip_end();
-  
+
     if (err == ERR_OK) { // domain name was in cache
         conn->status = STATUS_DNS_FOUND;
     }
@@ -126,12 +127,12 @@ static bool tcp_client_open(void *arg) {
         }
         sleep_ms(1);
     }
-    
+
     conn->pcb = tcp_new_ip_type(IP_GET_TYPE(&conn->remote_addr));
     if (conn->pcb == NULL) {
         return false;
     }
-    
+
     tcp_arg(conn->pcb, conn);
     tcp_poll(conn->pcb, tcp_client_poll, POLL_TIME_S * 2);
     tcp_sent(conn->pcb, tcp_client_sent);
@@ -145,7 +146,7 @@ static bool tcp_client_open(void *arg) {
     return err == ERR_OK;
 }
 
-static struct connection * tcp_client_init() {
+static struct connection *tcp_client_init() {
     struct connection *conn = malloc(sizeof(struct connection));
     if (conn == NULL) {
         return NULL;
@@ -172,7 +173,7 @@ bool send_file(const char *filename) {
     if (!(fr == FR_OK || fr == FR_EXIST)) {
         return false;
     }
-    
+
     struct connection *conn = tcp_client_init();
     if (conn == NULL) {
         return false;
@@ -189,18 +190,16 @@ bool send_file(const char *filename) {
         sleep_ms(1);
     }
 
-    conn->data_len =
-        2 + // the constant string "ID"
-        PICO_UNIQUE_BOARD_ID_SIZE_BYTES +
-        sizeof(FSIZE_t) +
-        (FILENAME_LENGTH - 1) + // we don't send the terminating null byte
-        finfo.fsize;
+    conn->data_len = 2 + // the constant string "ID"
+                     PICO_UNIQUE_BOARD_ID_SIZE_BYTES + sizeof(FSIZE_t) +
+                     (FILENAME_LENGTH - 1) + // we don't send the terminating null byte
+                     finfo.fsize;
 
     cyw43_arch_lwip_begin();
     tcp_write(conn->pcb, "ID", 2, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, board_id.id, PICO_UNIQUE_BOARD_ID_SIZE_BYTES, TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
     tcp_write(conn->pcb, &finfo.fsize, sizeof(FSIZE_t), TCP_WRITE_FLAG_COPY | TCP_WRITE_FLAG_MORE);
-    tcp_write(conn->pcb, filename, FILENAME_LENGTH - 1, TCP_WRITE_FLAG_COPY); 
+    tcp_write(conn->pcb, filename, FILENAME_LENGTH - 1, TCP_WRITE_FLAG_COPY);
     tcp_output(conn->pcb);
     cyw43_arch_lwip_end();
 

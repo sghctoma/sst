@@ -12,16 +12,16 @@ under the License is distributed on an AS IS BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 */
-/*   
+/*
 This file should be tailored to match the hardware design.
 
-See 
+See
 https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing-for-the-hardware-configuration
 */
 
-#include <string.h>
-#include "hw_config.h"
 #include "../fw/hardware_config.h"
+#include "hw_config.h"
+#include <string.h>
 
 #ifdef SPI_MICROSD
 
@@ -65,10 +65,7 @@ static sd_sdio_if_t sdio_if = {
 };
 
 /* Hardware Configuration of the SD Card socket "object" */
-static sd_card_t sd_card = {
-    .type = SD_IF_SDIO,
-    .sdio_if_p = &sdio_if
-};
+static sd_card_t sd_card = {.type = SD_IF_SDIO, .sdio_if_p = &sdio_if};
 
 #endif // SPI_MICROSD
 

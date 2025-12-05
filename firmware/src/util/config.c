@@ -2,8 +2,8 @@
 
 #include "cyw43_country.h"
 
-#include "ff_stdio.h"
 #include "config.h"
+#include "ff_stdio.h"
 
 struct config config = {
     .ssid = "sst",
@@ -52,7 +52,7 @@ bool load_config() {
                 continue;
             }
             if (strcmp(key, "SSID") == 0) {
-                strncpy(config.ssid, value, 33);          
+                strncpy(config.ssid, value, 33);
                 ++count;
             } else if (strcmp(key, "PSK") == 0) {
                 strncpy(config.psk, value, 64);
@@ -76,6 +76,6 @@ bool load_config() {
         }
     }
     f_close(&config_fil);
-  
+
     return count == 7;
 }
