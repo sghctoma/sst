@@ -10,13 +10,13 @@ project(sufni-suspension-telemetry)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(USB_UART_DEBUG "Enable USB UART for debugging (disables MSC)" OFF)
+
 pico_sdk_init()
 
 add_executable(sufni-suspension-telemetry
     src/fw/main.c
     src/fs/microsd.c
-    src/msc/msc_disk.c
-    src/msc/sst_usb_descriptors.c
     src/net/tcpclient.c
     src/net/tcpserver.c
     src/ntp/ntp.c
@@ -28,6 +28,13 @@ add_executable(sufni-suspension-telemetry
     src/sensor/rotational.c
     src/sensor/linear.c
 )
+
+if(NOT USB_UART_DEBUG)
+    target_sources(sufni-suspension-telemetry PRIVATE
+        src/msc/msc_disk.c
+        src/msc/sst_usb_descriptors.c
+    )
+endif()
 
 pico_generate_pio_header(sufni-suspension-telemetry
     ${CMAKE_CURRENT_LIST_DIR}/src/pio_i2c/i2c.pio
@@ -62,9 +69,14 @@ if(${SHOCK_LINEAR})
 endif()
 
 target_include_directories(sufni-suspension-telemetry PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/src/msc
     ${CMAKE_CURRENT_LIST_DIR}/src/net
 )
+
+if(NOT USB_UART_DEBUG)
+    target_include_directories(sufni-suspension-telemetry PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}/src/msc
+    )
+endif()
 
 target_link_libraries(sufni-suspension-telemetry
     pico_stdlib
@@ -76,7 +88,6 @@ target_link_libraries(sufni-suspension-telemetry
     hardware_adc
     hardware_sleep
     tinyusb_board
-    tinyusb_device
     hardware_i2c
     hardware_pio
     hardware_rtc
@@ -85,10 +96,27 @@ target_link_libraries(sufni-suspension-telemetry
     ssd1306
 )
 
+if(NOT USB_UART_DEBUG)
+    target_link_libraries(sufni-suspension-telemetry
+        tinyusb_device
+    )
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSNTP_DEBUG=LWIP_DBG_ON -DUSE_PRINTF=1 -DUSE_DBG_PRINTF=1)
-    pico_enable_stdio_uart(sufni-suspension-telemetry 1)
+endif()
+
+if(USB_UART_DEBUG)
+    target_compile_definitions(sufni-suspension-telemetry PRIVATE
+        USB_UART_DEBUG=1
+        CFG_TUD_MSC=0
+    )
+    pico_enable_stdio_usb(sufni-suspension-telemetry 1)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PRIVATE
+        CFG_TUD_MSC=1
+    )
 endif()
 
 pico_add_extra_outputs(sufni-suspension-telemetry)
