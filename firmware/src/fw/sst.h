@@ -1,11 +1,11 @@
 #ifndef _SST_H
 #define _SST_H
 
-#include "tusb.h"
-#include "as5600.h"
-#include "ssd1306.h"
 #include "../net/tcpclient.h"
 #include "../ui/pushbutton.h"
+#include "as5600.h"
+#include "ssd1306.h"
+#include "tusb.h"
 
 enum state {
     IDLE,
@@ -36,13 +36,10 @@ struct record {
     uint16_t shock_angle;
 };
 
-enum command {
-    OPEN,
-    DUMP,
-    FINISH
-};
+enum command { OPEN, DUMP, FINISH };
 
 #define BUFFER_SIZE 2048
-#define FILENAME_LENGTH 10 // filename is always in 00000.SST format,
-                           // so length is always 10.
+#define FILENAME_LENGTH                                                                                                \
+    10 // filename is always in 00000.SST format,
+       // so length is always 10.
 #endif /* _SST_H */

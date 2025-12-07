@@ -1,7 +1,7 @@
 #include "ntp.h"
 #include "lwip/apps/sntp.h"
-#include "pico/time.h"
 #include "pico/aon_timer.h"
+#include "pico/time.h"
 
 #include "../rtc/ds3231.h"
 #include "../util/config.h"
@@ -36,16 +36,14 @@ bool sync_rtc_to_ntp() {
     sntp_init();
 
     absolute_time_t timeout_time = make_timeout_time_ms(NTP_TIMEOUT_TIME);
-    while (!ntp_done && absolute_time_diff_us(get_absolute_time(), timeout_time) > 0) {
-        tight_loop_contents();
-    }
+    while (!ntp_done && absolute_time_diff_us(get_absolute_time(), timeout_time) > 0) { tight_loop_contents(); }
 
     sntp_stop();
 
     return ntp_done;
 }
 
-void setup_ntp(const char* server) {
+void setup_ntp(const char *server) {
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, server);
     if (aon_timer_is_running()) {
@@ -63,7 +61,7 @@ uint64_t get_system_time_us() {
 void set_system_time_us(uint32_t sec, uint32_t us) {
     time_t epoch = sec;
     struct tm *tm_utc = gmtime(&epoch);
-    
+
     aon_timer_set_time_calendar(tm_utc);
     ds3231_set_datetime(&rtc, tm_utc);
     start_time_us = (epoch * 1000000 + us) - time_us_64();

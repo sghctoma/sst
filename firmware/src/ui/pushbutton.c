@@ -1,11 +1,11 @@
+#include "hardware/gpio.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "hardware/gpio.h"
 
 #include "pushbutton.h"
 
-static struct button *buttons[28] = { NULL };
+static struct button *buttons[28] = {NULL};
 
 static int64_t longpress_callback(alarm_id_t id, void *user_data) {
     struct button *btn = user_data;
@@ -62,12 +62,12 @@ void create_button(uint gpio, void *user_data, void (*onpress)(void *), void (*o
 }
 
 void disable_button(uint gpio, bool release_only) {
-	buttons[gpio]->enabled = false;
-	uint32_t mask = GPIO_IRQ_EDGE_RISE | (release_only ? 0 : GPIO_IRQ_EDGE_FALL);
+    buttons[gpio]->enabled = false;
+    uint32_t mask = GPIO_IRQ_EDGE_RISE | (release_only ? 0 : GPIO_IRQ_EDGE_FALL);
     gpio_set_irq_enabled(gpio, mask, false);
 }
 
 void enable_button(uint gpio) {
-	buttons[gpio]->enabled = true;
+    buttons[gpio]->enabled = true;
     gpio_set_irq_enabled(gpio, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }

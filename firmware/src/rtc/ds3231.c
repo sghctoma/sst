@@ -1,22 +1,14 @@
 #include "ds3231.h"
 
-static inline uint8_t from_bcd(uint8_t bcd)
-{
-    return ((bcd / 16) * 10) + (bcd % 16);
-}
+static inline uint8_t from_bcd(uint8_t bcd) { return ((bcd / 16) * 10) + (bcd % 16); }
 
-static inline uint8_t to_bcd(uint8_t val)
-{
-    return ((val / 10) * 16) + (val % 10);
-}
+static inline uint8_t to_bcd(uint8_t val) { return ((val / 10) * 16) + (val % 10); }
 
-void ds3231_init(struct ds3231 *d, PIO pio, uint sm,
-                 int (*i2c_write)(PIO, uint, uint8_t, const uint8_t *, uint),
+void ds3231_init(struct ds3231 *d, PIO pio, uint sm, int (*i2c_write)(PIO, uint, uint8_t, const uint8_t *, uint),
                  int (*i2c_read)(PIO, uint, uint8_t, uint8_t *, uint)) {
     d->pio = pio;
     d->sm = sm;
-    d->i2c_write = i2c_write,
-    d->i2c_read = i2c_read;
+    d->i2c_write = i2c_write, d->i2c_read = i2c_read;
 }
 
 void ds3231_get_datetime(struct ds3231 *d, struct tm *tm) {
@@ -49,4 +41,3 @@ void ds3231_set_datetime(struct ds3231 *d, const struct tm *tm) {
 
     (*d->i2c_write)(d->pio, d->sm, 0x68, buf, sizeof(buf));
 }
-

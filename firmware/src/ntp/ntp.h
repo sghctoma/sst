@@ -10,7 +10,7 @@
 // Needs to be called when the always-on timer has a sensible value, so
 // that get_system_time_us gives a sensible value even when time
 // hasn't been synced yet.
-void setup_ntp(const char* server);
+void setup_ntp(const char *server);
 
 time_t rtc_timestamp();
 uint64_t get_system_time_us();
