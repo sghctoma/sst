@@ -1,4 +1,5 @@
 #include "ds3231.h"
+#include <stdbool.h>
 
 static inline uint8_t from_bcd(uint8_t bcd) { return ((bcd / 16) * 10) + (bcd % 16); }
 
@@ -11,31 +12,38 @@ void ds3231_init(struct ds3231 *d, PIO pio, uint sm, int (*i2c_write)(PIO, uint,
     d->i2c_write = i2c_write, d->i2c_read = i2c_read;
 }
 
-void ds3231_get_datetime(struct ds3231 *d, datetime_t *dt) {
+bool ds3231_get_datetime(struct ds3231 *d, struct tm *tm) {
     uint8_t dt_buf[7];
     uint8_t reg = 0;
-    (*d->i2c_write)(d->pio, d->sm, 0x68, &reg, 1);
-    (*d->i2c_read)(d->pio, d->sm, 0x68, dt_buf, sizeof(dt_buf));
+    if ((*d->i2c_write)(d->pio, d->sm, 0x68, &reg, 1) < 0) {
+        return false;
+    }
+    if ((*d->i2c_read)(d->pio, d->sm, 0x68, dt_buf, sizeof(dt_buf)) < 0) {
+        return false;
+    }
 
-    dt->sec = from_bcd(dt_buf[0]);
-    dt->min = from_bcd(dt_buf[1]);
-    dt->hour = from_bcd(dt_buf[2]);
-    dt->dotw = from_bcd(dt_buf[3]) - 1;
-    dt->day = from_bcd(dt_buf[4]);
-    dt->month = from_bcd(dt_buf[5] & 0x1F);
-    dt->year = from_bcd(dt_buf[6]) + 2000;
+    tm->tm_sec = from_bcd(dt_buf[0]);
+    tm->tm_min = from_bcd(dt_buf[1]);
+    tm->tm_hour = from_bcd(dt_buf[2]);
+    tm->tm_wday = from_bcd(dt_buf[3]) - 1;
+    tm->tm_mday = from_bcd(dt_buf[4]);
+    tm->tm_mon = from_bcd(dt_buf[5] & 0x1F) - 1;
+    tm->tm_year = from_bcd(dt_buf[6]) + 100;  // years since 1900
+    tm->tm_isdst = -1;
+    tm->tm_yday = 0;
+    return true;
 }
 
-void ds3231_set_datetime(struct ds3231 *d, datetime_t *dt) {
+void ds3231_set_datetime(struct ds3231 *d, const struct tm *tm) {
     uint8_t buf[8];
     buf[0] = 0; // register
-    buf[1] = to_bcd(dt->sec);
-    buf[2] = to_bcd(dt->min);
-    buf[3] = to_bcd(dt->hour);
-    buf[4] = to_bcd(dt->dotw + 1);
-    buf[5] = to_bcd(dt->day);
-    buf[6] = to_bcd(dt->month);
-    buf[7] = to_bcd(dt->year - 2000);
+    buf[1] = to_bcd(tm->tm_sec);
+    buf[2] = to_bcd(tm->tm_min);
+    buf[3] = to_bcd(tm->tm_hour);
+    buf[4] = to_bcd(tm->tm_wday + 1);
+    buf[5] = to_bcd(tm->tm_mday);
+    buf[6] = to_bcd(tm->tm_mon + 1);
+    buf[7] = to_bcd((tm->tm_year + 1900) - 2000);
 
     (*d->i2c_write)(d->pio, d->sm, 0x68, buf, sizeof(buf));
 }

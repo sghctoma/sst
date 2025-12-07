@@ -90,6 +90,11 @@
 #define SNTP_STARTUP_DELAY  0
 #define SNTP_COMP_ROUNDTRIP 1
 
+// Forward declarations for custom time functions defined in ntp.c
+#include <stdint.h>
+uint64_t get_system_time_us(void);
+void set_system_time_us(uint32_t sec, uint32_t us);
+
 #define SNTP_GET_SYSTEM_TIME(sec, us)                                                                                  \
     do {                                                                                                               \
         uint64_t time = get_system_time_us();                                                                          \
