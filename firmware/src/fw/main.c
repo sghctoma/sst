@@ -2,35 +2,38 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "cyw43_ll.h"
+#ifndef USB_UART_DEBUG
+#include "bsp/board.h"
 #include "device/usbd.h"
-#include "pico/platform.h"
-#include "pico/multicore.h"
+#endif
+
+#include "cyw43_ll.h"
+#include "ff.h"
+#include "hardware/adc.h"
+#include "hardware/gpio.h"
+#include "hardware/rosc.h"
+#include "hardware/timer.h"
+#include "hardware/watchdog.h"
 #include "pico/cyw43_arch.h"
+#include "pico/multicore.h"
+#include "pico/platform.h"
+#include "pico/runtime_init.h"
 #include "pico/sleep.h"
 #include "pico/time.h"
 #include "pico/types.h"
 #include "pico/unique_id.h"
-#include "pico/runtime_init.h"
-#include "hardware/adc.h"
-#include "hardware/gpio.h"
-#include "pico/aon_timer.h"
-#include "hardware/rosc.h"
-#include "hardware/timer.h"
-#include "hardware/watchdog.h"
-#include "bsp/board.h"
-#include "ff.h"
 
 // For scb_hw so we can enable deep sleep
 #include "hardware/structs/scb.h"
 
-#include "sst.h"
-#include "../ntp//ntp.h"
 #include "../net/tcpserver.h"
+#include "../ntp//ntp.h"
 #include "../rtc//ds3231.h"
-#include "../util/list.h"
-#include "../util/config.h"
 #include "../sensor/sensor.h"
+#include "../util/config.h"
+#include "../util/list.h"
+#include "../util/log.h"
+#include "sst.h"
 
 #include "hardware_config.h"
 
@@ -60,8 +63,8 @@ static void display_message(ssd1306_t *disp, char *message) {
 }
 
 static void soft_reset() {
-      watchdog_enable(1, 1);
-      while(1);
+    watchdog_enable(1, 1);
+    while (1);
 }
 
 static bool on_battery() {
@@ -73,13 +76,11 @@ static bool on_battery() {
 
 static float read_voltage() {
     cyw43_thread_enter();
-    sleep_ms(1); // NOTE ADC3 readings are way too high without this sleep.
+    sleep_ms(1);         // NOTE ADC3 readings are way too high without this sleep.
     adc_gpio_init(29);   // GPIO29 measures VSYS/3
     adc_select_input(3); // GPIO29 is ADC #3
     uint32_t vsys = 0;
-    for(int i = 0; i < 3; i++) {
-        vsys += adc_read();
-    }
+    for (int i = 0; i < 3; i++) { vsys += adc_read(); }
     cyw43_thread_exit();
     const float conversion_factor = 3.3f / (1 << 12);
     float ret = vsys * conversion_factor;
@@ -87,6 +88,9 @@ static float read_voltage() {
 }
 
 static bool msc_present() {
+#ifdef USB_UART_DEBUG
+    return false;
+#else
     // Wait for a maximum of 1 second for USB MSC to initialize
     uint32_t t = time_us_32();
     while (!tud_ready()) {
@@ -96,18 +100,28 @@ static bool msc_present() {
         tud_task();
     }
     return true;
+#endif
 }
 
 static bool wifi_connect(bool do_ntp) {
+    LOG("WiFi", "Enabling STA mode\n");
     cyw43_arch_enable_sta_mode();
+    LOG("WiFi", "Connecting to SSID: %s\n", config.ssid);
     bool ret = cyw43_arch_wifi_connect_timeout_ms(config.ssid, config.psk, CYW43_AUTH_WPA2_AES_PSK, 20000) == 0;
-    if (ret && do_ntp) {
-        sync_rtc_to_ntp();
+    if (ret) {
+        LOG("WiFi", "Connected successfully\n");
+        if (do_ntp) {
+            LOG("WiFi", "Syncing RTC to NTP\n");
+            sync_rtc_to_ntp();
+        }
+    } else {
+        LOG("WiFi", "Connection failed\n");
     }
     return ret;
 }
 
 static void wifi_disconnect() {
+    LOG("WiFi", "Disconnecting\n");
     cyw43_arch_disable_sta_mode();
     sleep_ms(100);
 }
@@ -117,9 +131,15 @@ static void calibrate_if_needed() {
     gpio_pull_up(BUTTON_LEFT);
 
     FRESULT fr = f_stat("CALIBRATION", NULL);
-    if (fr != FR_OK || !gpio_get(BUTTON_LEFT)) {
+    bool button_pressed = !gpio_get(BUTTON_LEFT);
+    LOG("CAL", "CALIBRATION file %s, button %s\n", fr == FR_OK ? "exists" : "missing",
+        button_pressed ? "pressed" : "not pressed");
+
+    if (fr != FR_OK || button_pressed) {
+        LOG("CAL", "Entering calibration mode\n");
         state = CAL_IDLE_1;
     } else {
+        LOG("CAL", "Skipping calibration\n");
         state = IDLE;
     }
 }
@@ -136,11 +156,11 @@ static const uint16_t SAMPLE_RATE = 1000;
 // When the active buffer is filled on core #1,
 //  - the buffer's pointer is sent to core #2 via the Pico's multicore FIFO
 //  - the other buffer's address is read from the FIFO, and set as active buffer.
-//  
+//
 // Core #2 waits until an address is sent from core #1, and
 //  - dumps the content at that address to the card
-//  - sends the buffer address to core #1 via FIFO 
-// 
+//  - sends the buffer address to core #1 via FIFO
+//
 
 struct record databuffer1[BUFFER_SIZE];
 struct record databuffer2[BUFFER_SIZE];
@@ -184,13 +204,16 @@ static bool start_sensors() {
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     fork_sensor.start(&fork_sensor, baseline, inverted);
+    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
+        fork_sensor.available);
 
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     shock_sensor.start(&shock_sensor, baseline, inverted);
+    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
+        shock_sensor.available);
 
     f_close(&calibration_fil);
-
     return fork_sensor.available || shock_sensor.available;
 }
 
@@ -200,8 +223,10 @@ static int setup_storage() {
     static FATFS fs;
     FRESULT fr = f_mount(&fs, "", 1);
     if (fr != FR_OK) {
+        LOG("STORAGE", "Failed to mount filesystem: %d\n", fr);
         return PICO_ERROR_GENERIC;
     }
+    LOG("STORAGE", "Filesystem mounted\n");
 
     char board_id_str[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1];
     pico_get_unique_board_id_string(board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1);
@@ -209,7 +234,7 @@ static int setup_storage() {
     uint btw;
     fr = f_open(&f, "BOARDID", FA_OPEN_ALWAYS | FA_WRITE);
     if (fr == FR_OK || fr == FR_EXIST) {
-        f_write(&f, board_id_str, 2*PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
+        f_write(&f, board_id_str, 2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES, &btw);
     }
     f_close(&f);
 
@@ -252,6 +277,7 @@ static int open_datafile() {
 
     char filename[10];
     sprintf(filename, "%05u.SST", index);
+    LOG("STORAGE", "Creating file: %s\n", filename);
     fr = f_open(&recording, filename, FA_CREATE_NEW | FA_WRITE);
     if (fr != FR_OK) {
         return fr;
@@ -273,7 +299,7 @@ static void data_storage_core1() {
     struct record *buffer;
     while (true) {
         cmd = (enum command)multicore_fifo_pop_blocking();
-        switch(cmd) {
+        switch (cmd) {
             case OPEN:
                 multicore_fifo_drain();
                 index = open_datafile();
@@ -283,13 +309,13 @@ static void data_storage_core1() {
             case DUMP:
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
                 multicore_fifo_push_blocking((uintptr_t)buffer);
-                f_write(&recording, buffer, sizeof(struct record)*BUFFER_SIZE, NULL);
+                f_write(&recording, buffer, sizeof(struct record) * BUFFER_SIZE, NULL);
                 f_sync(&recording);
                 break;
             case FINISH:
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-                f_write(&recording, buffer, sizeof(struct record)*size, NULL);
+                f_write(&recording, buffer, sizeof(struct record) * size, NULL);
                 f_sync(&recording);
                 f_close(&recording);
                 break;
@@ -318,7 +344,7 @@ static void setup_display(ssd1306_t *disp) {
     ssd1306_proto_t p = {DISPLAY_ADDRESS, I2C_PIO, I2C_SM, pio_i2c_write_blocking};
     ssd1306_init(disp, DISPLAY_WIDTH, DISPLAY_HEIGHT, p);
 #endif // SPI_DISPLAY
-            
+
     ssd1306_flip(disp, DISPLAY_FLIPPED);
     ssd1306_clear(disp);
     ssd1306_show(disp);
@@ -349,11 +375,21 @@ static void on_cal_idle() {
             }
         }
 
-        ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
-        ssd1306_draw_string(&disp,   0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
+        // Print sensor values
         if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+            uint16_t fork_val = fork_sensor.measure(&fork_sensor);
+            LOG("SENSOR", "Fork: 0x%04x\n", fork_val);
+        }
+        if (shock_sensor.check_availability(&shock_sensor)) {
+            uint16_t shock_val = shock_sensor.measure(&shock_sensor);
+            LOG("SENSOR", "Shock: 0x%04x\n", shock_val);
+        }
+
+        ssd1306_clear(&disp);
+        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
+        ssd1306_draw_string(&disp, 0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
+        if (fork_sensor.check_availability(&fork_sensor)) {
+            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
         }
         if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
@@ -363,26 +399,36 @@ static void on_cal_idle() {
 }
 
 static void on_cal_exp() {
+    LOG("CAL", "Calibrating expanded position\n");
     fork_sensor.calibrate_expanded(&fork_sensor);
     shock_sensor.calibrate_expanded(&shock_sensor);
 
+    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", fork_sensor.baseline, shock_sensor.baseline);
+
     if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
+        LOG("CAL", "Error: Both sensors failed calibration\n");
         display_message(&disp, "CAL ERR");
         sleep_ms(1000);
         state = CAL_IDLE_1;
         return;
     }
 
+    LOG("CAL", "Expanded calibration complete\n");
     state = CAL_IDLE_2;
 }
 
 static void on_cal_comp() {
+    LOG("CAL", "Calibrating compressed position\n");
     fork_sensor.calibrate_compressed(&fork_sensor);
     shock_sensor.calibrate_compressed(&shock_sensor);
+
+    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", fork_sensor.baseline, fork_sensor.inverted);
+    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", shock_sensor.baseline, shock_sensor.inverted);
 
     FIL calibration_fil;
     FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
     if (!(fr == FR_OK || fr == FR_EXIST)) {
+        LOG("CAL", "Error: Failed to open CALIBRATION file\n");
         display_message(&disp, "CAL ERR");
         sleep_ms(1000);
         state = CAL_IDLE_2;
@@ -396,16 +442,19 @@ static void on_cal_comp() {
     f_write(&calibration_fil, (const void *)&shock_sensor.inverted, sizeof(bool), &bw);
     f_close(&calibration_fil);
 
+    LOG("CAL", "Calibration saved successfully\n");
     state = IDLE;
 }
 
 static void on_rec_start() {
+    LOG("REC", "Starting recording session\n");
     count = 0;
     active_buffer = databuffer1;
     multicore_fifo_drain();
-    
+
     display_message(&disp, "INIT SENS");
     if (!start_sensors()) {
+        LOG("REC", "No sensors available\n");
         display_message(&disp, "NO SENS");
         sleep_ms(1000);
         state = IDLE;
@@ -420,18 +469,21 @@ static void on_rec_start() {
     multicore_fifo_push_blocking(OPEN);
     int index = (int)multicore_fifo_pop_blocking();
     if (index < 0) {
+        LOG("REC", "Failed to open data file\n");
         display_message(&disp, "FILE ERR");
-        while(true) { tight_loop_contents(); }
+        while (true) { tight_loop_contents(); }
     }
+    LOG("REC", "Recording to file index %d\n", index);
 
     // Start data acquisition timer
-    if (!add_repeating_timer_us(-1000000/SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
+    if (!add_repeating_timer_us(-1000000 / SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
         display_message(&disp, "TIMER ERR");
-        while(true) { tight_loop_contents(); }
+        while (true) { tight_loop_contents(); }
     }
 }
 
 static void on_rec_stop() {
+    LOG("REC", "Stopping recording, samples: %u\n", count);
     state = IDLE;
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
@@ -442,8 +494,10 @@ static void on_rec_stop() {
 }
 
 static void on_sync_data() {
+    LOG("SYNC", "Starting data sync\n");
     display_message(&disp, "CONNECT");
     if (!wifi_connect(true)) {
+        LOG("SYNC", "Could not connect wifi\n");
         display_message(&disp, "CONN ERR");
         sleep_ms(1000);
     } else {
@@ -462,6 +516,7 @@ static void on_sync_data() {
             fr = f_findnext(&dj, &fno);
         }
         f_closedir(&dj);
+        LOG("SYNC", "Found %u files to sync\n", all);
 
         // send all files on the list via TCP, and move them
         // to the "uploaded" directory
@@ -474,16 +529,19 @@ static void on_sync_data() {
 
         while (n != NULL) {
             ++curr;
+            LOG("SYNC", "Sending file: %s (%u/%u)\n", (char *)n->data, curr, all);
             if (send_file(n->data)) {
+                LOG("SYNC", "File sent successfully\n");
                 sprintf(path_new, "uploaded/%s", n->data);
                 f_rename(n->data, path_new);
             } else {
+                LOG("SYNC", "File send failed\n");
                 ++err;
             }
             sprintf(status, "%u / %u", curr, all);
             sprintf(failed, "failed: %u", err);
             ssd1306_clear(&disp);
-            ssd1306_draw_string(&disp, 0,  0, 2, status);
+            ssd1306_draw_string(&disp, 0, 0, 2, status);
             ssd1306_draw_string(&disp, 0, 24, 1, failed);
             ssd1306_show(&disp);
 
@@ -492,6 +550,7 @@ static void on_sync_data() {
             n = n->next;
         }
         list_delete(to_import);
+        LOG("SYNC", "Sync complete: %u succeeded, %u failed\n", all - err, err);
 
         // leave results on the display for a bit
         sleep_ms(3000);
@@ -529,10 +588,10 @@ static void on_idle() {
         snprintf(time_str, sizeof(time_str), "%02d:%02d", tz_tm.tm_hour, tz_tm.tm_min);
 
         ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96,  0, 1, battery_str);
-        ssd1306_draw_string(&disp,   0, 0, 2, time_str);
+        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
+        ssd1306_draw_string(&disp, 0, 0, 2, time_str);
         if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp,  0, 24, 1, "fork");
+            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
         }
         if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 40, 24, 1, "shock");
@@ -542,6 +601,7 @@ static void on_idle() {
 }
 
 static void on_sleep() {
+    LOG("POWER", "Entering sleep mode\n");
     sleep_run_from_xosc();
     display_message(&disp, "SLEEP.");
 
@@ -566,6 +626,7 @@ static void on_sleep() {
 }
 
 static void on_waking() {
+    LOG("POWER", "Waking from sleep\n");
     rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
 
     scb_hw->scr = scb_orig;
@@ -586,9 +647,7 @@ static void on_msc() {
     tud_task();
 }
 
-static void dummy() {
-    tight_loop_contents();
-}
+static void dummy() { tight_loop_contents(); }
 
 static void on_serve_tcp() {
     display_message(&disp, "CONNECT");
@@ -623,7 +682,7 @@ static void (*state_handlers[STATES_COUNT])() = {
 // Button handlers
 
 static void on_left_press(void *user_data) {
-    switch(state) {
+    switch (state) {
         case CAL_IDLE_1:
             state = CAL_EXP;
             break;
@@ -642,7 +701,7 @@ static void on_left_press(void *user_data) {
 }
 
 static void on_left_longpress(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SYNC_DATA;
             break;
@@ -652,7 +711,7 @@ static void on_left_longpress(void *user_data) {
 }
 
 static void on_right_press(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SLEEP;
             break;
@@ -666,7 +725,7 @@ static void on_right_press(void *user_data) {
 }
 
 static void on_right_longpress(void *user_data) {
-    switch(state) {
+    switch (state) {
         case IDLE:
             state = SERVE_TCP;
             break;
@@ -676,11 +735,17 @@ static void on_right_longpress(void *user_data) {
 }
 
 // ----------------------------------------------------------------------------
-// Entry point 
+// Entry point
 
 int main() {
+#ifndef USB_UART_DEBUG
     board_init();
     tusb_init();
+#else
+    stdio_usb_init();
+    sleep_ms(3000); // Give time for the tty to get enumerated on the host
+#endif
+
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
@@ -689,44 +754,53 @@ int main() {
 #endif
 
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
-    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA+1);
+    i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
     struct tm tm_now;
-    ds3231_init(&rtc, I2C_PIO, I2C_SM,
-                pio_i2c_write_blocking,
-                pio_i2c_read_blocking);
+    LOG("DS3231", "Initializing RTC\n");
+    ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
+    LOG("DS3231", "Reading datetime\n");
     ds3231_get_datetime(&rtc, &tm_now);
-    
+    LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
+        tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
+
     if (!aon_timer_start_calendar(&tm_now)) {
         setup_display(&disp);
         display_message(&disp, "AON ERR");
-        while(true) { tight_loop_contents(); }
+        while (true) { tight_loop_contents(); }
     }
 
     setup_display(&disp);
 
+#ifndef USB_UART_DEBUG
     if (msc_present()) {
+        LOG("INIT", "Entering MSC mode\n");
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
+#endif
+
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
         if (err < 0) {
             display_message(&disp, "CARD ERR");
-            while(true) { tight_loop_contents(); }
+            while (true) { tight_loop_contents(); }
         }
+        LOG("INIT", "Storage initialized\n");
 
         if (!load_config()) {
             display_message(&disp, "CONF ERR");
-            while(true) { tight_loop_contents(); }
+            while (true) { tight_loop_contents(); }
         }
+        LOG("INIT", "Config loaded\n");
 
         setup_ntp(config.ntp_server);
         cyw43_arch_init_with_country(config.country);
         setenv("TZ", config.timezone, 1);
         tzset();
+        LOG("INIT", "WiFi initialized, country=%d, timezone=%s\n", config.country, config.timezone);
 
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;
@@ -736,12 +810,12 @@ int main() {
 
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
-    }
 
-    while (true) {
-        state_handlers[state]();
+#ifndef USB_UART_DEBUG
     }
+#endif
+
+    while (true) { state_handlers[state](); }
 
     return 0;
 }
-
