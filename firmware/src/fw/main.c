@@ -12,7 +12,6 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/rosc.h"
-#include "hardware/rtc.h"
 #include "hardware/timer.h"
 #include "hardware/watchdog.h"
 #include "pico/cyw43_arch.h"
@@ -89,19 +88,19 @@ static float read_voltage() {
 }
 
 static bool msc_present() {
-    #ifdef USB_UART_DEBUG
-        return false;
-    #else
-        // Wait for a maximum of 1 second for USB MSC to initialize
-        uint32_t t = time_us_32();
-        while (!tud_ready()) {
-            if (time_us_32() - t > 1000000) {
-                return false;
-            }
-            tud_task();
+#ifdef USB_UART_DEBUG
+    return false;
+#else
+    // Wait for a maximum of 1 second for USB MSC to initialize
+    uint32_t t = time_us_32();
+    while (!tud_ready()) {
+        if (time_us_32() - t > 1000000) {
+            return false;
         }
-        return true;
-    #endif
+        tud_task();
+    }
+    return true;
+#endif
 }
 
 static bool wifi_connect(bool do_ntp) {
@@ -133,10 +132,9 @@ static void calibrate_if_needed() {
 
     FRESULT fr = f_stat("CALIBRATION", NULL);
     bool button_pressed = !gpio_get(BUTTON_LEFT);
-    LOG("CAL", "CALIBRATION file %s, button %s\n", 
-        fr == FR_OK ? "exists" : "missing",
+    LOG("CAL", "CALIBRATION file %s, button %s\n", fr == FR_OK ? "exists" : "missing",
         button_pressed ? "pressed" : "not pressed");
-    
+
     if (fr != FR_OK || button_pressed) {
         LOG("CAL", "Entering calibration mode\n");
         state = CAL_IDLE_1;
@@ -206,12 +204,14 @@ static bool start_sensors() {
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     fork_sensor.start(&fork_sensor, baseline, inverted);
-    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted, fork_sensor.available);
+    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
+        fork_sensor.available);
 
     f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
     f_read(&calibration_fil, &inverted, sizeof(bool), &br);
     shock_sensor.start(&shock_sensor, baseline, inverted);
-    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted, shock_sensor.available);
+    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
+        shock_sensor.available);
 
     f_close(&calibration_fil);
     return fork_sensor.available || shock_sensor.available;
@@ -403,8 +403,7 @@ static void on_cal_exp() {
     fork_sensor.calibrate_expanded(&fork_sensor);
     shock_sensor.calibrate_expanded(&shock_sensor);
 
-    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", 
-        fork_sensor.baseline, shock_sensor.baseline);
+    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", fork_sensor.baseline, shock_sensor.baseline);
 
     if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
         LOG("CAL", "Error: Both sensors failed calibration\n");
@@ -423,10 +422,8 @@ static void on_cal_comp() {
     fork_sensor.calibrate_compressed(&fork_sensor);
     shock_sensor.calibrate_compressed(&shock_sensor);
 
-    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", 
-        fork_sensor.baseline, fork_sensor.inverted);
-    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", 
-        shock_sensor.baseline, shock_sensor.inverted);
+    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", fork_sensor.baseline, fork_sensor.inverted);
+    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", shock_sensor.baseline, shock_sensor.inverted);
 
     FIL calibration_fil;
     FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
@@ -532,7 +529,7 @@ static void on_sync_data() {
 
         while (n != NULL) {
             ++curr;
-            LOG("SYNC", "Sending file: %s (%u/%u)\n", (char*)n->data, curr, all);
+            LOG("SYNC", "Sending file: %s (%u/%u)\n", (char *)n->data, curr, all);
             if (send_file(n->data)) {
                 LOG("SYNC", "File sent successfully\n");
                 sprintf(path_new, "uploaded/%s", n->data);
@@ -608,11 +605,17 @@ static void on_sleep() {
     sleep_run_from_xosc();
     display_message(&disp, "SLEEP.");
 
+#if PICO_RP2040
     clocks_hw->sleep_en0 = CLOCKS_SLEEP_EN0_CLK_RTC_RTC_BITS;
     clocks_hw->sleep_en1 = 0x0;
+#endif
     display_message(&disp, "SLEEP..");
 
+#if PICO_RP2040
     scb_hw->scr = scb_orig | M0PLUS_SCR_SLEEPDEEP_BITS;
+#else
+    scb_hw->scr = scb_orig | M33_SCR_SLEEPDEEP_BITS;
+#endif
     display_message(&disp, "SLEEP...");
 
     disable_button(BUTTON_LEFT, false);
@@ -735,16 +738,14 @@ static void on_right_longpress(void *user_data) {
 // Entry point
 
 int main() {
+#ifndef USB_UART_DEBUG
+    board_init();
+    tusb_init();
+#else
+    stdio_usb_init();
+    sleep_ms(3000); // Give time for the tty to get enumerated on the host
+#endif
 
-    #ifndef USB_UART_DEBUG
-        board_init();
-        tusb_init();
-    #else
-        stdio_usb_init();
-        sleep_ms(3000); // Give time for the tty to get enumerated on the host
-    #endif
-    
-    rtc_init();
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
@@ -755,25 +756,45 @@ int main() {
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
-    datetime_t dt;
+    struct tm tm_now;
     LOG("DS3231", "Initializing RTC\n");
     ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
     LOG("DS3231", "Reading datetime\n");
-    ds3231_get_datetime(&rtc, &dt);
-    rtc_set_datetime(&dt);
-    LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n",
-        dt.year, dt.month, dt.day, dt.hour, dt.min, dt.sec);
+    ds3231_get_datetime(&rtc, &tm_now);
+    LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
+        tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
+
+#if PICO_RP2040
+    // RP2040: use calendar methods (native to RTC hardware)
+    if (!aon_timer_start_calendar(&tm_now)) {
+        setup_display(&disp);
+        display_message(&disp, "AON ERR");
+        while (true) { tight_loop_contents(); }
+    }
+#else
+    // RP2350: use linear time methods (native to Powman Timer)
+    // Convert UTC struct tm to timespec
+    setenv("TZ", "UTC0", 1);
+    tzset();
+    time_t epoch = mktime(&tm_now);
+    struct timespec ts = {.tv_sec = epoch, .tv_nsec = 0};
+    if (!aon_timer_start(&ts)) {
+        setup_display(&disp);
+        display_message(&disp, "AON ERR");
+        while (true) { tight_loop_contents(); }
+    }
+#endif
 
     setup_display(&disp);
 
-    #ifndef USB_UART_DEBUG
+#ifndef USB_UART_DEBUG
     if (msc_present()) {
         LOG("INIT", "Entering MSC mode\n");
         state = MSC;
         display_message(&disp, "MSC MODE");
     } else {
-    #endif
+#endif
 
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
@@ -794,8 +815,7 @@ int main() {
         cyw43_arch_init_with_country(config.country);
         setenv("TZ", config.timezone, 1);
         tzset();
-        LOG("INIT", "WiFi initialized, country=%d, timezone=%s\n", 
-            config.country, config.timezone);
+        LOG("INIT", "WiFi initialized, country=%d, timezone=%s\n", config.country, config.timezone);
 
         scb_orig = scb_hw->scr;
         clock0_orig = clocks_hw->sleep_en0;
@@ -806,9 +826,9 @@ int main() {
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
 
-    #ifndef USB_UART_DEBUG
+#ifndef USB_UART_DEBUG
     }
-    #endif
+#endif
 
     while (true) { state_handlers[state](); }
 
