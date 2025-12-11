@@ -765,11 +765,26 @@ int main() {
     LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
         tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
 
+#if PICO_RP2040
+    // RP2040: use calendar methods (native to RTC hardware)
     if (!aon_timer_start_calendar(&tm_now)) {
         setup_display(&disp);
         display_message(&disp, "AON ERR");
         while (true) { tight_loop_contents(); }
     }
+#else
+    // RP2350: use linear time methods (native to Powman Timer)
+    // Convert UTC struct tm to timespec
+    setenv("TZ", "UTC0", 1);
+    tzset();
+    time_t epoch = mktime(&tm_now);
+    struct timespec ts = {.tv_sec = epoch, .tv_nsec = 0};
+    if (!aon_timer_start(&ts)) {
+        setup_display(&disp);
+        display_message(&disp, "AON ERR");
+        while (true) { tight_loop_contents(); }
+    }
+#endif
 
     setup_display(&disp);
 
