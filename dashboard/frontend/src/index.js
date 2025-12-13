@@ -5,6 +5,8 @@ var Layout = require("./views/Layout")
 var Dashboard = require("./views/Dashboard")
 var SST = require("./models/Global")
 
+window.SST = SST
+
 m.route.prefix = '#'
 m.route(document.body, "/dashboard", {
     "/dashboard": {
@@ -18,5 +20,3 @@ m.route(document.body, "/dashboard", {
         }
     },
 })
-
-window.SST = SST

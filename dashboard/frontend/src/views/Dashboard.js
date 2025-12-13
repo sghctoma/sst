@@ -71,16 +71,37 @@ function waitForDivs(divIds, callback) {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
+function clearBokeh() {
+  if (Bokeh.documents.length != 0) {
+    Bokeh.documents[0].clear()
+    delete Bokeh.documents[0]
+    Bokeh.documents.splice(0)
+  }
+}
+
+function initBokeh() {
+  m.redraw()
+  waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
+}
+
 module.exports = {
   oncreate: function(vnode) {
+    // Register reload handler for use by Session.importGPX
+    window.SST.reloadSession = function() {
+      clearBokeh()
+      return Session.load(Session.current.id)
+        .then(() => {
+          initBokeh()
+        })
+    }
+
     // Load new session and update dashboard
     Session.load(vnode.attrs.key)
     .then(() => {
       document.getElementById("layout-stylesheet").setAttribute("href",
         Session.current.suspension_count == 1 ? "static/layout-single.css" : "static/layout-double.css")
       document.title = `Sufni Suspenion Telemetry (${Session.current.name})`
-      m.redraw()
-      waitForDivs(Session.current.divIds, () => {eval(Session.current.script)})
+      initBokeh()
     })
     .catch((error) => {
       if (error.code == 401) {
@@ -89,11 +110,8 @@ module.exports = {
     })
   },
   onremove: function() {
-    if (Bokeh.documents.length != 0) {
-      Bokeh.documents[0].clear()
-      delete Bokeh.documents[0]
-      Bokeh.documents.splice(0)
-    }
+    clearBokeh()
+    window.SST.reloadSession = null
     Session.current = {loaded: false}
     document.getElementById("layout-stylesheet").setAttribute("href", "")
     document.title = "Sufni Suspenion Telemetry"

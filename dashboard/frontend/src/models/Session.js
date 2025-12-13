@@ -139,6 +139,10 @@ var Session = {
       if (result !== undefined) {
         SST.update.map(result.full_track, result.session_track);
         Session.current.session_track = result.session_track
+        // Reload session to get new HTML with speed graph
+        if (window.SST.reloadSession) {
+          return window.SST.reloadSession()
+        }
       }
     })
     .catch(function(error) {
