@@ -12,6 +12,7 @@ class SessionHtml(db.Model):
     script: str = db.Column(db.String, nullable=False)
     travel: str = db.Column(db.String, nullable=False)
     velocity: str = db.Column(db.String, nullable=False)
+    speed: str = db.Column(db.String)  # nullable for sessions without GPS
     map: str = db.Column(db.String, nullable=False)
     lr: str = db.Column(db.String, nullable=False)
     sw: str = db.Column(db.String, nullable=False)

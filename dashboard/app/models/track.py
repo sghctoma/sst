@@ -21,6 +21,9 @@ class Track(db.Model, Synchronizable):
                 track['ele'],
                 track['time']
             ]
+            # Speed is optional for backwards compatibility with existing tracks
+            if 'speed' in track:
+                data.append(track['speed'])
         except BaseException:
             return False
         return len(set(map(len, data))) == 1 and len(data[0]) >= 1
