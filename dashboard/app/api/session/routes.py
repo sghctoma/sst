@@ -315,7 +315,12 @@ def session_html(session_id: uuid.UUID):
     session_html = db.session.execute(db.select(SessionHtml).filter_by(
         session_id=session.id)).scalar_one_or_none()
     if not session_html:
-        return jsonify(), status.NOT_FOUND
+        # Regenerate cache on demand (not just return 404)
+        create_cache(session.id, 5, 200)
+        session_html = db.session.execute(db.select(SessionHtml).filter_by(
+            session_id=session.id)).scalar_one_or_none()
+        if not session_html:
+            return jsonify(), status.NOT_FOUND
 
     # If cached Bokeh document was generated with a previous version of Bokeh,
     # we need to delete and regenerate the cache.
@@ -331,6 +336,7 @@ def session_html(session_id: uuid.UUID):
     components_script = Markup(session_html.script.replace(
         '<script type="text/javascript">', '').replace('</script>', ''))
     components_divs = [Markup(d) if d else None for d in session_html.divs]
+    has_speed = session_html.speed is not None and session_html.speed != ""
 
     track = Track.get(session.track)
 
@@ -347,8 +353,8 @@ def session_html(session_id: uuid.UUID):
     elapsed_time = record_num / t.SampleRate
     start_time = session.timestamp
     end_time = start_time + elapsed_time
-    full_track, session_track = track_data(track.track if track else None,
-                                           start_time, end_time)
+    full_track, session_track, _ = track_data(track.track if track else None,
+                                              start_time, end_time)
 
     response = jsonify(
         id=session.id,
@@ -369,6 +375,7 @@ def session_html(session_id: uuid.UUID):
         suspension_count=suspension_count,
         full_track=full_track,
         session_track=session_track,
+        has_speed=has_speed,
         script=components_script,
         divs=components_divs,
         full_access=full_access,
@@ -394,7 +401,7 @@ def upload_gpx(id: uuid.UUID):
 
     track_dict = gpx_to_dict(request.data)
     ts, tf = track_dict['time'][0], track_dict['time'][-1]
-    full_track, session_track = track_data(track_dict, start_time, end_time)
+    full_track, session_track, _ = track_data(track_dict, start_time, end_time)
     if session_track is None:
         return jsonify(msg="Track is not applicable!"), status.BAD_REQUEST
 
@@ -419,6 +426,12 @@ def upload_gpx(id: uuid.UUID):
         .values(track=new_track.id)
     )
     db.session.execute(stmt_update)
+    db.session.commit()
+
+    # Invalidate cached HTML for affected sessions
+    db.session.execute(
+        db.delete(SessionHtml).filter(SessionHtml.session_id.in_(stmt_select))
+    )
     db.session.commit()
 
     data = dict(full_track=full_track, session_track=session_track)
