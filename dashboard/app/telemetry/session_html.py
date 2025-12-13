@@ -111,6 +111,12 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
     p_velocity.x_range.js_link('start', p_travel.x_range, 'start')
     p_velocity.x_range.js_link('end', p_travel.x_range, 'end')
 
+    # Link crosshair overlays between travel and velocity
+    travel_overlay = p_travel.toolbar.active_inspect.overlay
+    velocity_overlay = p_velocity.toolbar.active_inspect.overlay
+    travel_overlay.js_link('location', velocity_overlay, 'location')
+    velocity_overlay.js_link('location', travel_overlay, 'location')
+
     # Create speed figure if speed data available
     if session_speed_data:
         p_speed = speed_figure(session_speed_data)
@@ -126,6 +132,13 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
         p_speed.x_range.js_link('end', p_velocity.x_range, 'end')
         p_velocity.x_range.js_link('start', p_speed.x_range, 'start')
         p_velocity.x_range.js_link('end', p_speed.x_range, 'end')
+
+        # Link speed crosshair overlay with travel and velocity
+        speed_overlay = p_speed.toolbar.active_inspect.overlay
+        travel_overlay.js_link('location', speed_overlay, 'location')
+        speed_overlay.js_link('location', travel_overlay, 'location')
+        velocity_overlay.js_link('location', speed_overlay, 'location')
+        speed_overlay.js_link('location', velocity_overlay, 'location')
 
     '''
     Leverage-related graphs. These are input data, not something measured.
