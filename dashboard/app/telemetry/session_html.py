@@ -13,10 +13,12 @@ from bokeh.themes import built_in_themes, DARK_MINIMAL
 from app.extensions import db
 from app.models.session import Session
 from app.models.session_html import SessionHtml
+from app.models.track import Track
 from app.telemetry.balance import balance_figure
 from app.telemetry.fft import fft_figure
 from app.telemetry.leverage import leverage_ratio_figure, shock_wheel_figure
-from app.telemetry.map import map_figure
+from app.telemetry.map import map_figure, track_data
+from app.telemetry.speed import speed_figure
 from app.telemetry.psst import Telemetry, dataclass_from_dict
 from app.telemetry.travel import travel_figure, travel_histogram_figure
 from app.telemetry.velocity import velocity_figure
@@ -35,8 +37,22 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
 
     d = msgpack.unpackb(session.data)
     telemetry = dataclass_from_dict(Telemetry, d)
-
     tick = 1.0 / telemetry.SampleRate  # time step length in seconds
+
+    # Load track data including speed
+    p_speed = None
+    session_speed_data = None
+    if session.track:
+        track = Track.get(session.track)
+        if track:
+            record_num = len(telemetry.Front.Travel if telemetry.Front.Present
+                            else telemetry.Rear.Travel)
+            elapsed_time = record_num / telemetry.SampleRate
+            start_time = session.timestamp
+            end_time = start_time + elapsed_time
+
+            _, _, session_speed_data = track_data(
+                track.track, start_time, end_time)
 
     if telemetry.Front.Present:
         p_front_travel_hist = travel_histogram_figure(
@@ -94,6 +110,22 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
     p_travel.x_range.js_link('end', p_velocity.x_range, 'end')
     p_velocity.x_range.js_link('start', p_travel.x_range, 'start')
     p_velocity.x_range.js_link('end', p_travel.x_range, 'end')
+
+    # Create speed figure if speed data available
+    if session_speed_data:
+        p_speed = speed_figure(session_speed_data)
+
+        # Link speed x_range with travel (bidirectional)
+        p_speed.x_range.js_link('start', p_travel.x_range, 'start')
+        p_speed.x_range.js_link('end', p_travel.x_range, 'end')
+        p_travel.x_range.js_link('start', p_speed.x_range, 'start')
+        p_travel.x_range.js_link('end', p_speed.x_range, 'end')
+
+        # Link speed x_range with velocity (bidirectional)
+        p_speed.x_range.js_link('start', p_velocity.x_range, 'start')
+        p_speed.x_range.js_link('end', p_velocity.x_range, 'end')
+        p_velocity.x_range.js_link('start', p_speed.x_range, 'start')
+        p_velocity.x_range.js_link('end', p_speed.x_range, 'end')
 
     '''
     Leverage-related graphs. These are input data, not something measured.
@@ -164,10 +196,11 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
 
     document.add_root(p_travel)
     document.add_root(p_velocity)
+    if p_speed:
+        document.add_root(p_speed)
     document.add_root(p_map)
     document.add_root(p_lr)
     document.add_root(p_sw)
-    columns = ['session_id', 'script', 'travel', 'velocity', 'map', 'lr', 'sw']
 
     if telemetry.Front.Present:
         prefix = 'front_' if suspension_count == 2 else ''
@@ -183,7 +216,6 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
         document.add_root(p_front_travel_hist)
         document.add_root(p_front_fft)
         document.add_root(p_front_velocity)
-        columns.extend(['f_thist', 'f_fft', 'f_vhist'])
     if telemetry.Rear.Present:
         prefix = 'rear_' if suspension_count == 2 else ''
         p_rear_travel_hist.name = f'{prefix}travel_hist'
@@ -198,11 +230,9 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
         document.add_root(p_rear_travel_hist)
         document.add_root(p_rear_fft)
         document.add_root(p_rear_velocity)
-        columns.extend(['r_thist', 'r_fft', 'r_vhist'])
     if suspension_count == 2:
         document.add_root(p_balance_compression)
         document.add_root(p_balance_rebound)
-        columns.extend(['cbalance', 'rbalance'])
 
     # Some Bokeh models (like the map) need to be dynamically initialized based
     # on values in a particular Flask session.
@@ -210,7 +240,40 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
         args=dict(), code='SST.init_models();'))
 
     script, divs = components(document.roots, theme=dark_minimal_theme)
-    components_data = dict(zip(columns, [session_id, script] + list(divs)))
+
+    # Map root names to div HTML strings
+    div_by_name = {root.name: div for root, div in zip(document.roots, divs)}
+
+    # Build components_data with explicit column mapping
+    # Speed will be None if p_speed was not added to roots
+    components_data = {
+        'session_id': session_id,
+        'script': script,
+        'travel': div_by_name.get('travel'),
+        'velocity': div_by_name.get('velocity'),
+        'speed': div_by_name.get('speed'),
+        'map': div_by_name.get('map'),
+        'lr': div_by_name.get('lr'),
+        'sw': div_by_name.get('sw'),
+    }
+
+    # Add conditional histogram columns based on suspension configuration
+    if telemetry.Front.Present:
+        hist_prefix = 'front_' if suspension_count == 2 else ''
+        components_data['f_thist'] = div_by_name.get(f'{hist_prefix}travel_hist')
+        components_data['f_fft'] = div_by_name.get(f'{hist_prefix}fft')
+        components_data['f_vhist'] = div_by_name.get(f'{hist_prefix}velocity_hist')
+
+    if telemetry.Rear.Present:
+        hist_prefix = 'rear_' if suspension_count == 2 else ''
+        components_data['r_thist'] = div_by_name.get(f'{hist_prefix}travel_hist')
+        components_data['r_fft'] = div_by_name.get(f'{hist_prefix}fft')
+        components_data['r_vhist'] = div_by_name.get(f'{hist_prefix}velocity_hist')
+
+    if suspension_count == 2:
+        components_data['cbalance'] = div_by_name.get('balance_compression')
+        components_data['rbalance'] = div_by_name.get('balance_rebound')
+
     session_html = dataclass_from_dict(SessionHtml, components_data)
 
     db.session.add(session_html)
