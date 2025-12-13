@@ -10,13 +10,13 @@ var SingleSuspensionTabs = {
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone", checked: "checked"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
-        m(".travel-hist", m.trust(Session.current.divs[5])),
-        m(".fft", m.trust(Session.current.divs[6])),
+        m(".travel-hist", m.trust(Session.current.divs[6])),
+        m(".fft", m.trust(Session.current.divs[7])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabtwo"}),
       m("label.label", {style: "grid-column: 2", for: "tabtwo"}, "Damping"),
       m(".panel damping", {tabindex: "1"}, [
-        m(".velocity-hist", m.trust(Session.current.divs[7])),
+        m(".velocity-hist", m.trust(Session.current.divs[8])),
       ]),
     ])
   }
@@ -32,22 +32,22 @@ var DualSuspensionTabs = {
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabone"}),
       m("label.label", {style: "grid-column: 1", for: "tabone"}, "Spring rate"),
       m(".panel springrate", {tabindex: "1"}, [
-        m(".front-travel-hist", m.trust(Session.current.divs[5])),
-        m(".rear-travel-hist", m.trust(Session.current.divs[8])),
-        m(".front-fft", m.trust(Session.current.divs[6])),
-        m(".rear-fft", m.trust(Session.current.divs[9])),
+        m(".front-travel-hist", m.trust(Session.current.divs[6])),
+        m(".rear-travel-hist", m.trust(Session.current.divs[9])),
+        m(".front-fft", m.trust(Session.current.divs[7])),
+        m(".rear-fft", m.trust(Session.current.divs[10])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabtwo"}),
       m("label.label", {style: "grid-column: 2", for: "tabtwo"}, "Damping"),
       m(".panel damping", {tabindex: "1"}, [
-        m(".front-velocity-hist", m.trust(Session.current.divs[7])),
-        m(".rear-velocity-hist", m.trust(Session.current.divs[10])),
+        m(".front-velocity-hist", m.trust(Session.current.divs[8])),
+        m(".rear-velocity-hist", m.trust(Session.current.divs[11])),
       ]),
       m("input.radiotab", {name: "tabs", tabindex: "1", type: "radio", id: "tabthree"}),
       m("label.label", {style: "grid-column: 3", for: "tabthree"}, "Balance"),
       m(".panel balance", {tabindex: "1"}, [
-        m(".balance-compression", m.trust(Session.current.divs[11])),
-        m(".balance-rebound", m.trust(Session.current.divs[12])),
+        m(".balance-compression", m.trust(Session.current.divs[12])),
+        m(".balance-rebound", m.trust(Session.current.divs[13])),
       ]),
     ])
   }
@@ -100,19 +100,26 @@ module.exports = {
     m.redraw()
   },
   view: function() {
-    return Session.current.loaded ? m(".container", {id: "page-content"}, [
+    var hasVidMap = Session.current.session_track || VideoPlayer.loaded;
+    var hasSpeed = Session.current.has_speed;
+
+    return Session.current.loaded ? m(".container", {
+      id: "page-content",
+      class: hasSpeed ? "has-speed" : ""
+    }, [
       m(".video-map", [
-        m(".map", {style: VideoPlayer.loaded ? "" : "height: 100%"}, m.trust(Session.current.divs[2])),
+        m(".map", {style: VideoPlayer.loaded ? "" : "height: 100%"}, m.trust(Session.current.divs[3])),
         m(VideoPlayer),
       ]),
       m("div", {
-        class: Session.current.session_track || VideoPlayer.loaded ? "travel" : "travel novidmap"
+        class: hasVidMap ? "travel" : "travel novidmap"
       }, m.trust(Session.current.divs[0])),
       m("div", {
-        class: Session.current.session_track || VideoPlayer.loaded ? "velocity" : "velocity novidmap"
+        class: hasVidMap ? "velocity" : "velocity novidmap"
       }, m.trust(Session.current.divs[1])),
-      m(".lr", m.trust(Session.current.divs[3])),
-      m(".sw", m.trust(Session.current.divs[4])),
+      hasSpeed ? m(".speed", m.trust(Session.current.divs[2])) : null,
+      m(".lr", m.trust(Session.current.divs[4])),
+      m(".sw", m.trust(Session.current.divs[5])),
       m(".description", m(Notes)),
       Session.current.suspension_count == 2 ? m(DualSuspensionTabs) : m(SingleSuspensionTabs),
     ]) : m("div", "SESSION IS LOADING")
