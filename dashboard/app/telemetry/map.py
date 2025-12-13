@@ -15,6 +15,9 @@ from bokeh.plotting import figure
 from scipy.interpolate import pchip_interpolate
 
 
+EARTH_RADIUS_KM = 6371.0
+
+
 def _geographic_to_mercator(y_lat: float, x_lon: float) -> (float, float):
     if abs(x_lon) > 180 or abs(y_lat) >= 90:
         return None
@@ -24,6 +27,25 @@ def _geographic_to_mercator(y_lat: float, x_lon: float) -> (float, float):
     a = y_lat * 0.017453292519943295
     y_m = 3189068.5 * math.log((1.0 + math.sin(a)) / (1.0 - math.sin(a)))
     return y_m, x_m
+
+
+def _haversine_distance_km(lat1: float, lon1: float,
+                           lat2: float, lon2: float) -> float:
+    """Calculate distance between two GPS points in kilometers.
+
+    Uses Haversine formula. Input coordinates in degrees (WGS84).
+    """
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+
+    a = (math.sin(delta_lat / 2) ** 2 +
+         math.cos(lat1_rad) * math.cos(lat2_rad) *
+         math.sin(delta_lon / 2) ** 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    return EARTH_RADIUS_KM * c
 
 
 def _session_track(start: int, end: int, t: np.array, track: dict) -> (
@@ -46,32 +68,92 @@ def _session_track(start: int, end: int, t: np.array, track: dict) -> (
 
     return dict(lon=list(y[0, :]), lat=list(y[1, :]))
 
+def _session_speed(start: int, end: int, t: np.array,
+                   speed: list[float]) -> list[float]:
+    """Get speed data interpolated to session time range at 10Hz.
+
+    Same interpolation as _session_track for alignment.
+    Returns None if no speed data or time range invalid.
+    """
+    if not speed:
+        return None
+
+    session_indices = np.where(np.logical_and(t >= start, t <= end))
+    if len(session_indices[0]) == 0:
+        return None
+
+    start_idx = session_indices[0][0]
+    end_idx = session_indices[0][-1] + 1
+
+    session_speed_raw = np.array(speed[start_idx:end_idx])
+    session_time = np.array(t[start_idx:end_idx]) - start
+    session_time[0] = 0
+
+    # Interpolate to 10Hz (0.1s intervals) - same as _session_track
+    x = np.arange(0, session_time[-1], 0.1)
+    speed_interp = pchip_interpolate(session_time, session_speed_raw, x)
+
+    return list(speed_interp)
+
 
 def gpx_to_dict(gpx_data: str) -> dict[str, Any]:
-    gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
+    gpx_dict = dict(lat=[], lon=[], ele=[], time=[], speed=[])
+
+    prev_lat = None
+    prev_lon = None
+    prev_time = None
+
     gpx_file = io.BytesIO(gpx_data)
     gpx = gpxpy.parse(gpx_file)
+
     for track in gpx.tracks:
         for segment in track.segments:
             for point in segment.points:
-                lat, lon = _geographic_to_mercator(point.latitude,
-                                                   point.longitude)
-                gpx_dict['lat'].append(lat)
-                gpx_dict['lon'].append(lon)
+                lat = point.latitude
+                lon = point.longitude
+                time = point.time.timestamp()
+
+                # Calculate speed from previous point (raw WGS84)
+                if prev_lat is not None:
+                    dist_km = _haversine_distance_km(prev_lat, prev_lon, lat, lon)
+                    time_delta_hours = (time - prev_time) / 3600.0
+                    speed_kmh = dist_km / time_delta_hours if time_delta_hours > 0 else 0.0
+
+                    # First point gets same speed as second
+                    if len(gpx_dict['speed']) == 1:
+                        gpx_dict['speed'][0] = speed_kmh
+
+                    gpx_dict['speed'].append(speed_kmh)
+                else:
+                    # First point - placeholder, updated when we have second point
+                    gpx_dict['speed'].append(0.0)
+
+                # Convert to Mercator and store
+                merc_lat, merc_lon = _geographic_to_mercator(lat, lon)
+                gpx_dict['lat'].append(merc_lat)
+                gpx_dict['lon'].append(merc_lon)
+                gpx_dict['time'].append(time)
                 gpx_dict['ele'].append(point.elevation)
-                gpx_dict['time'].append(point.time.timestamp())
+
+                prev_lat = lat
+                prev_lon = lon
+                prev_time = time
+
     return gpx_dict
 
-
 def track_data(track: str, start_timestamp: int, end_timestamp: int) -> (
-               dict[str, Any], dict[str, list[float]]):
+               dict[str, Any], dict[str, list[float]], list[float]):
+    """Returns (full_track, session_track, session_speed_data)"""
     if not track:
-        return None, None
+        return None, None, None
 
     if type(track) is str:
         full_track = json.loads(track)
     else:
-        full_track = dict(track)  # Copy, so that we leage the original intact.
+        full_track = dict(track)  # Copy, so that we leave the original intact.
+
+    # Extract speed before removing from full_track
+    speed_data = full_track.pop('speed', None)
 
     # We don't yet use elevation data, so currently there is no need to include
     # it in the datasource. It is just saved to the database for future use.
@@ -85,7 +167,15 @@ def track_data(track: str, start_timestamp: int, end_timestamp: int) -> (
                                    timestamps,
                                    full_track)
 
-    return full_track, session_track
+    # Get interpolated session speed
+    sess_speed = None
+    if speed_data and session_track:
+        sess_speed = _session_speed(start_timestamp,
+                                    end_timestamp,
+                                    timestamps,
+                                    speed_data)
+
+    return full_track, session_track, sess_speed
 
 
 def map_figure() -> (figure, CustomJS):
