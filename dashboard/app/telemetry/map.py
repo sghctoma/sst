@@ -212,7 +212,7 @@ def map_figure() -> (figure, CustomJS):
     p.add_glyph(cs)
     p.add_glyph(ce)
 
-    pos_marker = Circle(name="pos_marker", x=0, y=0, radius=13,
+    pos_marker = Circle(name="pos_marker", x=0, y=0, radius=10, radius_units='screen',
                         line_color='black', fill_color='gray')
     p.add_glyph(pos_marker)
 
