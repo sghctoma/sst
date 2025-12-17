@@ -195,6 +195,81 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
     on_seek.code = on_seek_code
     p_travel.toolbar.active_inspect.overlay.js_on_change('location', on_seek)
 
+    ds_session = p_map.select_one(dict(name='ds_session'))
+    if ds_session:
+        zoom_map_code = '''
+            const start_t = cb_obj.start;
+            const end_t = cb_obj.end;
+
+            const lat = source.data['lat'];
+            const lon = source.data['lon'];
+
+            // 10Hz data
+            let start_idx = Math.floor(start_t * 10);
+            let end_idx = Math.ceil(end_t * 10);
+
+            if (start_idx < 0) start_idx = 0;
+            if (end_idx > lon.length) end_idx = lon.length;
+
+            if (start_idx >= end_idx) return;
+
+            let min_x = Infinity, max_x = -Infinity;
+            let min_y = Infinity, max_y = -Infinity;
+
+            for (let i = start_idx; i < end_idx; i++) {
+                if (lon[i] < min_x) min_x = lon[i];
+                if (lon[i] > max_x) max_x = lon[i];
+                if (lat[i] < min_y) min_y = lat[i];
+                if (lat[i] > max_y) max_y = lat[i];
+            }
+
+            let data_w = max_x - min_x;
+            let data_h = max_y - min_y;
+            const center_x = (min_x + max_x) / 2;
+            const center_y = (min_y + max_y) / 2;
+
+            // Add 5% padding
+            data_w *= 1.05;
+            data_h *= 1.05;
+
+            // Ensure a minimum extent to avoid extreme zoom-in for very short segments
+            const MIN_EXTENT = 1000;
+            if (data_w < MIN_EXTENT) data_w = MIN_EXTENT;
+            if (data_h < MIN_EXTENT) data_h = MIN_EXTENT;
+
+            // Get plot aspect ratio
+            let aspect = 1.0;
+            if (plot.inner_height > 0) {
+                aspect = plot.inner_width / plot.inner_height;
+            }
+
+            let final_w, final_h;
+            if (data_w / data_h > aspect) {
+                // Width constrained
+                final_w = data_w;
+                final_h = data_w / aspect;
+            } else {
+                // Height constrained
+                final_h = data_h;
+                final_w = final_h * aspect;
+            }
+
+            // Set ranges to form a bounding box centered around the visible track
+            map_x.start = center_x - final_w / 2;
+            map_x.end = center_x + final_w / 2;
+            map_y.start = center_y - final_h / 2;
+            map_y.end = center_y + final_h / 2;
+        '''
+        callback = CustomJS(
+            args=dict(source=ds_session,
+                      map_x=p_map.x_range,
+                      map_y=p_map.y_range,
+                      plot=p_map),
+            code=zoom_map_code
+        )
+        p_travel.x_range.js_on_change('start', callback)
+        p_travel.x_range.js_on_change('end', callback)
+
     '''
     Construct the layout.
     '''
