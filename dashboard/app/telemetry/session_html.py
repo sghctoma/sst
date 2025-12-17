@@ -228,12 +228,12 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
             const center_x = (min_x + max_x) / 2;
             const center_y = (min_y + max_y) / 2;
 
-            // Add 5% padding
-            data_w *= 1.05;
+            // Add padding
+            data_w *= 1.1;
             data_h *= 1.05;
 
             // Ensure a minimum extent to avoid extreme zoom-in for very short segments
-            const MIN_EXTENT = 1000;
+            const MIN_EXTENT = 100;
             if (data_w < MIN_EXTENT) data_w = MIN_EXTENT;
             if (data_h < MIN_EXTENT) data_h = MIN_EXTENT;
 
