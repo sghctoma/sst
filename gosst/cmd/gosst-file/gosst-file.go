@@ -55,7 +55,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	front, rear, meta, err := sst.ProcessRaw(tb)
+	front, rear, markers, meta, err := sst.ProcessRaw(tb)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -65,7 +65,7 @@ func main() {
 		FrontCalibration: fcal,
 		RearCalibration:  rcal,
 	}
-	pd, err := psst.ProcessRecording(front, rear, meta, &setup)
+	pd, err := psst.ProcessRecording(front, rear, markers, meta, &setup)
 	if err != nil {
 		log.Fatalln(err)
 	}

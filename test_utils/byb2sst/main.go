@@ -264,10 +264,10 @@ func main() {
 		start = time.Now()
 	}
 	meta := psst.Meta{
-		Name:       sessionName,
-		Version:    1,
-		SampleRate: 1000,
-		Timestamp:  start.Unix(),
+		Name:                sessionName,
+		Version:             1,
+		TelemetrySampleRate: 1000,
+		Timestamp:           start.Unix(),
 	}
 
 	fork, shock, err := loadData(opts.BybFile, start.Unix())
@@ -280,7 +280,7 @@ func main() {
 		FrontCalibration: fcal,
 		RearCalibration:  rcal,
 	}
-	pd, err := psst.ProcessRecording(fork, shock, meta, setup)
+	pd, err := psst.ProcessRecording(fork, shock, nil, meta, setup)
 	if err != nil {
 		log.Fatalln(err)
 	}

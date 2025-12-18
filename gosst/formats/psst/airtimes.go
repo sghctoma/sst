@@ -15,8 +15,8 @@ func (this *Processed) airtimes() {
 						r.airCandidate = false
 
 						at := &airtime{
-							Start: float64(min(f.Start, r.Start)) / float64(this.SampleRate),
-							End:   float64(min(f.End, r.End)) / float64(this.SampleRate),
+							Start: float64(min(f.Start, r.Start)) / float64(this.TelemetrySampleRate),
+							End:   float64(min(f.End, r.End)) / float64(this.TelemetrySampleRate),
 						}
 						this.Airtimes = append(this.Airtimes, at)
 						break
@@ -31,8 +31,8 @@ func (this *Processed) airtimes() {
 				rmean := stat.Mean(this.Rear.Travel[f.Start:f.End+1], nil)
 				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
 					at := &airtime{
-						Start: float64(f.Start) / float64(this.SampleRate),
-						End:   float64(f.End) / float64(this.SampleRate),
+						Start: float64(f.Start) / float64(this.TelemetrySampleRate),
+						End:   float64(f.End) / float64(this.TelemetrySampleRate),
 					}
 					this.Airtimes = append(this.Airtimes, at)
 				}
@@ -44,8 +44,8 @@ func (this *Processed) airtimes() {
 				rmean := stat.Mean(this.Rear.Travel[r.Start:r.End+1], nil)
 				if (fmean+rmean)/2 <= maxMean*AIRTIME_TRAVEL_MEAN_THRESHOLD_RATIO {
 					at := &airtime{
-						Start: float64(r.Start) / float64(this.SampleRate),
-						End:   float64(r.End) / float64(this.SampleRate),
+						Start: float64(r.Start) / float64(this.TelemetrySampleRate),
+						End:   float64(r.End) / float64(this.TelemetrySampleRate),
 					}
 					this.Airtimes = append(this.Airtimes, at)
 				}
@@ -55,8 +55,8 @@ func (this *Processed) airtimes() {
 		for _, f := range this.Front.Strokes.idlings {
 			if f.airCandidate {
 				at := &airtime{
-					Start: float64(f.Start) / float64(this.SampleRate),
-					End:   float64(f.End) / float64(this.SampleRate),
+					Start: float64(f.Start) / float64(this.TelemetrySampleRate),
+					End:   float64(f.End) / float64(this.TelemetrySampleRate),
 				}
 				this.Airtimes = append(this.Airtimes, at)
 			}
@@ -65,8 +65,8 @@ func (this *Processed) airtimes() {
 		for _, r := range this.Rear.Strokes.idlings {
 			if r.airCandidate {
 				at := &airtime{
-					Start: float64(r.Start) / float64(this.SampleRate),
-					End:   float64(r.End) / float64(this.SampleRate),
+					Start: float64(r.Start) / float64(this.TelemetrySampleRate),
+					End:   float64(r.End) / float64(this.TelemetrySampleRate),
 				}
 				this.Airtimes = append(this.Airtimes, at)
 			}

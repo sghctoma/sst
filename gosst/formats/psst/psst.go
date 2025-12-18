@@ -65,10 +65,10 @@ type Number interface {
 }
 
 type Meta struct {
-	Name       string
-	Version    uint8
-	SampleRate uint16
-	Timestamp  int64
+	Name                string
+	Version             uint8
+	TelemetrySampleRate uint16
+	Timestamp           int64
 }
 
 type SetupData struct {
@@ -83,6 +83,7 @@ type Processed struct {
 	Rear     suspension
 	Linkage  Linkage
 	Airtimes []*airtime
+	Markers  []float64
 }
 
 func (this *Linkage) ProcessRawData() error {
@@ -150,12 +151,13 @@ func (e *RecordCountMismatchError) Error() string {
 	return "Front and rear record counts are not equal"
 }
 
-func ProcessRecording[T Number](front, rear []T, meta Meta, setup *SetupData) (*Processed, error) {
+func ProcessRecording[T Number](front, rear []T, markers []float64, meta Meta, setup *SetupData) (*Processed, error) {
 	var pd Processed
 	pd.Meta = meta
 	pd.Front.Calibration = *setup.FrontCalibration
 	pd.Rear.Calibration = *setup.RearCalibration
 	pd.Linkage = *setup.Linkage
+	pd.Markers = markers
 
 	fc := len(front)
 	rc := len(rear)
@@ -170,7 +172,7 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, setup *SetupData) (*
 
 	t := make([]float64, record_count)
 	for i := range t {
-		t[i] = 1.0 / float64(pd.SampleRate) * float64(i)
+		t[i] = 1.0 / float64(pd.TelemetrySampleRate) * float64(i)
 	}
 	filter, _ := savitzkygolay.NewFilter(51, 1, 3)
 
@@ -202,7 +204,7 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, setup *SetupData) (*
 		vbinsFine, dvFine := digitizeVelocity(v, VELOCITY_HIST_STEP_FINE)
 		pd.Front.FineVelocityBins = vbinsFine
 
-		strokes := filterStrokes(v, pd.Front.Travel, pd.Linkage.MaxFrontTravel, pd.SampleRate)
+		strokes := filterStrokes(v, pd.Front.Travel, pd.Linkage.MaxFrontTravel, pd.TelemetrySampleRate)
 		pd.Front.Strokes.categorize(strokes, pd.Front.Travel, pd.Linkage.MaxFrontTravel)
 		if len(pd.Front.Strokes.Compressions) == 0 && len(pd.Front.Strokes.Rebounds) == 0 {
 			pd.Front.Present = false
@@ -235,7 +237,7 @@ func ProcessRecording[T Number](front, rear []T, meta Meta, setup *SetupData) (*
 		vbinsFine, dvFine := digitizeVelocity(v, VELOCITY_HIST_STEP_FINE)
 		pd.Rear.FineVelocityBins = vbinsFine
 
-		strokes := filterStrokes(v, pd.Rear.Travel, pd.Linkage.MaxRearTravel, pd.SampleRate)
+		strokes := filterStrokes(v, pd.Rear.Travel, pd.Linkage.MaxRearTravel, pd.TelemetrySampleRate)
 		pd.Rear.Strokes.categorize(strokes, pd.Rear.Travel, pd.Linkage.MaxRearTravel)
 		if len(pd.Rear.Strokes.Compressions) == 0 && len(pd.Rear.Strokes.Rebounds) == 0 {
 			pd.Rear.Present = false
