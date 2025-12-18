@@ -6,7 +6,8 @@ from bokeh.models.annotations import BoxAnnotation, Label, Span
 from bokeh.models.axes import LinearAxis
 from bokeh.models.callbacks import CustomJS
 from bokeh.models.ranges import Range1d
-from bokeh.models.tools import BoxSelectTool, CrosshairTool, WheelZoomTool
+from bokeh.models.tools import (BoxSelectTool, CrosshairTool, WheelPanTool,
+                                WheelZoomTool)
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
@@ -124,6 +125,8 @@ def travel_figure(telemetry: Telemetry, lod: int,
                  SST.update.plots(geometry['x0'], geometry['x1']);
                  '''))
 
+    wp = WheelPanTool(dimension='width')
+    p.add_tools(wp)
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz

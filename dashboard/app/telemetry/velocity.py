@@ -10,7 +10,7 @@ from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.models.ranges import Range1d
 from bokeh.models.tickers import FixedTicker, SingleIntervalTicker
-from bokeh.models.tools import CrosshairTool, WheelZoomTool
+from bokeh.models.tools import CrosshairTool, WheelPanTool, WheelZoomTool
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 from scipy.stats import norm
@@ -77,6 +77,8 @@ def velocity_figure(telemetry: Telemetry, lod: int,
         source=source)
     p.legend.level = 'overlay'
 
+    wp = WheelPanTool(dimension='width')
+    p.add_tools(wp)
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz

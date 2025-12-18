@@ -3,7 +3,7 @@ import numpy as np
 from bokeh.models import ColumnDataSource
 from bokeh.models.annotations import Span
 from bokeh.models.ranges import Range1d
-from bokeh.models.tools import CrosshairTool, WheelZoomTool
+from bokeh.models.tools import CrosshairTool, WheelPanTool, WheelZoomTool
 from bokeh.palettes import Spectral11
 from bokeh.plotting import figure
 
@@ -52,6 +52,8 @@ def speed_figure(speed_data: list[float], sample_rate: float = 10.0) -> figure:
 
     p.legend.level = 'overlay'
 
+    wp = WheelPanTool(dimension='width')
+    p.add_tools(wp)
     wz = WheelZoomTool(maintain_focus=False, dimensions='width')
     p.add_tools(wz)
     p.toolbar.active_scroll = wz
