@@ -752,6 +752,7 @@ static void on_right_press(void *user_data) {
             break;
         case RECORD:
             marker_pending = true;
+            LOG("REC", "Marker set\n");
             break;
         case SERVE_TCP:
             tcpserver_finish(&server);
