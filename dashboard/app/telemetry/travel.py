@@ -17,10 +17,11 @@ HISTOGRAM_RANGE_MULTIPLIER = 1.3
 
 
 def travel_figure(telemetry: Telemetry, lod: int,
-                  front_color: tuple[str], rear_color: tuple[str]) -> figure:
+                  front_color: tuple[str], rear_color: tuple[str],
+                  markers: list[float]) -> figure:
     length = len(telemetry.Front.Travel if telemetry.Front.Present else
                  telemetry.Rear.Travel)
-    time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
+    time = np.around(np.arange(0, length, lod) / telemetry.TelemetrySampleRate, 4)
     front_max = telemetry.Linkage.MaxFrontTravel
     rear_max = telemetry.Linkage.MaxRearTravel
 
@@ -53,6 +54,12 @@ def travel_figure(telemetry: Telemetry, lod: int,
         output_backend='webgl')
 
     _add_airtime_labels(p, telemetry.Airtimes)
+
+    if markers:
+        for marker in markers:
+            p.add_layout(Span(location=marker, dimension='height',
+                              line_color='red', line_dash='dashed',
+                              line_width=2))
 
     p.extra_y_ranges = {'rear': Range1d(start=rear_max, end=0)}
     p.add_layout(LinearAxis(y_range_name='rear'), 'right')

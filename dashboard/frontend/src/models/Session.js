@@ -137,8 +137,10 @@ var Session = {
     })
     .then(function(result) {
       if (result !== undefined) {
-        SST.update.map(result.full_track, result.session_track);
+        SST.update.map(result.full_track, result.session_track,
+                       result.markers_track);
         Session.current.session_track = result.session_track
+        Session.current.markers_track = result.markers_track
       }
     })
     .catch(function(error) {

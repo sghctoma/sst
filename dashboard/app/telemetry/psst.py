@@ -77,12 +77,13 @@ class Suspension:
 class Telemetry:
     Name: str
     Version: int
-    SampleRate: int
+    TelemetrySampleRate: int
     Timestamp: int
     Front: Suspension
     Rear: Suspension
     Linkage: Linkage
     Airtimes: list[Airtime]
+    Markers: list[float]
 
     def __post_init__(self):
         self.Airtimes = [dataclass_from_dict(Airtime, d) for d in self.Airtimes]

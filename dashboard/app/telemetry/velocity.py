@@ -25,10 +25,11 @@ HISTOGRAM_RANGE_LOW = -HISTOGRAM_RANGE_HIGH
 
 
 def velocity_figure(telemetry: Telemetry, lod: int,
-                    front_color: tuple[str], rear_color: tuple[str]) -> figure:
+                    front_color: tuple[str], rear_color: tuple[str],
+                    markers: list[float]) -> figure:
     length = len(telemetry.Front.Velocity if telemetry.Front.Present else
                  telemetry.Rear.Velocity)
-    time = np.around(np.arange(0, length, lod) / telemetry.SampleRate, 4)
+    time = np.around(np.arange(0, length, lod) / telemetry.TelemetrySampleRate, 4)
 
     if telemetry.Front.Present:
         vf_lod = np.around(telemetry.Front.Velocity[::lod], 4) / 1000
@@ -62,6 +63,12 @@ def velocity_figure(telemetry: Telemetry, lod: int,
         output_backend='webgl')
 
     p.x_range = Range1d(0, time[-1], bounds='auto')
+
+    if markers:
+        for marker in markers:
+            p.add_layout(Span(location=marker, dimension='height',
+                              line_color='red', line_dash='dashed',
+                              line_width=2))
 
     line = p.line(
         't', 'f',

@@ -47,6 +47,29 @@ def _session_track(start: int, end: int, t: np.array, track: dict) -> (
     return dict(lon=list(y[0, :]), lat=list(y[1, :]))
 
 
+def _markers_track(markers: list[float], start: int, end: int, t: np.array,
+                   track: dict) -> dict[str, list[float]]:
+    if not markers:
+        return dict(lat=[], lon=[])
+
+    session_indices = np.where(np.logical_and(t >= start, t <= end))
+    if len(session_indices[0]) == 0:
+        return dict(lat=[], lon=[])
+
+    start_idx = session_indices[0][0]
+    end_idx = session_indices[0][-1] + 1
+
+    session_lon = np.array(track['lon'][start_idx:end_idx])
+    session_lat = np.array(track['lat'][start_idx:end_idx])
+    session_time = np.array(t[start_idx:end_idx]) - start
+    session_time[0] = 0
+
+    yi = np.array([session_lon, session_lat])
+    y = pchip_interpolate(session_time, yi, markers, axis=1)
+
+    return dict(lon=list(y[0, :]), lat=list(y[1, :]))
+
+
 def gpx_to_dict(gpx_data: str) -> dict[str, Any]:
     gpx_dict = dict(lat=[], lon=[], ele=[], time=[])
     gpx_file = io.BytesIO(gpx_data)
@@ -63,10 +86,11 @@ def gpx_to_dict(gpx_data: str) -> dict[str, Any]:
     return gpx_dict
 
 
-def track_data(track: str, start_timestamp: int, end_timestamp: int) -> (
-               dict[str, Any], dict[str, list[float]]):
+def track_data(track: str, start_timestamp: int, end_timestamp: int,
+               markers: list[float] = None) -> (
+               dict[str, Any], dict[str, list[float]], dict[str, list[float]]):
     if not track:
-        return None, None
+        return None, None, None
 
     if type(track) is str:
         full_track = json.loads(track)
@@ -84,13 +108,19 @@ def track_data(track: str, start_timestamp: int, end_timestamp: int) -> (
                                    end_timestamp,
                                    timestamps,
                                    full_track)
+    markers_track = _markers_track(markers,
+                                   start_timestamp,
+                                   end_timestamp,
+                                   timestamps,
+                                   full_track)
 
-    return full_track, session_track
+    return full_track, session_track, markers_track
 
 
 def map_figure() -> (figure, CustomJS):
     ds_track = ColumnDataSource(name='ds_track', data=dict(lat=[], lon=[]))
     ds_session = ColumnDataSource(name='ds_session', data=dict(lat=[], lon=[]))
+    ds_markers = ColumnDataSource(name='ds_markers', data=dict(lat=[], lon=[]))
 
     p = figure(
         name='map',
@@ -121,6 +151,9 @@ def map_figure() -> (figure, CustomJS):
                 line_color='black', fill_color='#E74C3C', fill_alpha=0.8)
     p.add_glyph(cs)
     p.add_glyph(ce)
+
+    p.circle(name='markers', x='lon', y='lat', source=ds_markers, radius=10,
+             line_color='black', fill_color='#E74C3C', fill_alpha=0.8)
 
     pos_marker = Circle(name="pos_marker", x=0, y=0, radius=13,
                         line_color='black', fill_color='gray')

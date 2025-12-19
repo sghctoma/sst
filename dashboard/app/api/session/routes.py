@@ -143,14 +143,14 @@ def filter(id: uuid.UUID):
     d = msgpack.unpackb(entity.data)
     t = dataclass_from_dict(Telemetry, d)
 
-    start, end = _extract_range(t.SampleRate)
+    start, end = _extract_range(t.TelemetrySampleRate)
     count = len(t.Front.Travel if t.Front.Present else t.Rear.Travel)
     if not _validate_range(start, end, count):
         start = None
         end = None
 
     updated_data = {'front': None, 'rear': None}
-    tick = 1.0 / t.SampleRate
+    tick = 1.0 / t.TelemetrySampleRate
     if t.Front.Present:
         f_strokes = _filter_strokes(t.Front.Strokes, start, end)
         updated_data['front'] = _update_stroke_based(f_strokes, t.Front)
@@ -344,11 +344,11 @@ def session_html(session_id: uuid.UUID):
         suspension_count += 1
 
     record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
-    elapsed_time = record_num / t.SampleRate
+    elapsed_time = record_num / t.TelemetrySampleRate
     start_time = session.timestamp
     end_time = start_time + elapsed_time
-    full_track, session_track = track_data(track.track if track else None,
-                                           start_time, end_time)
+    full_track, session_track, markers_track = track_data(
+        track.track if track else None, start_time, end_time, t.Markers)
 
     response = jsonify(
         id=session.id,
@@ -369,6 +369,7 @@ def session_html(session_id: uuid.UUID):
         suspension_count=suspension_count,
         full_track=full_track,
         session_track=session_track,
+        markers_track=markers_track,
         script=components_script,
         divs=components_divs,
         full_access=full_access,
@@ -388,13 +389,14 @@ def upload_gpx(id: uuid.UUID):
     d = msgpack.unpackb(session.data)
     t = dataclass_from_dict(Telemetry, d)
     record_num = len(t.Front.Travel) if t.Front.Present else len(t.Rear.Travel)
-    elapsed_time = record_num / t.SampleRate
+    elapsed_time = record_num / t.TelemetrySampleRate
     start_time = session.timestamp
     end_time = start_time + elapsed_time
 
     track_dict = gpx_to_dict(request.data)
     ts, tf = track_dict['time'][0], track_dict['time'][-1]
-    full_track, session_track = track_data(track_dict, start_time, end_time)
+    full_track, session_track, markers_track = track_data(
+        track_dict, start_time, end_time, t.Markers)
     if session_track is None:
         return jsonify(msg="Track is not applicable!"), status.BAD_REQUEST
 
@@ -421,5 +423,6 @@ def upload_gpx(id: uuid.UUID):
     db.session.execute(stmt_update)
     db.session.commit()
 
-    data = dict(full_track=full_track, session_track=session_track)
+    data = dict(full_track=full_track, session_track=session_track,
+                markers_track=markers_track)
     return jsonify(data), status.OK

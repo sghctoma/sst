@@ -18,7 +18,8 @@ var SST = {
     VideoPlayer.travelSpan = Bokeh.documents[0].get_model_by_name("s_current_time")
 
     // Map
-    SST.update.map(Session.current.full_track, Session.current.session_track)
+    SST.update.map(Session.current.full_track, Session.current.session_track,
+                   Session.current.markers_track)
 
     // Disable tools on mobile
     if( /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
@@ -168,7 +169,7 @@ var SST = {
       p.select_one("ds_r").data = u.r_data;
       p.x_range.end = u.range_end;
     },
-    map: function(full_track, session_track) {
+    map: function(full_track, session_track, markers_track) {
       const map = Bokeh.documents[0].get_model_by_name("map");
       if (session_track) {
         const start_lon = session_track["lon"][0];
@@ -176,6 +177,7 @@ var SST = {
 
         map.select_one("ds_track").data = full_track;
         map.select_one("ds_session").data = session_track;
+        map.select_one("ds_markers").data = markers_track;
 
         const ratio = map.inner_height / map.inner_width;
         map.x_range.start = start_lon - 600;

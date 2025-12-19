@@ -36,7 +36,7 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
     d = msgpack.unpackb(session.data)
     telemetry = dataclass_from_dict(Telemetry, d)
 
-    tick = 1.0 / telemetry.SampleRate  # time step length in seconds
+    tick = 1.0 / telemetry.TelemetrySampleRate  # time step length in seconds
 
     if telemetry.Front.Present:
         p_front_travel_hist = travel_histogram_figure(
@@ -88,8 +88,10 @@ def create_cache(session_id: uuid.UUID, lod: int, hst: int):
             rear_color,
             "Frequencies (rear)")
 
-    p_travel = travel_figure(telemetry, lod, front_color, rear_color)
-    p_velocity = velocity_figure(telemetry, lod, front_color, rear_color)
+    p_travel = travel_figure(telemetry, lod, front_color, rear_color,
+                             telemetry.Markers)
+    p_velocity = velocity_figure(telemetry, lod, front_color, rear_color,
+                                 telemetry.Markers)
     p_travel.x_range.js_link('start', p_velocity.x_range, 'start')
     p_travel.x_range.js_link('end', p_velocity.x_range, 'end')
     p_velocity.x_range.js_link('start', p_travel.x_range, 'start')
