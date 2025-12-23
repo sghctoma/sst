@@ -8,6 +8,54 @@ var SST = {
   setError: function(error) {
     Layout.error = error
   },
+  fitMapToTrack: function(lon, lat, start_idx, end_idx) {
+    const map = Bokeh.documents[0].get_model_by_name("map");
+    if (!map || start_idx >= end_idx) return;
+
+    let min_x = Infinity, max_x = -Infinity;
+    let min_y = Infinity, max_y = -Infinity;
+
+    for (let i = start_idx; i < end_idx; i++) {
+      if (lon[i] < min_x) min_x = lon[i];
+      if (lon[i] > max_x) max_x = lon[i];
+      if (lat[i] < min_y) min_y = lat[i];
+      if (lat[i] > max_y) max_y = lat[i];
+    }
+
+    let data_w = max_x - min_x;
+    let data_h = max_y - min_y;
+    const center_x = (min_x + max_x) / 2;
+    const center_y = (min_y + max_y) / 2;
+
+    // Add padding
+    data_w *= 1.1;
+    data_h *= 1.05;
+
+    // Ensure a minimum extent to avoid extreme zoom-in for very short segments
+    const MIN_EXTENT = 100;
+    if (data_w < MIN_EXTENT) data_w = MIN_EXTENT;
+    if (data_h < MIN_EXTENT) data_h = MIN_EXTENT;
+
+    // Get plot aspect ratio
+    let aspect = 1.0;
+    if (map.inner_height > 0) {
+      aspect = map.inner_width / map.inner_height;
+    }
+
+    let final_w, final_h;
+    if (data_w / data_h > aspect) {
+      final_w = data_w;
+      final_h = data_w / aspect;
+    } else {
+      final_h = data_h;
+      final_w = final_h * aspect;
+    }
+
+    map.x_range.start = center_x - final_w / 2;
+    map.x_range.end = center_x + final_w / 2;
+    map.y_range.start = center_y - final_h / 2;
+    map.y_range.end = center_y + final_h / 2;
+  },
   getCookie: function (name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -171,17 +219,13 @@ var SST = {
     map: function(full_track, session_track) {
       const map = Bokeh.documents[0].get_model_by_name("map");
       if (session_track) {
-        const start_lon = session_track["lon"][0];
-        const start_lat = session_track["lat"][0];
-
         map.select_one("ds_track").data = full_track;
         map.select_one("ds_session").data = session_track;
 
-        const ratio = map.inner_height / map.inner_width;
-        map.x_range.start = start_lon - 600;
-        map.x_range.end = start_lon + 600;
-        map.y_range.start = start_lat - (600 * ratio);
-        map.y_range.end = start_lat + (600 * ratio);
+        // Fit map to entire session track
+        const lon = session_track["lon"];
+        const lat = session_track["lat"];
+        SST.fitMapToTrack(lon, lat, 0, lon.length);
 
         const start_point = map.select_one("start_point");
         start_point.size = 10
