@@ -1,4 +1,5 @@
 #include "ds3231.h"
+#include <stdbool.h>
 
 static inline uint8_t from_bcd(uint8_t bcd) { return ((bcd / 16) * 10) + (bcd % 16); }
 
@@ -11,11 +12,15 @@ void ds3231_init(struct ds3231 *d, PIO pio, uint sm, int (*i2c_write)(PIO, uint,
     d->i2c_write = i2c_write, d->i2c_read = i2c_read;
 }
 
-void ds3231_get_datetime(struct ds3231 *d, struct tm *tm) {
+bool ds3231_get_datetime(struct ds3231 *d, struct tm *tm) {
     uint8_t dt_buf[7];
     uint8_t reg = 0;
-    (*d->i2c_write)(d->pio, d->sm, 0x68, &reg, 1);
-    (*d->i2c_read)(d->pio, d->sm, 0x68, dt_buf, sizeof(dt_buf));
+    if ((*d->i2c_write)(d->pio, d->sm, 0x68, &reg, 1) < 0) {
+        return false;
+    }
+    if ((*d->i2c_read)(d->pio, d->sm, 0x68, dt_buf, sizeof(dt_buf)) < 0) {
+        return false;
+    }
 
     tm->tm_sec = from_bcd(dt_buf[0]);
     tm->tm_min = from_bcd(dt_buf[1]);
@@ -26,6 +31,7 @@ void ds3231_get_datetime(struct ds3231 *d, struct tm *tm) {
     tm->tm_year = from_bcd(dt_buf[6]) + 100;  // years since 1900
     tm->tm_isdst = -1;
     tm->tm_yday = 0;
+    return true;
 }
 
 void ds3231_set_datetime(struct ds3231 *d, const struct tm *tm) {

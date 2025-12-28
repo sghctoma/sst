@@ -761,7 +761,12 @@ int main() {
     ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
     sleep_ms(1); // without this, garbage values are read from the RTC
     LOG("DS3231", "Reading datetime\n");
-    ds3231_get_datetime(&rtc, &tm_now);
+    if (!ds3231_get_datetime(&rtc, &tm_now)) {
+        LOG("DS3231", "RTC not connected\n");
+        setup_display(&disp);
+        display_message(&disp, "RTC ERR");
+        while (true) { tight_loop_contents(); }
+    }
     LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
         tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
 
