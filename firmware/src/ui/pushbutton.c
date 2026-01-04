@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "pushbutton.h"
+#include "../util/log.h"
 
 static struct button *buttons[28] = {NULL};
 
@@ -13,6 +14,7 @@ static int64_t longpress_callback(alarm_id_t id, void *user_data) {
     if (state == btn->state) {
         btn->alarm = -1;
         if (btn->onlongpress != NULL) {
+            LOG("BUTTON", "Button %u long press\n", btn->gpio);
             btn->onlongpress(btn->user_data);
         }
     }
@@ -30,6 +32,7 @@ static int64_t debounce_callback(alarm_id_t id, void *user_data) {
             cancel_alarm(btn->alarm);
             btn->alarm = -1;
             if (btn->onpress != NULL) {
+                LOG("BUTTON", "Button %u press\n", btn->gpio);
                 btn->onpress(btn->user_data);
             }
         }
