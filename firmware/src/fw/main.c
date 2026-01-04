@@ -29,6 +29,11 @@
 #include "../net/tcpserver.h"
 #include "../ntp//ntp.h"
 #include "../rtc//ds3231.h"
+#include "../sensor/imu/imu_sensor.h"
+#ifndef IMU_MODEL_NONE
+#include "../sensor/imu/lsm6dso.h"
+#include "../sensor/imu/mpu6050.h"
+#endif
 #include "../sensor/travel/travel_sensor.h"
 #include "../util/config.h"
 #include "../util/list.h"
@@ -53,6 +58,128 @@ struct ds3231 rtc;
 
 extern struct sensor fork_sensor;
 extern struct sensor shock_sensor;
+static struct calibration_ctx cal_ctx;
+
+#if IMU_FRAME == IMU_MPU6050
+struct imu_sensor imu_frame = {
+    .type = IMU_TYPE_MPU6050,
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FRAME_I2C_INST, IMU_FRAME_ADDRESS, IMU_FRAME_PIN_SDA, IMU_FRAME_PIN_SCL},
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+    .temp_scale = MPU6050_TEMP_SCALE,
+    .temp_offset = MPU6050_TEMP_OFFSET,
+    .init = mpu6050_init,
+    .check_availability = mpu6050_check_availability,
+    .read_raw = mpu6050_read_raw,
+    .read_temperature = mpu6050_read_temperature,
+    .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_FRAME == IMU_LSM6DSO
+struct imu_sensor imu_frame = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_FRAME_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_FRAME_SPI_INST, IMU_FRAME_PIN_CS, IMU_FRAME_PIN_SCK, IMU_FRAME_PIN_MOSI, IMU_FRAME_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FRAME_I2C_INST, IMU_FRAME_ADDRESS, IMU_FRAME_PIN_SDA, IMU_FRAME_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_frame = {.available = false};
+#endif
+
+#if IMU_FORK == IMU_MPU6050
+struct imu_sensor imu_fork = {.type = IMU_TYPE_MPU6050,
+                              .protocol = IMU_PROTOCOL_I2C,
+                              .comm.i2c = {IMU_FORK_I2C_INST, IMU_FORK_ADDRESS, IMU_FORK_PIN_SDA, IMU_FORK_PIN_SCL},
+                              .available = false,
+                              .calibration = IMU_CALIBRATION_DEFAULT,
+                              .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+                              .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+                              .temp_scale = MPU6050_TEMP_SCALE,
+                              .temp_offset = MPU6050_TEMP_OFFSET,
+                              .init = mpu6050_init,
+                              .check_availability = mpu6050_check_availability,
+                              .read_raw = mpu6050_read_raw,
+                              .read_temperature = mpu6050_read_temperature,
+                              .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_FORK == IMU_LSM6DSO
+struct imu_sensor imu_fork = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_FORK_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_FORK_SPI_INST, IMU_FORK_PIN_CS, IMU_FORK_PIN_SCK, IMU_FORK_PIN_MOSI, IMU_FORK_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FORK_I2C_INST, IMU_FORK_ADDRESS, IMU_FORK_PIN_SDA, IMU_FORK_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_fork = {.available = false};
+#endif
+
+#if IMU_REAR == IMU_MPU6050
+struct imu_sensor imu_rear = {.type = IMU_TYPE_MPU6050,
+                              .protocol = IMU_PROTOCOL_I2C,
+                              .comm.i2c = {IMU_REAR_I2C_INST, IMU_REAR_ADDRESS, IMU_REAR_PIN_SDA, IMU_REAR_PIN_SCL},
+                              .available = false,
+                              .calibration = IMU_CALIBRATION_DEFAULT,
+                              .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+                              .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+                              .temp_scale = MPU6050_TEMP_SCALE,
+                              .temp_offset = MPU6050_TEMP_OFFSET,
+                              .init = mpu6050_init,
+                              .check_availability = mpu6050_check_availability,
+                              .read_raw = mpu6050_read_raw,
+                              .read_temperature = mpu6050_read_temperature,
+                              .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_REAR == IMU_LSM6DSO
+struct imu_sensor imu_rear = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_REAR_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_REAR_SPI_INST, IMU_REAR_PIN_CS, IMU_REAR_PIN_SCK, IMU_REAR_PIN_MOSI, IMU_REAR_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_REAR_I2C_INST, IMU_REAR_ADDRESS, IMU_REAR_PIN_SDA, IMU_REAR_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_rear = {.available = false};
+#endif
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -791,9 +918,28 @@ int main() {
     stdio_uart_init();
 #endif
 
+    // I2C Init
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
+    // IMU init
+#if IMU_FRAME != IMU_NONE
+    if (!imu_sensor_init(&imu_frame)) {
+        LOG("INIT", "Frame IMU not found or failed to initialize\n");
+    }
+#endif
+#if IMU_FORK != IMU_NONE
+    if (!imu_sensor_init(&imu_fork)) {
+        LOG("INIT", "Fork IMU not found or failed to initialize\n");
+    }
+#endif
+#if IMU_REAR != IMU_NONE
+    if (!imu_sensor_init(&imu_rear)) {
+        LOG("INIT", "Rear IMU not found or failed to initialize\n");
+    }
+#endif
+
+    // DS3231 init
     struct tm tm_now;
     LOG("DS3231", "Initializing RTC\n");
     ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
