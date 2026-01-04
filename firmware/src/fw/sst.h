@@ -71,7 +71,8 @@ struct gps_record {
 
 enum command { OPEN, DUMP, DUMP_GPS, FINISH, MARKER };
 
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE     2048
+#define GPS_BUFFER_SIZE 30
 #define FILENAME_LENGTH                                                                                                \
     10 // filename is always in 00000.SST format,
        // so length is always 10.
