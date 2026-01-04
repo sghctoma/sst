@@ -174,15 +174,6 @@ static void calibrate_if_needed() {
     }
 }
 
-static void on_gps_fix(const struct gps_telemetry *t) {
-    if (gps.fix_tracker.ready) {
-        LOG("GPS", "%.6f,%.6f alt=%.1f spd=%.1f sats=%d epe=%.1f\n", t->latitude, t->longitude, t->altitude, t->speed,
-            t->satellites, t->epe_3d);
-    } else {
-        LOG("GPS", "No reliable fix. sats=%d epe=%.1f\n", t->satellites, t->epe_3d);
-    }
-}
-
 // ----------------------------------------------------------------------------
 // Data acquisition
 
@@ -206,12 +197,28 @@ struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
+#if GPS_MODULE != GPS_NONE
+struct gps_record gps_databuffer1[GPS_BUFFER_SIZE];
+struct gps_record gps_databuffer2[GPS_BUFFER_SIZE];
+struct gps_record *gps_active_buffer = gps_databuffer1;
+uint16_t gps_count = 0;
+#endif
+
 static void dump_active_buffer(uint16_t size) {
     multicore_fifo_push_blocking(DUMP);
     multicore_fifo_push_blocking(size);
     multicore_fifo_push_blocking((uintptr_t)active_buffer);
     active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
+
+#if GPS_MODULE != GPS_NONE
+static void dump_gps_active_buffer(uint16_t size) {
+    multicore_fifo_push_blocking(DUMP_GPS);
+    multicore_fifo_push_blocking(size);
+    multicore_fifo_push_blocking((uintptr_t)gps_active_buffer);
+    gps_active_buffer = (struct gps_record *)((uintptr_t)multicore_fifo_pop_blocking());
+}
+#endif
 
 static bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
@@ -234,6 +241,37 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
 
     return state == RECORD; // keep repeating if we are still recording
 }
+
+#if GPS_MODULE != GPS_NONE
+static void on_gps_fix(const struct gps_telemetry *t) {
+    if (gps.fix_tracker.ready) {
+        LOG("GPS", "%.6f,%.6f alt=%.1f spd=%.1f sats=%d epe=%.1f\n", t->latitude, t->longitude, t->altitude, t->speed,
+            t->satellites, t->epe_3d);
+
+        if (state == RECORD) {
+            if (gps_count == GPS_BUFFER_SIZE) {
+                dump_gps_active_buffer(GPS_BUFFER_SIZE);
+                gps_count = 0;
+            }
+
+            gps_active_buffer[gps_count].date = t->date;
+            gps_active_buffer[gps_count].time_ms = t->time_ms;
+            gps_active_buffer[gps_count].latitude = t->latitude;
+            gps_active_buffer[gps_count].longitude = t->longitude;
+            gps_active_buffer[gps_count].altitude = t->altitude;
+            gps_active_buffer[gps_count].speed = t->speed;
+            gps_active_buffer[gps_count].heading = t->heading;
+            gps_active_buffer[gps_count].fix_mode = (uint8_t)t->fix_mode;
+            gps_active_buffer[gps_count].satellites = t->satellites;
+            gps_active_buffer[gps_count].epe_2d = t->epe_2d;
+            gps_active_buffer[gps_count].epe_3d = t->epe_3d;
+            gps_count++;
+        }
+    } else {
+        LOG("GPS", "No reliable fix. sats=%d epe=%.1f\n", t->satellites, t->epe_3d);
+    }
+}
+#endif
 
 #if GPS_MODULE != GPS_NONE
 static bool gps_timer_cb(repeating_timer_t *rt) {
@@ -364,6 +402,15 @@ static void write_telemetry_chunk(uint16_t size, struct record *buffer) {
     f_sync(&recording);
 }
 
+static void write_gps_chunk(uint16_t size, struct gps_record *buffer) {
+    struct chunk_header ch;
+    ch.type = CHUNK_TYPE_GPS;
+    ch.length = size * sizeof(struct gps_record);
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    f_write(&recording, buffer, ch.length, NULL);
+    f_sync(&recording);
+}
+
 static void data_storage_core1() {
     int err = setup_storage();
     multicore_fifo_push_blocking(err);
@@ -372,6 +419,7 @@ static void data_storage_core1() {
     enum command cmd;
     uint16_t size;
     struct record *buffer;
+    struct gps_record *gps_buffer;
     struct chunk_header ch;
 
     while (true) {
@@ -382,12 +430,21 @@ static void data_storage_core1() {
                 index = open_datafile();
                 multicore_fifo_push_blocking(index);
                 multicore_fifo_push_blocking((uintptr_t)databuffer2);
+#if GPS_MODULE != GPS_NONE
+                multicore_fifo_push_blocking((uintptr_t)gps_databuffer2);
+#endif
                 break;
             case DUMP:
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
                 multicore_fifo_push_blocking((uintptr_t)buffer);
                 write_telemetry_chunk(size, buffer);
+                break;
+            case DUMP_GPS:
+                size = (uint16_t)multicore_fifo_pop_blocking();
+                gps_buffer = (struct gps_record *)((uintptr_t)multicore_fifo_pop_blocking());
+                multicore_fifo_push_blocking((uintptr_t)gps_buffer);
+                write_gps_chunk(size, gps_buffer);
                 break;
             case MARKER:
                 ch.type = CHUNK_TYPE_MARKER;
@@ -532,6 +589,10 @@ static void on_rec_start() {
     LOG("REC", "Starting recording session\n");
     count = 0;
     active_buffer = databuffer1;
+#if GPS_MODULE != GPS_NONE
+    gps_count = 0;
+    gps_active_buffer = gps_databuffer1;
+#endif
     multicore_fifo_drain();
 
     display_message(&disp, "INIT SENS");
@@ -577,6 +638,9 @@ static void on_rec_stop() {
     cancel_repeating_timer(&data_acquisition_timer);
 #if GPS_MODULE != GPS_NONE
     cancel_repeating_timer(&gps_timer);
+    if (gps_count > 0) {
+        dump_gps_active_buffer(gps_count);
+    }
 #endif
 
     multicore_fifo_push_blocking(FINISH);
@@ -939,9 +1003,7 @@ int main() {
 #if GPS_MODULE != GPS_NONE
 #endif
 
-    while (true) {
-        state_handlers[state]();
-    }
+    while (true) { state_handlers[state](); }
 
     return 0;
 }
