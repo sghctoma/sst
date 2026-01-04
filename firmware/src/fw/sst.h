@@ -17,12 +17,8 @@ enum state {
     SYNC_DATA,
     SERVE_TCP,
     MSC,
-    CAL_IDLE_1,
-    CAL_EXP,
-    CAL_IDLE_2,
-    CAL_COMP,
 };
-#define STATES_COUNT 13
+#define STATES_COUNT 9
 
 #define CHUNK_TYPE_RATES    0x00
 #define CHUNK_TYPE_TRAVEL   0x01
