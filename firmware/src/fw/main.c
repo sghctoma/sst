@@ -50,14 +50,15 @@ static uint32_t clock0_orig;
 static uint32_t clock1_orig;
 
 static ssd1306_t disp;
-static repeating_timer_t data_acquisition_timer;
+static repeating_timer_t travel_timer;
 static FIL recording;
 static struct tcpserver server;
 
 struct ds3231 rtc;
 
-extern struct sensor fork_sensor;
-extern struct sensor shock_sensor;
+extern struct travel_sensor fork_sensor;
+extern struct travel_sensor shock_sensor;
+
 static struct calibration_ctx cal_ctx;
 
 #if IMU_FRAME == IMU_MPU6050
@@ -275,10 +276,11 @@ static void calibrate_if_needed() {
 // ----------------------------------------------------------------------------
 // Data acquisition
 
-static const uint16_t SAMPLE_RATE = 1000;
+static const uint16_t TRAVEL_SAMPLE_RATE = 1000;
+static const uint16_t IMU_SAMPLE_RATE = 200;
 
-// We are using two buffers. Data acquisition happens on core #1 into the active
-// buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
+// We are using two buffers per sensor type. Data acquisition happens on core #1 into the active
+// buffer (referred to by the pointer active_travel_buffer) and we dump to Micro SD card
 // on core #2.
 //
 // When the active buffer is filled on core #1,
@@ -290,38 +292,40 @@ static const uint16_t SAMPLE_RATE = 1000;
 //  - sends the buffer address to core #1 via FIFO
 //
 
-struct record databuffer1[BUFFER_SIZE];
-struct record databuffer2[BUFFER_SIZE];
-struct record *active_buffer = databuffer1;
-uint16_t count = 0;
+struct travel_record travel_databuffer1[BUFFER_SIZE];
+struct travel_record travel_databuffer2[BUFFER_SIZE];
+struct travel_record *active_travel_buffer = travel_databuffer1;
+uint16_t travel_count = 0;
 
 static void dump_active_buffer(uint16_t size) {
     multicore_fifo_push_blocking(DUMP);
+static void dump_active_travel_buffer(uint16_t size) {
+    multicore_fifo_push_blocking(DUMP_TRAVEL);
     multicore_fifo_push_blocking(size);
-    multicore_fifo_push_blocking((uintptr_t)active_buffer);
-    active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
+    multicore_fifo_push_blocking((uintptr_t)active_travel_buffer);
+    active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
 
-static bool data_acquisition_cb(repeating_timer_t *rt) {
-    if (count == BUFFER_SIZE) {
-        dump_active_buffer(BUFFER_SIZE);
-        count = 0;
-    }
-
-    active_buffer[count].fork_angle = fork_sensor.measure(&fork_sensor);
-    active_buffer[count].shock_angle = shock_sensor.measure(&shock_sensor);
 
     count += 1;
+static bool travel_cb(repeating_timer_t *rt) {
+    if (travel_count == BUFFER_SIZE) {
+        dump_active_travel_buffer(BUFFER_SIZE);
+        travel_count = 0;
+    }
+    active_travel_buffer[travel_count].fork_angle = fork_sensor.measure(&fork_sensor);
+    active_travel_buffer[travel_count].shock_angle = shock_sensor.measure(&shock_sensor);
+    travel_count += 1;
 
     if (marker_pending) {
-        dump_active_buffer(count);
-        multicore_fifo_push_blocking(MARKER);
+        dump_active_travel_buffer(travel_count);
+        travel_count = 0;
 
-        count = 0;
+        multicore_fifo_push_blocking(MARKER);
         marker_pending = false;
     }
 
-    return state == RECORD; // keep repeating if we are still recording
+    return state == RECORD;
 }
 
 static bool start_sensors() {
@@ -424,18 +428,25 @@ static int open_datafile() {
         return fr;
     }
 
-    struct header h = {"SST", 4, 0, rtc_timestamp()};
-    f_write(&recording, &h, sizeof(struct header), NULL);
+    struct sst_header h = {"SST", 4, 0, rtc_timestamp()};
+    f_write(&recording, &h, sizeof(struct sst_header), NULL);
 
-    struct chunk_header ch = {CHUNK_TYPE_RATES, sizeof(struct rate_entry)};
+    struct chunk_header ch = {CHUNK_TYPE_RATES, 2 * sizeof(struct samplerate_record)};
     f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
-    struct rate_entry re = {CHUNK_TYPE_TELEMETRY, SAMPLE_RATE};
-    f_write(&recording, &re, sizeof(struct rate_entry), NULL);
+    struct samplerate_record re = {CHUNK_TYPE_TRAVEL, TRAVEL_SAMPLE_RATE};
+    f_write(&recording, &re, sizeof(struct samplerate_record), NULL);
 
     return index;
 }
 
-static void write_telemetry_chunk(uint16_t size, struct record *buffer) {
+static void write_travel_chunk(uint16_t size, struct travel_record *buffer) {
+    struct chunk_header ch;
+    ch.type = CHUNK_TYPE_TRAVEL;
+    ch.length = size * sizeof(struct travel_record);
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    f_write(&recording, buffer, ch.length, NULL);
+    f_sync(&recording);
+}
     struct chunk_header ch;
     ch.type = CHUNK_TYPE_TELEMETRY;
     ch.length = size * sizeof(struct record);
@@ -451,7 +462,7 @@ static void data_storage_core1() {
     int index;
     enum command cmd;
     uint16_t size;
-    struct record *buffer;
+    struct travel_record *travel_buffer;
     struct chunk_header ch;
 
     while (true) {
@@ -461,7 +472,7 @@ static void data_storage_core1() {
                 multicore_fifo_drain();
                 index = open_datafile();
                 multicore_fifo_push_blocking(index);
-                multicore_fifo_push_blocking((uintptr_t)databuffer2);
+                multicore_fifo_push_blocking((uintptr_t)travel_databuffer2);
                 break;
             case DUMP:
                 size = (uint16_t)multicore_fifo_pop_blocking();
@@ -610,8 +621,8 @@ static void on_cal_comp() {
 
 static void on_rec_start() {
     LOG("REC", "Starting recording session\n");
-    count = 0;
-    active_buffer = databuffer1;
+    travel_count = 0;
+    active_travel_buffer = travel_databuffer1;
     multicore_fifo_drain();
 
     display_message(&disp, "INIT SENS");
@@ -637,22 +648,25 @@ static void on_rec_start() {
     }
     LOG("REC", "Recording to file index %d\n", index);
 
-    // Start data acquisition timer
-    if (!add_repeating_timer_us(-1000000 / SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
-        display_message(&disp, "TIMER ERR");
+    // Initial buffer pointers for Core 1
+    active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
+    // Start data acquisition timers
+    if (!add_repeating_timer_us(-1000000 / TRAVEL_SAMPLE_RATE, travel_cb, NULL, &travel_timer)) {
+        display_message(&disp, "TEL TMR ERR");
         while (true) { tight_loop_contents(); }
     }
 }
 
 static void on_rec_stop() {
-    LOG("REC", "Stopping recording, samples: %u\n", count);
+    LOG("REC", "Stopping recording\n");
     state = IDLE;
     display_message(&disp, "IDLE");
-    cancel_repeating_timer(&data_acquisition_timer);
+    cancel_repeating_timer(&travel_timer);
 
     multicore_fifo_push_blocking(FINISH);
-    multicore_fifo_push_blocking(count);
-    multicore_fifo_push_blocking((uintptr_t)active_buffer);
+    // Flush travel
+    multicore_fifo_push_blocking(travel_count);
+    multicore_fifo_push_blocking((uintptr_t)active_travel_buffer);
 }
 
 static void on_sync_data() {
@@ -911,6 +925,7 @@ int main() {
     sleep_ms(3000); // Give time for the tty to get enumerated on the host
 #endif
 
+    // Suspension sensors init
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
@@ -949,6 +964,7 @@ int main() {
     LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
         tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
 
+    // Set board time
 #if PICO_RP2040
     // RP2040: use calendar methods (native to RTC hardware)
     if (!aon_timer_start_calendar(&tm_now)) {
@@ -980,6 +996,7 @@ int main() {
     } else {
 #endif
 
+        // Storage init
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
