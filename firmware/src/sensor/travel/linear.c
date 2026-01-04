@@ -1,32 +1,32 @@
 #include "hardware/adc.h"
 
 #include "../fw/hardware_config.h"
-#include "sensor.h"
+#include "travel_sensor.h"
 #include <stdint.h>
 
-static void linear_sensor_init(struct sensor *sensor) { adc_gpio_init(sensor->comm.adc.gpio); }
+static void linear_sensor_init(struct travel_sensor *sensor) { adc_gpio_init(sensor->comm.adc.gpio); }
 
-static bool linear_sensor_check_availability(struct sensor *sensor) {
+static bool linear_sensor_check_availability(struct travel_sensor *sensor) {
     sensor->available = true;
     return true; // XXX: AFAIK there is no way to check this for the ADC.
 }
 
-static bool linear_sensor_start(struct sensor *sensor, uint16_t baseline, bool inverted) { return true; }
+static bool linear_sensor_start(struct travel_sensor *sensor, uint16_t baseline, bool inverted) { return true; }
 
-static uint16_t linear_sensor_measure(struct sensor *sensor) {
+static uint16_t linear_sensor_measure(struct travel_sensor *sensor) {
     adc_select_input(sensor->comm.adc.adc_num);
     return adc_read() - sensor->baseline;
 }
 
-static void linear_sensor_calibrate_expanded(struct sensor *sensor) {
+static void linear_sensor_calibrate_expanded(struct travel_sensor *sensor) {
     adc_select_input(sensor->comm.adc.adc_num);
     sensor->baseline = adc_read();
 }
 
-static void linear_sensor_calibrate_compressed(struct sensor *sensor) { sensor->inverted = false; }
+static void linear_sensor_calibrate_compressed(struct travel_sensor *sensor) { sensor->inverted = false; }
 
 #ifdef FORK_LINEAR
-struct sensor fork_sensor = {
+struct travel_sensor fork_sensor = {
     .comm.adc = {FORK_ADC, FORK_PIN_ADC},
     .init = linear_sensor_init,
     .check_availability = linear_sensor_check_availability,
@@ -38,7 +38,7 @@ struct sensor fork_sensor = {
 #endif
 
 #ifdef SHOCK_LINEAR
-struct sensor shock_sensor = {
+struct travel_sensor shock_sensor = {
     .comm.adc = {SHOCK_ADC, SHOCK_PIN_ADC},
     .init = linear_sensor_init,
     .check_availability = linear_sensor_check_availability,

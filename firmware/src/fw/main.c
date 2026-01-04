@@ -29,7 +29,7 @@
 #include "../net/tcpserver.h"
 #include "../ntp//ntp.h"
 #include "../rtc//ds3231.h"
-#include "../sensor/sensor.h"
+#include "../sensor/travel/travel_sensor.h"
 #include "../util/config.h"
 #include "../util/list.h"
 #include "../util/log.h"
