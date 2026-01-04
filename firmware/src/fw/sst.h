@@ -24,9 +24,11 @@ enum state {
 };
 #define STATES_COUNT 13
 
-#define CHUNK_TYPE_RATES 0x00
+#define CHUNK_TYPE_RATES     0x00
 #define CHUNK_TYPE_TELEMETRY 0x01
-#define CHUNK_TYPE_MARKER 0x02
+#define CHUNK_TYPE_MARKER    0x02
+
+#define CHUNK_TYPE_GPS 0x05
 
 struct chunk_header {
     uint8_t type;
@@ -50,7 +52,24 @@ struct record {
     uint16_t shock_angle;
 };
 
-enum command { OPEN, DUMP, FINISH, MARKER };
+struct gps_record {
+    uint32_t date;    // UTC date in YYYYMMDD format
+    uint32_t time_ms; // UTC time of day in milliseconds
+
+    double latitude;
+    double longitude;
+    float altitude;
+
+    float speed;
+    float heading;
+
+    uint8_t fix_mode; // 0 = none, 1 = 2D, 2 = rD
+    uint8_t satellites;
+    float epe_2d;
+    float epe_3d;
+};
+
+enum command { OPEN, DUMP, DUMP_GPS, FINISH, MARKER };
 
 #define BUFFER_SIZE 2048
 #define FILENAME_LENGTH                                                                                                \
