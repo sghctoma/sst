@@ -37,8 +37,34 @@
 
 #include "hardware_config.h"
 
+#if GPS_MODULE != GPS_NONE
+#include "../sensor/gps/gps_sensor.h"
+#include "../sensor/gps/lc76g.h"
+#endif
+
 static volatile enum state state;
 static volatile bool marker_pending = false;
+
+#if GPS_MODULE == GPS_LC76G
+static void on_gps_fix(const struct gps_telemetry *t);
+struct gps_sensor gps = {
+    .type = GPS_TYPE_LC76G,
+    .protocol = GPS_PROTOCOL_UART,
+    .comm.uart = {GPS_UART_INST, GPS_PIN_TX, GPS_PIN_RX, 115200},
+    .available = false,
+    .on_fix = on_gps_fix,
+    .init = lc76g_init,
+    .configure = lc76g_configure,
+    .process = lc76g_process,
+    .send_command = lc76g_send_command,
+    .hot_start = lc76g_hot_start,
+    .cold_start = lc76g_cold_start,
+    .power_on = lc76g_power_on,
+    .power_off = lc76g_power_off,
+};
+#else
+struct gps_sensor gps = {.available = false};
+#endif
 
 static uint32_t scb_orig;
 static uint32_t clock0_orig;
@@ -142,6 +168,15 @@ static void calibrate_if_needed() {
     } else {
         LOG("CAL", "Skipping calibration\n");
         state = IDLE;
+    }
+}
+
+static void on_gps_fix(const struct gps_telemetry *t) {
+    if (gps.fix_tracker.ready) {
+        LOG("GPS", "%.6f,%.6f alt=%.1f spd=%.1f sats=%d epe=%.1f\n", t->latitude, t->longitude, t->altitude, t->speed,
+            t->satellites, t->epe_3d);
+    } else {
+        LOG("GPS", "No reliable fix. sats=%d epe=%.1f\n", t->satellites, t->epe_3d);
     }
 }
 
@@ -787,8 +822,20 @@ int main() {
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
-#ifndef NDEBUG
+#if !defined(NDEBUG) && GPS_MODULE == GPS_NONE
     stdio_uart_init();
+#endif
+
+    // GPS init
+#if GPS_MODULE != GPS_NONE
+    if (gps_sensor_init(&gps)) {
+        LOG("INIT", "GPS initialized\n");
+        if (!gps_sensor_configure(&gps, 1000, true, false, false, false, false)) {
+            LOG("INIT", "GPS configuration failed\n");
+        }
+    } else {
+        LOG("INIT", "GPS not found or failed to initialize\n");
+    }
 #endif
 
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
@@ -868,7 +915,15 @@ int main() {
     }
 #endif
 
-    while (true) { state_handlers[state](); }
+    while (true) {
+        state_handlers[state]();
+        // TODO: Move to proper schedulling
+#if GPS_MODULE != GPS_NONE
+        if (gps.available) {
+            gps.process(&gps);
+        }
+#endif
+    }
 
     return 0;
 }
