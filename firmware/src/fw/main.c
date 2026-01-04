@@ -38,6 +38,7 @@
 #include "../util/config.h"
 #include "../util/list.h"
 #include "../util/log.h"
+#include "calibration_flow.h"
 #include "sst.h"
 
 #include "hardware_config.h"
@@ -255,24 +256,6 @@ static void wifi_disconnect() {
     sleep_ms(100);
 }
 
-static void calibrate_if_needed() {
-    gpio_init(BUTTON_LEFT);
-    gpio_pull_up(BUTTON_LEFT);
-
-    FRESULT fr = f_stat("CALIBRATION", NULL);
-    bool button_pressed = !gpio_get(BUTTON_LEFT);
-    LOG("CAL", "CALIBRATION file %s, button %s\n", fr == FR_OK ? "exists" : "missing",
-        button_pressed ? "pressed" : "not pressed");
-
-    if (fr != FR_OK || button_pressed) {
-        LOG("CAL", "Entering calibration mode\n");
-        state = CAL_IDLE_1;
-    } else {
-        LOG("CAL", "Skipping calibration\n");
-        state = IDLE;
-    }
-}
-
 // ----------------------------------------------------------------------------
 // Data acquisition
 
@@ -337,29 +320,6 @@ static bool start_sensors() {
         sleep_ms(10);
     }
 
-    FIL calibration_fil;
-    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_EXISTING | FA_READ);
-    if (!(fr == FR_OK || fr == FR_EXIST)) {
-        return false;
-    }
-
-    uint br;
-    uint16_t baseline;
-    bool inverted;
-    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
-    fork_sensor.start(&fork_sensor, baseline, inverted);
-    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
-        fork_sensor.available);
-
-    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
-    shock_sensor.start(&shock_sensor, baseline, inverted);
-    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
-        shock_sensor.available);
-
-    f_close(&calibration_fil);
-    return fork_sensor.available || shock_sensor.available;
 }
 
 // ----------------------------------------------------------------------------
@@ -525,99 +485,6 @@ static void setup_display(ssd1306_t *disp) {
 
 // ----------------------------------------------------------------------------
 // State handlers
-
-static void on_cal_idle() {
-    // No MSC if there is no USB cable connected, so checking
-    // tud is not necessary.
-    bool battery = on_battery();
-    if (!battery && msc_present()) {
-        soft_reset();
-    }
-
-    static absolute_time_t timeout = {0};
-    if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
-        timeout = make_timeout_time_ms(1000);
-
-        uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
-        static char battery_str[] = " PWR";
-        if (battery) {
-            if (voltage_percentage > 99) {
-                snprintf(battery_str, sizeof(battery_str), "FULL");
-            } else {
-                snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
-            }
-        }
-
-        // Print sensor values
-        if (fork_sensor.check_availability(&fork_sensor)) {
-            uint16_t fork_val = fork_sensor.measure(&fork_sensor);
-            LOG("SENSOR", "Fork: 0x%04x\n", fork_val);
-        }
-        if (shock_sensor.check_availability(&shock_sensor)) {
-            uint16_t shock_val = shock_sensor.measure(&shock_sensor);
-            LOG("SENSOR", "Shock: 0x%04x\n", shock_val);
-        }
-
-        ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
-        ssd1306_draw_string(&disp, 0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
-        if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
-        }
-        if (shock_sensor.check_availability(&shock_sensor)) {
-            ssd1306_draw_string(&disp, 40, 24, 1, "shock");
-        }
-        ssd1306_show(&disp);
-    }
-}
-
-static void on_cal_exp() {
-    LOG("CAL", "Calibrating expanded position\n");
-    fork_sensor.calibrate_expanded(&fork_sensor);
-    shock_sensor.calibrate_expanded(&shock_sensor);
-
-    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", fork_sensor.baseline, shock_sensor.baseline);
-
-    if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
-        LOG("CAL", "Error: Both sensors failed calibration\n");
-        display_message(&disp, "CAL ERR");
-        sleep_ms(1000);
-        state = CAL_IDLE_1;
-        return;
-    }
-
-    LOG("CAL", "Expanded calibration complete\n");
-    state = CAL_IDLE_2;
-}
-
-static void on_cal_comp() {
-    LOG("CAL", "Calibrating compressed position\n");
-    fork_sensor.calibrate_compressed(&fork_sensor);
-    shock_sensor.calibrate_compressed(&shock_sensor);
-
-    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", fork_sensor.baseline, fork_sensor.inverted);
-    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", shock_sensor.baseline, shock_sensor.inverted);
-
-    FIL calibration_fil;
-    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
-    if (!(fr == FR_OK || fr == FR_EXIST)) {
-        LOG("CAL", "Error: Failed to open CALIBRATION file\n");
-        display_message(&disp, "CAL ERR");
-        sleep_ms(1000);
-        state = CAL_IDLE_2;
-        return;
-    }
-
-    uint bw;
-    f_write(&calibration_fil, &fork_sensor.baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&fork_sensor.inverted, sizeof(bool), &bw);
-    f_write(&calibration_fil, &shock_sensor.baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&shock_sensor.inverted, sizeof(bool), &bw);
-    f_close(&calibration_fil);
-
-    LOG("CAL", "Calibration saved successfully\n");
-    state = IDLE;
-}
 
 static void on_rec_start() {
     LOG("REC", "Starting recording session\n");
@@ -1022,7 +889,25 @@ int main() {
         clock0_orig = clocks_hw->sleep_en0;
         clock1_orig = clocks_hw->sleep_en1;
 
-        calibrate_if_needed();
+        // Initialize calibration context
+        cal_ctx = (struct calibration_ctx){
+            .fork = &fork_sensor,
+            .shock = &shock_sensor,
+            .imu_frame = &imu_frame,
+            .imu_fork = &imu_fork,
+            .imu_rear = &imu_rear,
+            .disp = &disp,
+        };
+
+        if (calibration_check_needed(&cal_ctx)) {
+            if (!calibration_run(&cal_ctx)) {
+                while (true) { tight_loop_contents(); }
+            }
+        }
+
+        calibration_apply_to_sensors(&cal_ctx);
+
+        state = IDLE;
 
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
