@@ -245,31 +245,33 @@ bool lc76g_configure(struct gps_sensor *g, uint16_t fix_interval_ms, bool gps_en
     return true;
 }
 
+#define GPS_PROCESS_MAX_BYTES 512
 static char s_debug_line[256];
 static uint16_t s_debug_pos = 0;
 
 void lc76g_process(struct gps_sensor *g) {
     struct gps_rx_buffer *buf = &g->comm.uart.rx_buffer;
-    uint8_t byte;
+    uint16_t processed = 0;
 
-    while (buf->tail != buf->head) {
-        byte = buf->data[buf->tail];
+    while (buf->tail != buf->head && processed < GPS_PROCESS_MAX_BYTES) {
+        uint8_t byte = buf->data[buf->tail];
         buf->tail = (buf->tail + 1) & (GPS_RX_BUFFER_SIZE - 1);
 
-        // Log complete NMEA sentences
-        if (byte == '$') {
-            // Start of new sentence - reset buffer (handles missed newlines)
-            s_debug_pos = 0;
-            s_debug_line[s_debug_pos++] = byte;
-        } else if (byte == '\n') {
-            s_debug_line[s_debug_pos] = '\0';
-            LOG("GPS", "RX: %s\n", s_debug_line);
-            s_debug_pos = 0;
-        } else if (byte != '\r' && s_debug_pos < sizeof(s_debug_line) - 1) {
-            s_debug_line[s_debug_pos++] = byte;
-        }
+        // // Log complete NMEA sentences
+        // if (byte == '$') {
+        //     // Start of new sentence - reset buffer (handles missed newlines)
+        //     s_debug_pos = 0;
+        //     s_debug_line[s_debug_pos++] = byte;
+        // } else if (byte == '\n') {
+        //     s_debug_line[s_debug_pos] = '\0';
+        //     LOG("GPS", "RX: %s\n", s_debug_line);
+        //     s_debug_pos = 0;
+        // } else if (byte != '\r' && s_debug_pos < sizeof(s_debug_line) - 1) {
+        //     s_debug_line[s_debug_pos++] = byte;
+        // }
 
         lwgps_process(&s_lwgps, &byte, 1, lc76g_on_statement);
+        processed++;
     }
 }
 

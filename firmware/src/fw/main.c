@@ -72,6 +72,9 @@ static uint32_t clock1_orig;
 
 static ssd1306_t disp;
 static repeating_timer_t data_acquisition_timer;
+#if GPS_MODULE != GPS_NONE
+static repeating_timer_t gps_timer;
+#endif
 static FIL recording;
 static struct tcpserver server;
 
@@ -231,6 +234,15 @@ static bool data_acquisition_cb(repeating_timer_t *rt) {
 
     return state == RECORD; // keep repeating if we are still recording
 }
+
+#if GPS_MODULE != GPS_NONE
+static bool gps_timer_cb(repeating_timer_t *rt) {
+    if (gps.available) {
+        gps.process(&gps);
+    }
+    return state == RECORD;
+}
+#endif
 
 static bool start_sensors() {
     absolute_time_t timeout = make_timeout_time_ms(3000);
@@ -550,6 +562,12 @@ static void on_rec_start() {
         display_message(&disp, "TIMER ERR");
         while (true) { tight_loop_contents(); }
     }
+
+#if GPS_MODULE != GPS_NONE
+    if (gps.available) {
+        add_repeating_timer_ms(-50, gps_timer_cb, NULL, &gps_timer);
+    }
+#endif
 }
 
 static void on_rec_stop() {
@@ -557,6 +575,9 @@ static void on_rec_stop() {
     state = IDLE;
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&data_acquisition_timer);
+#if GPS_MODULE != GPS_NONE
+    cancel_repeating_timer(&gps_timer);
+#endif
 
     multicore_fifo_push_blocking(FINISH);
     multicore_fifo_push_blocking(count);
@@ -830,7 +851,7 @@ int main() {
 #if GPS_MODULE != GPS_NONE
     if (gps_sensor_init(&gps)) {
         LOG("INIT", "GPS initialized\n");
-        if (!gps_sensor_configure(&gps, 1000, true, false, false, false, false)) {
+        if (!gps_sensor_configure(&gps, 100, true, true, true, true, false)) {
             LOG("INIT", "GPS configuration failed\n");
         }
     } else {
@@ -915,14 +936,11 @@ int main() {
     }
 #endif
 
+#if GPS_MODULE != GPS_NONE
+#endif
+
     while (true) {
         state_handlers[state]();
-        // TODO: Move to proper schedulling
-#if GPS_MODULE != GPS_NONE
-        if (gps.available) {
-            gps.process(&gps);
-        }
-#endif
     }
 
     return 0;
