@@ -30,7 +30,25 @@ add_executable(sufni-suspension-telemetry
     src/util/list.c
     src/sensor/travel/rotational.c
     src/sensor/travel/linear.c
+    src/sensor/imu/imu_sensor.c
 )
+
+if(NOT IMU_FRAME)
+    set(IMU_FRAME "NONE")
+endif()
+if(NOT IMU_FORK)
+    set(IMU_FORK "NONE")
+endif()
+if(NOT IMU_REAR)
+    set(IMU_REAR "NONE")
+endif()
+
+if(NOT IMU_FRAME STREQUAL "NONE" OR NOT IMU_FORK STREQUAL "NONE" OR NOT IMU_REAR STREQUAL "NONE")
+    target_sources(sufni-suspension-telemetry PRIVATE
+        src/sensor/imu/lsm6dso.c
+        src/sensor/imu/mpu6050.c
+    )
+endif()
 
 if(NOT USB_UART_DEBUG)
     target_sources(sufni-suspension-telemetry PRIVATE
@@ -47,16 +65,20 @@ add_subdirectory(external/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src firmware/external
 add_subdirectory(external/pico-as5600 firmware/external/pico-as5600)
 add_subdirectory(external/pico-ssd1306 firmware/external/pico-ssd1306)
 
+set(NEEDS_SPI OFF)
+
 if(${DISP_PROTO} STREQUAL SPI)
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSPI_DISPLAY
     )
+    set(NEEDS_SPI ON)
 endif()
 
 if(${SPI_MICROSD})
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSPI_MICROSD
     )
+    set(NEEDS_SPI ON)
 endif()
 
 if(${FORK_LINEAR})
@@ -69,6 +91,58 @@ if(${SHOCK_LINEAR})
     target_compile_options(sufni-suspension-telemetry PUBLIC
         -DSHOCK_LINEAR
     )
+endif()
+
+# Frame IMU
+if(IMU_FRAME STREQUAL "LSM6DSO")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FRAME=IMU_LSM6DSO)
+elseif(IMU_FRAME STREQUAL "MPU6050")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FRAME=IMU_MPU6050)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FRAME=IMU_NONE)
+endif()
+
+if(IMU_FRAME_PROTO STREQUAL "SPI")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FRAME_SPI)
+    set(NEEDS_SPI ON)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FRAME_I2C)
+endif()
+
+# Fork IMU
+if(IMU_FORK STREQUAL "LSM6DSO")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FORK=IMU_LSM6DSO)
+elseif(IMU_FORK STREQUAL "MPU6050")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FORK=IMU_MPU6050)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FORK=IMU_NONE)
+endif()
+
+if(IMU_FORK_PROTO STREQUAL "SPI")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FORK_SPI)
+    set(NEEDS_SPI ON)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_FORK_I2C)
+endif()
+
+# Rear IMU
+if(IMU_REAR STREQUAL "LSM6DSO")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_REAR=IMU_LSM6DSO)
+elseif(IMU_REAR STREQUAL "MPU6050")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_REAR=IMU_MPU6050)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_REAR=IMU_NONE)
+endif()
+
+if(IMU_REAR_PROTO STREQUAL "SPI")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_REAR_SPI)
+    set(NEEDS_SPI ON)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC IMU_REAR_I2C)
+endif()
+
+if(NEEDS_SPI)
+    target_link_libraries(sufni-suspension-telemetry hardware_spi)
 endif()
 
 target_include_directories(sufni-suspension-telemetry PUBLIC
