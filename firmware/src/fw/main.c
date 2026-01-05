@@ -339,6 +339,10 @@ static void start_recording_session() {
         display_message(&disp, "FILE ERR");
         while (true) { tight_loop_contents(); }
     }
+    active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
+#if HAS_GPS
+    gps_active_buffer = (struct gps_record *)((uintptr_t)multicore_fifo_pop_blocking());
+#endif
     LOG("REC", "Recording to file index %d\n", index);
 
     if (!add_repeating_timer_us(-1000000 / SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
@@ -660,8 +664,9 @@ static void on_rec_start() {
 static void on_gps_wait() {
     static absolute_time_t display_timeout = {0};
 
-    if (gps.fix_tracker.ready) {
-        LOG("REC", "GPS fix ready, starting recording\n");
+    if (gps.fix_tracker.ready || skip_gps_recording) {
+        LOG("REC", "GPS %s, starting recording\n", skip_gps_recording ? "skipped" : "fix ready");
+        cancel_repeating_timer(&gps_timer);
         start_recording_session();
         return;
     }
@@ -941,10 +946,7 @@ static void on_right_press(void *user_data) {
             break;
 #if HAS_GPS
         case GPS_WAIT:
-            LOG("REC", "GPS skipped\n");
-            cancel_repeating_timer(&gps_timer);
             skip_gps_recording = true;
-            start_recording_session();
             break;
 #endif
         default:
