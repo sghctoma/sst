@@ -12,6 +12,7 @@ enum state {
     SLEEP,
     WAKING,
     REC_START,
+    GPS_WAIT,
     RECORD,
     REC_STOP,
     SYNC_DATA,
@@ -22,7 +23,7 @@ enum state {
     CAL_IDLE_2,
     CAL_COMP,
 };
-#define STATES_COUNT 13
+#define STATES_COUNT 14
 
 #define CHUNK_TYPE_RATES     0x00
 #define CHUNK_TYPE_TELEMETRY 0x01
