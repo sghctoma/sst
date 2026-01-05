@@ -45,7 +45,8 @@
 static volatile enum state state;
 static volatile bool marker_pending = false;
 #if HAS_GPS
-static volatile bool skip_gps_recording = false;
+static volatile bool skip_gps_recording = false;   // Skip GPS fix wait, start recording without GPS
+static volatile bool cancel_gps_recording = false;  // Cancel GPS fix wait, return to IDLE without recording
 static volatile uint8_t gps_last_satellites = 0;
 static volatile float gps_last_epe = 0.0f;
 #endif
@@ -634,6 +635,7 @@ static void on_rec_start() {
     gps_count = 0;
     gps_active_buffer = gps_databuffer1;
     skip_gps_recording = false;
+    cancel_gps_recording = false;
     gps_last_satellites = 0;
     gps_last_epe = 0.0f;
 #endif
@@ -650,7 +652,8 @@ static void on_rec_start() {
 
 #if HAS_GPS
     if (gps.available && !gps.fix_tracker.ready) {
-        LOG("REC", "Waiting for GPS fix\n");
+        LOG("REC", "Powering on GPS and waiting for fix\n");
+        gps.power_on(&gps);
         add_repeating_timer_ms(-50, gps_timer_cb, NULL, &gps_timer);
         state = GPS_WAIT;
         return;
@@ -664,9 +667,20 @@ static void on_rec_start() {
 static void on_gps_wait() {
     static absolute_time_t display_timeout = {0};
 
+    if (cancel_gps_recording) {
+        LOG("REC", "GPS wait cancelled\n");
+        cancel_repeating_timer(&gps_timer);
+        gps.power_off(&gps);
+        state = IDLE;
+        return;
+    }
+
     if (gps.fix_tracker.ready || skip_gps_recording) {
         LOG("REC", "GPS %s, starting recording\n", skip_gps_recording ? "skipped" : "fix ready");
         cancel_repeating_timer(&gps_timer);
+        if (skip_gps_recording) {
+            gps.power_off(&gps);
+        }
         start_recording_session();
         return;
     }
@@ -695,6 +709,10 @@ static void on_rec_stop() {
     cancel_repeating_timer(&gps_timer);
     if (gps_count > 0) {
         dump_gps_active_buffer(gps_count);
+    }
+    if (gps.available && !skip_gps_recording) {
+        gps.power_off(&gps);
+        LOG("REC", "GPS powered off\n");
     }
 #endif
 
@@ -912,9 +930,7 @@ static void on_left_press(void *user_data) {
             break;
 #if HAS_GPS
         case GPS_WAIT:
-            LOG("REC", "GPS wait cancelled\n");
-            cancel_repeating_timer(&gps_timer);
-            state = IDLE;
+            cancel_gps_recording = true;
             break;
 #endif
         default:
@@ -990,6 +1006,8 @@ int main() {
         if (!gps_sensor_configure(&gps, 100, true, true, true, true, false)) {
             LOG("INIT", "GPS configuration failed\n");
         }
+        gps.power_off(&gps);
+        LOG("INIT", "GPS powered off to save power\n");
     } else {
         LOG("INIT", "GPS not found or failed to initialize\n");
     }
