@@ -82,4 +82,91 @@
 #define SHOCK_PIN_SCL 15
 #endif // SHOCK_LINEAR
 
+// ----------------------------------------------------------------------------
+// IMU Definitions
+
+#define IMU_NONE    0
+#define IMU_MPU6050 1
+#define IMU_LSM6DSO 2
+
+// Frame IMU
+#ifndef IMU_FRAME
+#define IMU_FRAME IMU_NONE
+#endif
+
+#if IMU_FRAME != IMU_NONE
+#ifdef IMU_FRAME_SPI
+#define IMU_FRAME_SPI_INST spi1
+#define IMU_FRAME_PIN_MISO 12
+#define IMU_FRAME_PIN_MOSI 11
+#define IMU_FRAME_PIN_SCK  10
+#define IMU_FRAME_PIN_CS   13
+#else
+#define IMU_FRAME_I2C_INST i2c1
+#if IMU_FRAME == IMU_MPU6050
+#define IMU_FRAME_ADDRESS 0x68
+#else
+#define IMU_FRAME_ADDRESS 0x6B
+#endif
+#define IMU_FRAME_PIN_SDA 14
+#define IMU_FRAME_PIN_SCL 15
+#endif
+#endif
+
+// Fork IMU
+#ifndef IMU_FORK
+#define IMU_FORK IMU_NONE
+#endif
+
+#if IMU_FORK != IMU_NONE
+#ifdef IMU_FORK_SPI
+#define IMU_FORK_SPI_INST spi1
+#define IMU_FORK_PIN_MISO 12
+#define IMU_FORK_PIN_MOSI 11
+#define IMU_FORK_PIN_SCK  10
+#define IMU_FORK_PIN_CS   13
+#else
+#define IMU_FORK_I2C_INST i2c0
+#if IMU_FORK == IMU_MPU6050
+#define IMU_FORK_ADDRESS 0x68
+#else
+#define IMU_FORK_ADDRESS 0x6B
+#endif
+#define IMU_FORK_PIN_SDA 8
+#define IMU_FORK_PIN_SCL 9
+#endif
+#endif
+
+// Rear IMU
+#ifndef IMU_REAR
+#define IMU_REAR IMU_NONE
+#endif
+
+#if IMU_REAR != IMU_NONE
+#ifdef IMU_REAR_SPI
+#define IMU_REAR_SPI_INST spi1
+#define IMU_REAR_PIN_MISO 12
+#define IMU_REAR_PIN_MOSI 11
+#define IMU_REAR_PIN_SCK  10
+#define IMU_REAR_PIN_CS   13
+#else
+#define IMU_REAR_I2C_INST i2c0
+#if IMU_REAR == IMU_MPU6050
+#define IMU_REAR_ADDRESS 0x68
+#else
+#define IMU_REAR_ADDRESS 0x6B
+#endif
+#define IMU_REAR_PIN_SDA 8
+#define IMU_REAR_PIN_SCL 9
+#endif
+#endif
+
+// IMU count and convenience flag
+#define IMU_FRAME_ENABLED (IMU_FRAME != IMU_NONE)
+#define IMU_FORK_ENABLED  (IMU_FORK != IMU_NONE)
+#define IMU_REAR_ENABLED  (IMU_REAR != IMU_NONE)
+
+#define IMU_COUNT (IMU_FRAME_ENABLED + IMU_FORK_ENABLED + IMU_REAR_ENABLED)
+#define HAS_IMU   (IMU_COUNT > 0)
+
 #endif // _HARDWARE_CONFIG_H

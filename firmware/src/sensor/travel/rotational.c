@@ -2,10 +2,10 @@
 
 #include "../fw/hardware_config.h"
 #include "as5600.h"
-#include "sensor.h"
+#include "travel_sensor.h"
 #include <stdint.h>
 
-static void rotational_sensor_init(struct sensor *sensor) {
+static void rotational_sensor_init(struct travel_sensor *sensor) {
     i2c_init(sensor->comm.i2c.instance, 1000000);
     gpio_set_function(sensor->comm.i2c.sda_gpio, GPIO_FUNC_I2C);
     gpio_set_function(sensor->comm.i2c.scl_gpio, GPIO_FUNC_I2C);
@@ -13,12 +13,12 @@ static void rotational_sensor_init(struct sensor *sensor) {
     gpio_pull_up(sensor->comm.i2c.scl_gpio);
 }
 
-static bool rotational_sensor_check_availability(struct sensor *sensor) {
+static bool rotational_sensor_check_availability(struct travel_sensor *sensor) {
     sensor->available = as5600_connected(sensor->comm.i2c.instance) && as5600_detect_magnet(sensor->comm.i2c.instance);
     return sensor->available;
 }
 
-static bool rotational_sensor_start(struct sensor *sensor, uint16_t baseline, bool inverted) {
+static bool rotational_sensor_start(struct travel_sensor *sensor, uint16_t baseline, bool inverted) {
     if (!sensor->check_availability(sensor)) {
         return false;
     }
@@ -37,7 +37,7 @@ static bool rotational_sensor_start(struct sensor *sensor, uint16_t baseline, bo
     return true;
 }
 
-static uint16_t rotational_sensor_measure(struct sensor *sensor) {
+static uint16_t rotational_sensor_measure(struct travel_sensor *sensor) {
     static uint16_t value = 0xffff;
     if (sensor->available) {
         value = as5600_get_scaled_angle(sensor->comm.i2c.instance);
@@ -49,7 +49,7 @@ static uint16_t rotational_sensor_measure(struct sensor *sensor) {
     return value;
 }
 
-static void rotational_sensor_calibrate_expanded(struct sensor *sensor) {
+static void rotational_sensor_calibrate_expanded(struct travel_sensor *sensor) {
     sensor->baseline = 0xffff;
     if (sensor->check_availability(sensor)) {
         sensor->baseline = as5600_get_raw_angle(sensor->comm.i2c.instance);
@@ -57,7 +57,7 @@ static void rotational_sensor_calibrate_expanded(struct sensor *sensor) {
     }
 }
 
-static void rotational_sensor_calibrate_compressed(struct sensor *sensor) {
+static void rotational_sensor_calibrate_compressed(struct travel_sensor *sensor) {
     sensor->baseline = 0xffff;
     if (sensor->check_availability(sensor)) {
         // We check rotation direction by comparing the measured value in a compressed
@@ -69,7 +69,7 @@ static void rotational_sensor_calibrate_compressed(struct sensor *sensor) {
 }
 
 #ifndef FORK_LINEAR
-struct sensor fork_sensor = {
+struct travel_sensor fork_sensor = {
     .comm.i2c = {FORK_I2C, FORK_PIN_SCL, FORK_PIN_SDA},
     .init = rotational_sensor_init,
     .check_availability = rotational_sensor_check_availability,
@@ -81,7 +81,7 @@ struct sensor fork_sensor = {
 #endif
 
 #ifndef SHOCK_LINEAR
-struct sensor shock_sensor = {
+struct travel_sensor shock_sensor = {
     .comm.i2c = {SHOCK_I2C, SHOCK_PIN_SCL, SHOCK_PIN_SDA},
     .init = rotational_sensor_init,
     .check_availability = rotational_sensor_check_availability,

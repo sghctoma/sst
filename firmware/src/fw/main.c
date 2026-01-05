@@ -29,29 +29,164 @@
 #include "../net/tcpserver.h"
 #include "../ntp//ntp.h"
 #include "../rtc//ds3231.h"
-#include "../sensor/sensor.h"
+#include "../sensor/imu/imu_sensor.h"
+#ifndef IMU_MODEL_NONE
+#include "../sensor/imu/lsm6dso.h"
+#include "../sensor/imu/mpu6050.h"
+#endif
+#include "../sensor/travel/travel_sensor.h"
 #include "../util/config.h"
 #include "../util/list.h"
 #include "../util/log.h"
+#include "calibration_flow.h"
 #include "sst.h"
 
 #include "hardware_config.h"
 
 static volatile enum state state;
+static volatile bool marker_pending = false;
 
 static uint32_t scb_orig;
 static uint32_t clock0_orig;
 static uint32_t clock1_orig;
 
 static ssd1306_t disp;
-static repeating_timer_t data_acquisition_timer;
+static repeating_timer_t travel_timer;
+#if HAS_IMU
+static repeating_timer_t imu_timer;
+#endif
 static FIL recording;
 static struct tcpserver server;
 
 struct ds3231 rtc;
 
-extern struct sensor fork_sensor;
-extern struct sensor shock_sensor;
+extern struct travel_sensor fork_sensor;
+extern struct travel_sensor shock_sensor;
+
+static struct calibration_ctx cal_ctx;
+
+#if HAS_IMU
+#if IMU_FRAME == IMU_MPU6050
+struct imu_sensor imu_frame = {
+    .type = IMU_TYPE_MPU6050,
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FRAME_I2C_INST, IMU_FRAME_ADDRESS, IMU_FRAME_PIN_SDA, IMU_FRAME_PIN_SCL},
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+    .temp_scale = MPU6050_TEMP_SCALE,
+    .temp_offset = MPU6050_TEMP_OFFSET,
+    .init = mpu6050_init,
+    .check_availability = mpu6050_check_availability,
+    .read_raw = mpu6050_read_raw,
+    .read_temperature = mpu6050_read_temperature,
+    .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_FRAME == IMU_LSM6DSO
+struct imu_sensor imu_frame = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_FRAME_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_FRAME_SPI_INST, IMU_FRAME_PIN_CS, IMU_FRAME_PIN_SCK, IMU_FRAME_PIN_MOSI, IMU_FRAME_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FRAME_I2C_INST, IMU_FRAME_ADDRESS, IMU_FRAME_PIN_SDA, IMU_FRAME_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_frame = {.available = false};
+#endif
+
+#if IMU_FORK == IMU_MPU6050
+struct imu_sensor imu_fork = {.type = IMU_TYPE_MPU6050,
+                              .protocol = IMU_PROTOCOL_I2C,
+                              .comm.i2c = {IMU_FORK_I2C_INST, IMU_FORK_ADDRESS, IMU_FORK_PIN_SDA, IMU_FORK_PIN_SCL},
+                              .available = false,
+                              .calibration = IMU_CALIBRATION_DEFAULT,
+                              .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+                              .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+                              .temp_scale = MPU6050_TEMP_SCALE,
+                              .temp_offset = MPU6050_TEMP_OFFSET,
+                              .init = mpu6050_init,
+                              .check_availability = mpu6050_check_availability,
+                              .read_raw = mpu6050_read_raw,
+                              .read_temperature = mpu6050_read_temperature,
+                              .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_FORK == IMU_LSM6DSO
+struct imu_sensor imu_fork = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_FORK_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_FORK_SPI_INST, IMU_FORK_PIN_CS, IMU_FORK_PIN_SCK, IMU_FORK_PIN_MOSI, IMU_FORK_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_FORK_I2C_INST, IMU_FORK_ADDRESS, IMU_FORK_PIN_SDA, IMU_FORK_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_fork = {.available = false};
+#endif
+
+#if IMU_REAR == IMU_MPU6050
+struct imu_sensor imu_rear = {.type = IMU_TYPE_MPU6050,
+                              .protocol = IMU_PROTOCOL_I2C,
+                              .comm.i2c = {IMU_REAR_I2C_INST, IMU_REAR_ADDRESS, IMU_REAR_PIN_SDA, IMU_REAR_PIN_SCL},
+                              .available = false,
+                              .calibration = IMU_CALIBRATION_DEFAULT,
+                              .gyro_temp_coeff = MPU6050_GYRO_TEMP_COEFF,
+                              .accel_temp_coeff = MPU6050_ACCEL_TEMP_COEFF,
+                              .temp_scale = MPU6050_TEMP_SCALE,
+                              .temp_offset = MPU6050_TEMP_OFFSET,
+                              .init = mpu6050_init,
+                              .check_availability = mpu6050_check_availability,
+                              .read_raw = mpu6050_read_raw,
+                              .read_temperature = mpu6050_read_temperature,
+                              .temperature_celsius = mpu6050_temperature_celsius};
+#elif IMU_REAR == IMU_LSM6DSO
+struct imu_sensor imu_rear = {
+    .type = IMU_TYPE_LSM6DSO,
+#ifdef IMU_REAR_SPI
+    .protocol = IMU_PROTOCOL_SPI,
+    .comm.spi = {IMU_REAR_SPI_INST, IMU_REAR_PIN_CS, IMU_REAR_PIN_SCK, IMU_REAR_PIN_MOSI, IMU_REAR_PIN_MISO},
+#else
+    .protocol = IMU_PROTOCOL_I2C,
+    .comm.i2c = {IMU_REAR_I2C_INST, IMU_REAR_ADDRESS, IMU_REAR_PIN_SDA, IMU_REAR_PIN_SCL},
+#endif
+    .available = false,
+    .calibration = IMU_CALIBRATION_DEFAULT,
+    .gyro_temp_coeff = LSM6DSO_GYRO_TEMP_COEFF,
+    .accel_temp_coeff = LSM6DSO_ACCEL_TEMP_COEFF,
+    .temp_scale = LSM6DSO_TEMP_SCALE,
+    .temp_offset = LSM6DSO_TEMP_OFFSET,
+    .init = lsm6dso_init,
+    .check_availability = lsm6dso_check_availability,
+    .read_raw = lsm6dso_read_raw,
+    .read_temperature = lsm6dso_read_temperature,
+    .temperature_celsius = lsm6dso_temperature_celsius};
+#else
+struct imu_sensor imu_rear = {.available = false};
+#endif
+#endif // HAS_IMU
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -126,31 +261,16 @@ static void wifi_disconnect() {
     sleep_ms(100);
 }
 
-static void calibrate_if_needed() {
-    gpio_init(BUTTON_LEFT);
-    gpio_pull_up(BUTTON_LEFT);
-
-    FRESULT fr = f_stat("CALIBRATION", NULL);
-    bool button_pressed = !gpio_get(BUTTON_LEFT);
-    LOG("CAL", "CALIBRATION file %s, button %s\n", fr == FR_OK ? "exists" : "missing",
-        button_pressed ? "pressed" : "not pressed");
-
-    if (fr != FR_OK || button_pressed) {
-        LOG("CAL", "Entering calibration mode\n");
-        state = CAL_IDLE_1;
-    } else {
-        LOG("CAL", "Skipping calibration\n");
-        state = IDLE;
-    }
-}
-
 // ----------------------------------------------------------------------------
 // Data acquisition
 
-static const uint16_t SAMPLE_RATE = 1000;
+static const uint16_t TRAVEL_SAMPLE_RATE = 1000;
+#if HAS_IMU
+static const uint16_t IMU_SAMPLE_RATE = 1000;
+#endif
 
-// We are using two buffers. Data acquisition happens on core #1 into the active
-// buffer (referred to by the pointer active_buffer) and we dump to Micro SD card
+// We are using two buffers per sensor type. Data acquisition happens on core #1 into the active
+// buffer (referred to by the pointer active_travel_buffer) and we dump to Micro SD card
 // on core #2.
 //
 // When the active buffer is filled on core #1,
@@ -162,60 +282,111 @@ static const uint16_t SAMPLE_RATE = 1000;
 //  - sends the buffer address to core #1 via FIFO
 //
 
-struct record databuffer1[BUFFER_SIZE];
-struct record databuffer2[BUFFER_SIZE];
-struct record *active_buffer = databuffer1;
-uint16_t count = 0;
+struct travel_record travel_databuffer1[BUFFER_SIZE];
+struct travel_record travel_databuffer2[BUFFER_SIZE];
+struct travel_record *active_travel_buffer = travel_databuffer1;
+uint16_t travel_count = 0;
 
-static bool data_acquisition_cb(repeating_timer_t *rt) {
-    if (count == BUFFER_SIZE) {
-        count = 0;
-        multicore_fifo_push_blocking(DUMP);
-        multicore_fifo_push_blocking((uintptr_t)active_buffer);
-        active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-    }
+#if HAS_IMU
+struct imu_record imu_databuffer1[IMU_BUFFER_SIZE];
+struct imu_record imu_databuffer2[IMU_BUFFER_SIZE];
+struct imu_record *active_imu_buffer = imu_databuffer1;
+uint16_t imu_count = 0;
+#endif
 
-    active_buffer[count].fork_angle = fork_sensor.measure(&fork_sensor);
-    active_buffer[count].shock_angle = shock_sensor.measure(&shock_sensor);
-
-    count += 1;
-
-    return state == RECORD; // keep repeating if we are still recording
+static void dump_active_travel_buffer(uint16_t size) {
+    multicore_fifo_push_blocking(DUMP_TRAVEL);
+    multicore_fifo_push_blocking(size);
+    multicore_fifo_push_blocking((uintptr_t)active_travel_buffer);
+    active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
 
-static bool start_sensors() {
-    absolute_time_t timeout = make_timeout_time_ms(3000);
-    while (!(fork_sensor.check_availability(&fork_sensor) || shock_sensor.check_availability(&shock_sensor))) {
-        if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
-            return false;
-        }
-        sleep_ms(10);
-    }
-
-    FIL calibration_fil;
-    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_EXISTING | FA_READ);
-    if (!(fr == FR_OK || fr == FR_EXIST)) {
-        return false;
-    }
-
-    uint br;
-    uint16_t baseline;
-    bool inverted;
-    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
-    fork_sensor.start(&fork_sensor, baseline, inverted);
-    LOG("SENSOR", "Fork sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
-        fork_sensor.available);
-
-    f_read(&calibration_fil, &baseline, sizeof(uint16_t), &br);
-    f_read(&calibration_fil, &inverted, sizeof(bool), &br);
-    shock_sensor.start(&shock_sensor, baseline, inverted);
-    LOG("SENSOR", "Shock sensor: baseline=0x%04x, inverted=%d, available=%d\n", baseline, inverted,
-        shock_sensor.available);
-
-    f_close(&calibration_fil);
-    return fork_sensor.available || shock_sensor.available;
+#if HAS_IMU
+static void dump_active_imu_buffer(uint16_t size) {
+    multicore_fifo_push_blocking(DUMP_IMU);
+    multicore_fifo_push_blocking(size);
+    multicore_fifo_push_blocking((uintptr_t)active_imu_buffer);
+    active_imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
+#endif
+
+static bool travel_cb(repeating_timer_t *rt) {
+    if (travel_count == BUFFER_SIZE) {
+        dump_active_travel_buffer(BUFFER_SIZE);
+        travel_count = 0;
+    }
+    active_travel_buffer[travel_count].fork_angle = fork_sensor.measure(&fork_sensor);
+    active_travel_buffer[travel_count].shock_angle = shock_sensor.measure(&shock_sensor);
+    travel_count += 1;
+
+    if (marker_pending) {
+        dump_active_travel_buffer(travel_count);
+        travel_count = 0;
+#if HAS_IMU
+        dump_active_imu_buffer(imu_count);
+        imu_count = 0;
+#endif
+
+        multicore_fifo_push_blocking(MARKER);
+        marker_pending = false;
+    }
+
+    return state == RECORD;
+}
+
+#if HAS_IMU
+static bool imu_cb(repeating_timer_t *rt) {
+    uint8_t active_count = 0;
+    if (imu_frame.available)
+        active_count++;
+    if (imu_fork.available)
+        active_count++;
+    if (imu_rear.available)
+        active_count++;
+
+    if (imu_count + active_count > IMU_BUFFER_SIZE) {
+        dump_active_imu_buffer(imu_count);
+        imu_count = 0;
+    }
+
+    // The order of filling the buffer must match the order of imu meta chunks written to file
+    // frame, fork, rear
+    // The records do not identify what sensor they come from
+    int16_t ax, ay, az, gx, gy, gz;
+    if (imu_frame.available) {
+        imu_sensor_read(&imu_frame, &ax, &ay, &az, &gx, &gy, &gz);
+        active_imu_buffer[imu_count].ax = ax;
+        active_imu_buffer[imu_count].ay = ay;
+        active_imu_buffer[imu_count].az = az;
+        active_imu_buffer[imu_count].gx = gx;
+        active_imu_buffer[imu_count].gy = gy;
+        active_imu_buffer[imu_count].gz = gz;
+        imu_count++;
+    }
+    if (imu_fork.available) {
+        imu_sensor_read(&imu_fork, &ax, &ay, &az, &gx, &gy, &gz);
+        active_imu_buffer[imu_count].ax = ax;
+        active_imu_buffer[imu_count].ay = ay;
+        active_imu_buffer[imu_count].az = az;
+        active_imu_buffer[imu_count].gx = gx;
+        active_imu_buffer[imu_count].gy = gy;
+        active_imu_buffer[imu_count].gz = gz;
+        imu_count++;
+    }
+    if (imu_rear.available) {
+        imu_sensor_read(&imu_rear, &ax, &ay, &az, &gx, &gy, &gz);
+        active_imu_buffer[imu_count].ax = ax;
+        active_imu_buffer[imu_count].ay = ay;
+        active_imu_buffer[imu_count].az = az;
+        active_imu_buffer[imu_count].gx = gx;
+        active_imu_buffer[imu_count].gy = gy;
+        active_imu_buffer[imu_count].gz = gz;
+        imu_count++;
+    }
+
+    return state == RECORD;
+}
+#endif // HAS_IMU
 
 // ----------------------------------------------------------------------------
 // Data storage
@@ -283,11 +454,76 @@ static int open_datafile() {
         return fr;
     }
 
-    struct header h = {"SST", 3, SAMPLE_RATE, rtc_timestamp()};
-    f_write(&recording, &h, sizeof(struct header), NULL);
+    struct sst_header h = {"SST", 4, 0, rtc_timestamp()};
+    f_write(&recording, &h, sizeof(struct sst_header), NULL);
+
+#if HAS_IMU
+    struct chunk_header ch = {CHUNK_TYPE_RATES, 2 * sizeof(struct samplerate_record)};
+#else
+    struct chunk_header ch = {CHUNK_TYPE_RATES, 1 * sizeof(struct samplerate_record)};
+#endif
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    struct samplerate_record re = {CHUNK_TYPE_TRAVEL, TRAVEL_SAMPLE_RATE};
+    f_write(&recording, &re, sizeof(struct samplerate_record), NULL);
+#if HAS_IMU
+    re.type = CHUNK_TYPE_IMU;
+    re.rate = IMU_SAMPLE_RATE;
+    f_write(&recording, &re, sizeof(struct samplerate_record), NULL);
+
+    // Count active IMUs and prepare metadata
+    uint8_t imu_meta_count = 0;
+    if (imu_frame.available)
+        imu_meta_count++;
+    if (imu_fork.available)
+        imu_meta_count++;
+    if (imu_rear.available)
+        imu_meta_count++;
+
+    // IMU meta chunks determine the order of records in IMU record chunks written in the imu_cb
+    // frame, fork, rear
+    if (imu_meta_count > 0) {
+        ch.type = CHUNK_TYPE_IMU_META;
+        ch.length = 1 + imu_meta_count * sizeof(struct imu_meta_record);
+        f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+        f_write(&recording, &imu_meta_count, 1, NULL);
+
+        if (imu_frame.available) {
+            struct imu_meta_record entry = {0, imu_frame.accel_lsb_per_g, imu_frame.gyro_lsb_per_dps};
+            f_write(&recording, &entry, sizeof(struct imu_meta_record), NULL);
+        }
+        if (imu_fork.available) {
+            struct imu_meta_record entry = {1, imu_fork.accel_lsb_per_g, imu_fork.gyro_lsb_per_dps};
+            f_write(&recording, &entry, sizeof(struct imu_meta_record), NULL);
+        }
+        if (imu_rear.available) {
+            struct imu_meta_record entry = {2, imu_rear.accel_lsb_per_g, imu_rear.gyro_lsb_per_dps};
+            f_write(&recording, &entry, sizeof(struct imu_meta_record), NULL);
+        }
+    }
+#endif
 
     return index;
 }
+
+static void write_travel_chunk(uint16_t size, struct travel_record *buffer) {
+    struct chunk_header ch;
+    ch.type = CHUNK_TYPE_TRAVEL;
+    ch.length = size * sizeof(struct travel_record);
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    f_write(&recording, buffer, ch.length, NULL);
+    f_sync(&recording);
+}
+
+#if HAS_IMU
+static void write_imu_chunk(uint16_t size, struct imu_record *buffer) {
+    struct chunk_header ch;
+    ch.type = CHUNK_TYPE_IMU;
+    ch.length = size * sizeof(struct imu_record);
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    f_write(&recording, buffer, ch.length, NULL);
+    f_sync(&recording);
+}
+#endif
 
 static void data_storage_core1() {
     int err = setup_storage();
@@ -296,7 +532,12 @@ static void data_storage_core1() {
     int index;
     enum command cmd;
     uint16_t size;
-    struct record *buffer;
+    struct travel_record *travel_buffer;
+#if HAS_IMU
+    struct imu_record *imu_buffer;
+#endif
+    struct chunk_header ch;
+
     while (true) {
         cmd = (enum command)multicore_fifo_pop_blocking();
         switch (cmd) {
@@ -304,19 +545,42 @@ static void data_storage_core1() {
                 multicore_fifo_drain();
                 index = open_datafile();
                 multicore_fifo_push_blocking(index);
-                multicore_fifo_push_blocking((uintptr_t)databuffer2);
+                multicore_fifo_push_blocking((uintptr_t)travel_databuffer2);
+#if HAS_IMU
+                multicore_fifo_push_blocking((uintptr_t)imu_databuffer2);
+#endif
                 break;
-            case DUMP:
-                buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-                multicore_fifo_push_blocking((uintptr_t)buffer);
-                f_write(&recording, buffer, sizeof(struct record) * BUFFER_SIZE, NULL);
+            case DUMP_TRAVEL:
+                size = (uint16_t)multicore_fifo_pop_blocking();
+                travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
+                multicore_fifo_push_blocking((uintptr_t)travel_buffer);
+                write_travel_chunk(size, travel_buffer);
+                break;
+#if HAS_IMU
+            case DUMP_IMU:
+                size = (uint16_t)multicore_fifo_pop_blocking();
+                imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
+                multicore_fifo_push_blocking((uintptr_t)imu_buffer);
+                write_imu_chunk(size, imu_buffer);
+                break;
+#endif
+            case MARKER:
+                ch.type = CHUNK_TYPE_MARKER;
+                ch.length = 0;
+                f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
                 f_sync(&recording);
                 break;
             case FINISH:
+                // Flush travel
                 size = (uint16_t)multicore_fifo_pop_blocking();
-                buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-                f_write(&recording, buffer, sizeof(struct record) * size, NULL);
-                f_sync(&recording);
+                travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
+                write_travel_chunk(size, travel_buffer);
+#if HAS_IMU
+                // Flush IMU
+                size = (uint16_t)multicore_fifo_pop_blocking();
+                imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
+                write_imu_chunk(size, imu_buffer);
+#endif
                 f_close(&recording);
                 break;
         }
@@ -353,107 +617,18 @@ static void setup_display(ssd1306_t *disp) {
 // ----------------------------------------------------------------------------
 // State handlers
 
-static void on_cal_idle() {
-    // No MSC if there is no USB cable connected, so checking
-    // tud is not necessary.
-    bool battery = on_battery();
-    if (!battery && msc_present()) {
-        soft_reset();
-    }
-
-    static absolute_time_t timeout = {0};
-    if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
-        timeout = make_timeout_time_ms(1000);
-
-        uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
-        static char battery_str[] = " PWR";
-        if (battery) {
-            if (voltage_percentage > 99) {
-                snprintf(battery_str, sizeof(battery_str), "FULL");
-            } else {
-                snprintf(battery_str, sizeof(battery_str), "% 3d%%", voltage_percentage);
-            }
-        }
-
-        // Print sensor values
-        if (fork_sensor.check_availability(&fork_sensor)) {
-            uint16_t fork_val = fork_sensor.measure(&fork_sensor);
-            LOG("SENSOR", "Fork: 0x%04x\n", fork_val);
-        }
-        if (shock_sensor.check_availability(&shock_sensor)) {
-            uint16_t shock_val = shock_sensor.measure(&shock_sensor);
-            LOG("SENSOR", "Shock: 0x%04x\n", shock_val);
-        }
-
-        ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 96, 0, 1, battery_str);
-        ssd1306_draw_string(&disp, 0, 0, 2, state == CAL_IDLE_1 ? "CAL EXP" : "CAL COMP");
-        if (fork_sensor.check_availability(&fork_sensor)) {
-            ssd1306_draw_string(&disp, 0, 24, 1, "fork");
-        }
-        if (shock_sensor.check_availability(&shock_sensor)) {
-            ssd1306_draw_string(&disp, 40, 24, 1, "shock");
-        }
-        ssd1306_show(&disp);
-    }
-}
-
-static void on_cal_exp() {
-    LOG("CAL", "Calibrating expanded position\n");
-    fork_sensor.calibrate_expanded(&fork_sensor);
-    shock_sensor.calibrate_expanded(&shock_sensor);
-
-    LOG("CAL", "Fork baseline: 0x%04x, Shock baseline: 0x%04x\n", fork_sensor.baseline, shock_sensor.baseline);
-
-    if (fork_sensor.baseline == 0xffff && shock_sensor.baseline == 0xffff) {
-        LOG("CAL", "Error: Both sensors failed calibration\n");
-        display_message(&disp, "CAL ERR");
-        sleep_ms(1000);
-        state = CAL_IDLE_1;
-        return;
-    }
-
-    LOG("CAL", "Expanded calibration complete\n");
-    state = CAL_IDLE_2;
-}
-
-static void on_cal_comp() {
-    LOG("CAL", "Calibrating compressed position\n");
-    fork_sensor.calibrate_compressed(&fork_sensor);
-    shock_sensor.calibrate_compressed(&shock_sensor);
-
-    LOG("CAL", "Fork: baseline=0x%04x inverted=%d\n", fork_sensor.baseline, fork_sensor.inverted);
-    LOG("CAL", "Shock: baseline=0x%04x inverted=%d\n", shock_sensor.baseline, shock_sensor.inverted);
-
-    FIL calibration_fil;
-    FRESULT fr = f_open(&calibration_fil, "CALIBRATION", FA_OPEN_ALWAYS | FA_WRITE);
-    if (!(fr == FR_OK || fr == FR_EXIST)) {
-        LOG("CAL", "Error: Failed to open CALIBRATION file\n");
-        display_message(&disp, "CAL ERR");
-        sleep_ms(1000);
-        state = CAL_IDLE_2;
-        return;
-    }
-
-    uint bw;
-    f_write(&calibration_fil, &fork_sensor.baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&fork_sensor.inverted, sizeof(bool), &bw);
-    f_write(&calibration_fil, &shock_sensor.baseline, sizeof(uint16_t), &bw);
-    f_write(&calibration_fil, (const void *)&shock_sensor.inverted, sizeof(bool), &bw);
-    f_close(&calibration_fil);
-
-    LOG("CAL", "Calibration saved successfully\n");
-    state = IDLE;
-}
-
 static void on_rec_start() {
     LOG("REC", "Starting recording session\n");
-    count = 0;
-    active_buffer = databuffer1;
+    travel_count = 0;
+    active_travel_buffer = travel_databuffer1;
+#if HAS_IMU
+    imu_count = 0;
+    active_imu_buffer = imu_databuffer1;
+#endif
     multicore_fifo_drain();
 
     display_message(&disp, "INIT SENS");
-    if (!start_sensors()) {
+    if (!calibration_apply_to_sensors(&cal_ctx)) {
         LOG("REC", "No sensors available\n");
         display_message(&disp, "NO SENS");
         sleep_ms(1000);
@@ -475,22 +650,51 @@ static void on_rec_start() {
     }
     LOG("REC", "Recording to file index %d\n", index);
 
-    // Start data acquisition timer
-    if (!add_repeating_timer_us(-1000000 / SAMPLE_RATE, data_acquisition_cb, NULL, &data_acquisition_timer)) {
-        display_message(&disp, "TIMER ERR");
+    // Initial buffer pointers for Core 1
+    active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
+#if HAS_IMU
+    active_imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
+#endif
+
+    // Start data acquisition timers
+    if (!add_repeating_timer_us(-1000000 / TRAVEL_SAMPLE_RATE, travel_cb, NULL, &travel_timer)) {
+        display_message(&disp, "TEL TMR ERR");
         while (true) { tight_loop_contents(); }
     }
+
+#if HAS_IMU
+    bool imu_active = imu_frame.available || imu_fork.available || imu_rear.available;
+    if (imu_active) {
+        if (!add_repeating_timer_us(-1000000 / IMU_SAMPLE_RATE, imu_cb, NULL, &imu_timer)) {
+            display_message(&disp, "IMU TMR ERR");
+            while (true) { tight_loop_contents(); }
+        }
+    }
+#endif
 }
 
 static void on_rec_stop() {
-    LOG("REC", "Stopping recording, samples: %u\n", count);
+    LOG("REC", "Stopping recording\n");
     state = IDLE;
     display_message(&disp, "IDLE");
-    cancel_repeating_timer(&data_acquisition_timer);
+    cancel_repeating_timer(&travel_timer);
+
+#if HAS_IMU
+    bool imu_active = imu_frame.available || imu_fork.available || imu_rear.available;
+    if (imu_active) {
+        cancel_repeating_timer(&imu_timer);
+    }
+#endif
 
     multicore_fifo_push_blocking(FINISH);
-    multicore_fifo_push_blocking(count);
-    multicore_fifo_push_blocking((uintptr_t)active_buffer);
+    // Flush travel
+    multicore_fifo_push_blocking(travel_count);
+    multicore_fifo_push_blocking((uintptr_t)active_travel_buffer);
+#if HAS_IMU
+    // Flush IMU
+    multicore_fifo_push_blocking(imu_count);
+    multicore_fifo_push_blocking((uintptr_t)active_imu_buffer);
+#endif
 }
 
 static void on_sync_data() {
@@ -569,7 +773,7 @@ static void on_idle() {
 
     static absolute_time_t timeout = {0};
     if (absolute_time_diff_us(get_absolute_time(), timeout) < 0) {
-        timeout = make_timeout_time_ms(1000);
+        timeout = make_timeout_time_ms(500);
 
         uint8_t voltage_percentage = ((read_voltage() - BATTERY_MIN_V) / BATTERY_RANGE) * 100;
         static char battery_str[] = " PWR";
@@ -594,8 +798,16 @@ static void on_idle() {
             ssd1306_draw_string(&disp, 0, 24, 1, "fork");
         }
         if (shock_sensor.check_availability(&shock_sensor)) {
-            ssd1306_draw_string(&disp, 40, 24, 1, "shock");
+            ssd1306_draw_string(&disp, 30, 24, 1, "shock");
         }
+#if HAS_IMU
+        if (imu_sensor_available(&imu_frame)) {
+            ssd1306_draw_string(&disp, 63, 24, 1, "iFra");
+        }
+        if (imu_sensor_available(&imu_fork)) {
+            ssd1306_draw_string(&disp, 90, 24, 1, "iFor");
+        }
+#endif
         ssd1306_show(&disp);
     }
 }
@@ -672,10 +884,6 @@ static void (*state_handlers[STATES_COUNT])() = {
     on_sync_data, /* SYNC_DATA */
     on_serve_tcp, /* SERVE_TCP */
     on_msc,       /* MSC */
-    on_cal_idle,  /* CAL_IDLE_1 */
-    on_cal_exp,   /* CAL_EXP */
-    on_cal_idle,  /* CAL_IDLE_2 */
-    on_cal_comp,  /* CAL_COMP */
 };
 
 // ----------------------------------------------------------------------------
@@ -683,12 +891,6 @@ static void (*state_handlers[STATES_COUNT])() = {
 
 static void on_left_press(void *user_data) {
     switch (state) {
-        case CAL_IDLE_1:
-            state = CAL_EXP;
-            break;
-        case CAL_IDLE_2:
-            state = CAL_COMP;
-            break;
         case IDLE:
             state = REC_START;
             break;
@@ -714,6 +916,10 @@ static void on_right_press(void *user_data) {
     switch (state) {
         case IDLE:
             state = SLEEP;
+            break;
+        case RECORD:
+            marker_pending = true;
+            LOG("REC", "Marker set\n");
             break;
         case SERVE_TCP:
             tcpserver_finish(&server);
@@ -746,6 +952,7 @@ int main() {
     sleep_ms(3000); // Give time for the tty to get enumerated on the host
 #endif
 
+    // Suspension sensors init
     adc_init();
     fork_sensor.init(&fork_sensor);
     shock_sensor.init(&shock_sensor);
@@ -753,9 +960,30 @@ int main() {
     stdio_uart_init();
 #endif
 
+    // I2C Init
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
+#if HAS_IMU
+    // IMU init
+#if IMU_FRAME != IMU_NONE
+    if (!imu_sensor_init(&imu_frame)) {
+        LOG("INIT", "Frame IMU not found or failed to initialize\n");
+    }
+#endif
+#if IMU_FORK != IMU_NONE
+    if (!imu_sensor_init(&imu_fork)) {
+        LOG("INIT", "Fork IMU not found or failed to initialize\n");
+    }
+#endif
+#if IMU_REAR != IMU_NONE
+    if (!imu_sensor_init(&imu_rear)) {
+        LOG("INIT", "Rear IMU not found or failed to initialize\n");
+    }
+#endif
+#endif // HAS_IMU
+
+    // DS3231 init
     struct tm tm_now;
     LOG("DS3231", "Initializing RTC\n");
     ds3231_init(&rtc, I2C_PIO, I2C_SM, pio_i2c_write_blocking, pio_i2c_read_blocking);
@@ -765,6 +993,7 @@ int main() {
     LOG("DS3231", "Time: %04d-%02d-%02d %02d:%02d:%02d\n", tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
         tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
 
+    // Set board time
 #if PICO_RP2040
     // RP2040: use calendar methods (native to RTC hardware)
     if (!aon_timer_start_calendar(&tm_now)) {
@@ -796,6 +1025,7 @@ int main() {
     } else {
 #endif
 
+        // Storage init
         display_message(&disp, "INIT STOR");
         multicore_launch_core1(&data_storage_core1);
         int err = (int)multicore_fifo_pop_blocking();
@@ -821,7 +1051,27 @@ int main() {
         clock0_orig = clocks_hw->sleep_en0;
         clock1_orig = clocks_hw->sleep_en1;
 
-        calibrate_if_needed();
+        // Initialize calibration context
+        cal_ctx = (struct calibration_ctx){
+            .fork = &fork_sensor,
+            .shock = &shock_sensor,
+#if HAS_IMU
+            .imu_frame = &imu_frame,
+            .imu_fork = &imu_fork,
+            .imu_rear = &imu_rear,
+#endif
+            .disp = &disp,
+        };
+
+        if (calibration_check_needed(&cal_ctx)) {
+            if (!calibration_run(&cal_ctx)) {
+                while (true) { tight_loop_contents(); }
+            }
+        }
+
+        calibration_apply_to_sensors(&cal_ctx);
+
+        state = IDLE;
 
         create_button(BUTTON_LEFT, NULL, on_left_press, on_left_longpress);
         create_button(BUTTON_RIGHT, NULL, on_right_press, on_right_longpress);
