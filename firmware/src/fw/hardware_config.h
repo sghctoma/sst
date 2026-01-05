@@ -161,4 +161,12 @@
 #endif
 #endif
 
+// IMU count and convenience flag
+#define IMU_FRAME_ENABLED (IMU_FRAME != IMU_NONE)
+#define IMU_FORK_ENABLED  (IMU_FORK != IMU_NONE)
+#define IMU_REAR_ENABLED  (IMU_REAR != IMU_NONE)
+
+#define IMU_COUNT (IMU_FRAME_ENABLED + IMU_FORK_ENABLED + IMU_REAR_ENABLED)
+#define HAS_IMU   (IMU_COUNT > 0)
+
 #endif // _HARDWARE_CONFIG_H

@@ -4,6 +4,7 @@
 #include "../net/tcpclient.h"
 #include "../ui/pushbutton.h"
 #include "as5600.h"
+#include "hardware_config.h"
 #include "ssd1306.h"
 #include "tusb.h"
 
@@ -75,6 +76,11 @@ struct imu_record {
 enum command { OPEN, DUMP_TRAVEL, DUMP_IMU, FINISH, MARKER };
 
 #define BUFFER_SIZE 2048
+
+// IMU buffer size scales with number of configured IMUs: 1024/1536/2048
+#if HAS_IMU
+#define IMU_BUFFER_SIZE ((IMU_COUNT + 1) * 512)
+#endif
 #define FILENAME_LENGTH                                                                                                \
     10 // filename is always in 00000.SST format,
        // so length is always 10.

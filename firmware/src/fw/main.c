@@ -52,7 +52,9 @@ static uint32_t clock1_orig;
 
 static ssd1306_t disp;
 static repeating_timer_t travel_timer;
+#if HAS_IMU
 static repeating_timer_t imu_timer;
+#endif
 static FIL recording;
 static struct tcpserver server;
 
@@ -63,6 +65,7 @@ extern struct travel_sensor shock_sensor;
 
 static struct calibration_ctx cal_ctx;
 
+#if HAS_IMU
 #if IMU_FRAME == IMU_MPU6050
 struct imu_sensor imu_frame = {
     .type = IMU_TYPE_MPU6050,
@@ -183,6 +186,7 @@ struct imu_sensor imu_rear = {
 #else
 struct imu_sensor imu_rear = {.available = false};
 #endif
+#endif // HAS_IMU
 
 // ----------------------------------------------------------------------------
 // Helper functions
@@ -261,7 +265,9 @@ static void wifi_disconnect() {
 // Data acquisition
 
 static const uint16_t TRAVEL_SAMPLE_RATE = 1000;
+#if HAS_IMU
 static const uint16_t IMU_SAMPLE_RATE = 1000;
+#endif
 
 // We are using two buffers per sensor type. Data acquisition happens on core #1 into the active
 // buffer (referred to by the pointer active_travel_buffer) and we dump to Micro SD card
@@ -281,10 +287,12 @@ struct travel_record travel_databuffer2[BUFFER_SIZE];
 struct travel_record *active_travel_buffer = travel_databuffer1;
 uint16_t travel_count = 0;
 
-struct imu_record imu_databuffer1[BUFFER_SIZE];
-struct imu_record imu_databuffer2[BUFFER_SIZE];
+#if HAS_IMU
+struct imu_record imu_databuffer1[IMU_BUFFER_SIZE];
+struct imu_record imu_databuffer2[IMU_BUFFER_SIZE];
 struct imu_record *active_imu_buffer = imu_databuffer1;
 uint16_t imu_count = 0;
+#endif
 
 static void dump_active_travel_buffer(uint16_t size) {
     multicore_fifo_push_blocking(DUMP_TRAVEL);
@@ -293,12 +301,14 @@ static void dump_active_travel_buffer(uint16_t size) {
     active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
 
+#if HAS_IMU
 static void dump_active_imu_buffer(uint16_t size) {
     multicore_fifo_push_blocking(DUMP_IMU);
     multicore_fifo_push_blocking(size);
     multicore_fifo_push_blocking((uintptr_t)active_imu_buffer);
     active_imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
 }
+#endif
 
 static bool travel_cb(repeating_timer_t *rt) {
     if (travel_count == BUFFER_SIZE) {
@@ -312,8 +322,10 @@ static bool travel_cb(repeating_timer_t *rt) {
     if (marker_pending) {
         dump_active_travel_buffer(travel_count);
         travel_count = 0;
+#if HAS_IMU
         dump_active_imu_buffer(imu_count);
         imu_count = 0;
+#endif
 
         multicore_fifo_push_blocking(MARKER);
         marker_pending = false;
@@ -322,6 +334,7 @@ static bool travel_cb(repeating_timer_t *rt) {
     return state == RECORD;
 }
 
+#if HAS_IMU
 static bool imu_cb(repeating_timer_t *rt) {
     uint8_t active_count = 0;
     if (imu_frame.available)
@@ -331,7 +344,7 @@ static bool imu_cb(repeating_timer_t *rt) {
     if (imu_rear.available)
         active_count++;
 
-    if (imu_count + active_count > BUFFER_SIZE) {
+    if (imu_count + active_count > IMU_BUFFER_SIZE) {
         dump_active_imu_buffer(imu_count);
         imu_count = 0;
     }
@@ -373,6 +386,7 @@ static bool imu_cb(repeating_timer_t *rt) {
 
     return state == RECORD;
 }
+#endif // HAS_IMU
 
 // ----------------------------------------------------------------------------
 // Data storage
@@ -443,30 +457,35 @@ static int open_datafile() {
     struct sst_header h = {"SST", 4, 0, rtc_timestamp()};
     f_write(&recording, &h, sizeof(struct sst_header), NULL);
 
+#if HAS_IMU
     struct chunk_header ch = {CHUNK_TYPE_RATES, 2 * sizeof(struct samplerate_record)};
+#else
+    struct chunk_header ch = {CHUNK_TYPE_RATES, 1 * sizeof(struct samplerate_record)};
+#endif
     f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
     struct samplerate_record re = {CHUNK_TYPE_TRAVEL, TRAVEL_SAMPLE_RATE};
     f_write(&recording, &re, sizeof(struct samplerate_record), NULL);
+#if HAS_IMU
     re.type = CHUNK_TYPE_IMU;
     re.rate = IMU_SAMPLE_RATE;
     f_write(&recording, &re, sizeof(struct samplerate_record), NULL);
 
     // Count active IMUs and prepare metadata
-    uint8_t imu_count = 0;
+    uint8_t imu_meta_count = 0;
     if (imu_frame.available)
-        imu_count++;
+        imu_meta_count++;
     if (imu_fork.available)
-        imu_count++;
+        imu_meta_count++;
     if (imu_rear.available)
-        imu_count++;
+        imu_meta_count++;
 
     // IMU meta chunks determine the order of records in IMU record chunks written in the imu_cb
     // frame, fork, rear
-    if (imu_count > 0) {
+    if (imu_meta_count > 0) {
         ch.type = CHUNK_TYPE_IMU_META;
-        ch.length = 1 + imu_count * sizeof(struct imu_meta_record);
+        ch.length = 1 + imu_meta_count * sizeof(struct imu_meta_record);
         f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
-        f_write(&recording, &imu_count, 1, NULL);
+        f_write(&recording, &imu_meta_count, 1, NULL);
 
         if (imu_frame.available) {
             struct imu_meta_record entry = {0, imu_frame.accel_lsb_per_g, imu_frame.gyro_lsb_per_dps};
@@ -481,6 +500,7 @@ static int open_datafile() {
             f_write(&recording, &entry, sizeof(struct imu_meta_record), NULL);
         }
     }
+#endif
 
     return index;
 }
@@ -494,6 +514,7 @@ static void write_travel_chunk(uint16_t size, struct travel_record *buffer) {
     f_sync(&recording);
 }
 
+#if HAS_IMU
 static void write_imu_chunk(uint16_t size, struct imu_record *buffer) {
     struct chunk_header ch;
     ch.type = CHUNK_TYPE_IMU;
@@ -502,6 +523,7 @@ static void write_imu_chunk(uint16_t size, struct imu_record *buffer) {
     f_write(&recording, buffer, ch.length, NULL);
     f_sync(&recording);
 }
+#endif
 
 static void data_storage_core1() {
     int err = setup_storage();
@@ -511,7 +533,9 @@ static void data_storage_core1() {
     enum command cmd;
     uint16_t size;
     struct travel_record *travel_buffer;
+#if HAS_IMU
     struct imu_record *imu_buffer;
+#endif
     struct chunk_header ch;
 
     while (true) {
@@ -522,7 +546,9 @@ static void data_storage_core1() {
                 index = open_datafile();
                 multicore_fifo_push_blocking(index);
                 multicore_fifo_push_blocking((uintptr_t)travel_databuffer2);
+#if HAS_IMU
                 multicore_fifo_push_blocking((uintptr_t)imu_databuffer2);
+#endif
                 break;
             case DUMP_TRAVEL:
                 size = (uint16_t)multicore_fifo_pop_blocking();
@@ -530,12 +556,14 @@ static void data_storage_core1() {
                 multicore_fifo_push_blocking((uintptr_t)travel_buffer);
                 write_travel_chunk(size, travel_buffer);
                 break;
+#if HAS_IMU
             case DUMP_IMU:
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
                 multicore_fifo_push_blocking((uintptr_t)imu_buffer);
                 write_imu_chunk(size, imu_buffer);
                 break;
+#endif
             case MARKER:
                 ch.type = CHUNK_TYPE_MARKER;
                 ch.length = 0;
@@ -547,10 +575,12 @@ static void data_storage_core1() {
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
                 write_travel_chunk(size, travel_buffer);
+#if HAS_IMU
                 // Flush IMU
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
                 write_imu_chunk(size, imu_buffer);
+#endif
                 f_close(&recording);
                 break;
         }
@@ -591,8 +621,10 @@ static void on_rec_start() {
     LOG("REC", "Starting recording session\n");
     travel_count = 0;
     active_travel_buffer = travel_databuffer1;
+#if HAS_IMU
     imu_count = 0;
     active_imu_buffer = imu_databuffer1;
+#endif
     multicore_fifo_drain();
 
     display_message(&disp, "INIT SENS");
@@ -620,7 +652,9 @@ static void on_rec_start() {
 
     // Initial buffer pointers for Core 1
     active_travel_buffer = (struct travel_record *)((uintptr_t)multicore_fifo_pop_blocking());
+#if HAS_IMU
     active_imu_buffer = (struct imu_record *)((uintptr_t)multicore_fifo_pop_blocking());
+#endif
 
     // Start data acquisition timers
     if (!add_repeating_timer_us(-1000000 / TRAVEL_SAMPLE_RATE, travel_cb, NULL, &travel_timer)) {
@@ -628,6 +662,7 @@ static void on_rec_start() {
         while (true) { tight_loop_contents(); }
     }
 
+#if HAS_IMU
     bool imu_active = imu_frame.available || imu_fork.available || imu_rear.available;
     if (imu_active) {
         if (!add_repeating_timer_us(-1000000 / IMU_SAMPLE_RATE, imu_cb, NULL, &imu_timer)) {
@@ -635,6 +670,7 @@ static void on_rec_start() {
             while (true) { tight_loop_contents(); }
         }
     }
+#endif
 }
 
 static void on_rec_stop() {
@@ -643,18 +679,22 @@ static void on_rec_stop() {
     display_message(&disp, "IDLE");
     cancel_repeating_timer(&travel_timer);
 
+#if HAS_IMU
     bool imu_active = imu_frame.available || imu_fork.available || imu_rear.available;
     if (imu_active) {
         cancel_repeating_timer(&imu_timer);
     }
+#endif
 
     multicore_fifo_push_blocking(FINISH);
     // Flush travel
     multicore_fifo_push_blocking(travel_count);
     multicore_fifo_push_blocking((uintptr_t)active_travel_buffer);
+#if HAS_IMU
     // Flush IMU
     multicore_fifo_push_blocking(imu_count);
     multicore_fifo_push_blocking((uintptr_t)active_imu_buffer);
+#endif
 }
 
 static void on_sync_data() {
@@ -760,12 +800,14 @@ static void on_idle() {
         if (shock_sensor.check_availability(&shock_sensor)) {
             ssd1306_draw_string(&disp, 30, 24, 1, "shock");
         }
+#if HAS_IMU
         if (imu_sensor_available(&imu_frame)) {
             ssd1306_draw_string(&disp, 63, 24, 1, "iFra");
         }
         if (imu_sensor_available(&imu_fork)) {
             ssd1306_draw_string(&disp, 90, 24, 1, "iFor");
         }
+#endif
         ssd1306_show(&disp);
     }
 }
@@ -922,6 +964,7 @@ int main() {
     uint offset = pio_add_program(I2C_PIO, &i2c_program);
     i2c_program_init(I2C_PIO, I2C_SM, offset, PIO_PIN_SDA, PIO_PIN_SDA + 1);
 
+#if HAS_IMU
     // IMU init
 #if IMU_FRAME != IMU_NONE
     if (!imu_sensor_init(&imu_frame)) {
@@ -938,6 +981,7 @@ int main() {
         LOG("INIT", "Rear IMU not found or failed to initialize\n");
     }
 #endif
+#endif // HAS_IMU
 
     // DS3231 init
     struct tm tm_now;
@@ -1011,9 +1055,11 @@ int main() {
         cal_ctx = (struct calibration_ctx){
             .fork = &fork_sensor,
             .shock = &shock_sensor,
+#if HAS_IMU
             .imu_frame = &imu_frame,
             .imu_fork = &imu_fork,
             .imu_rear = &imu_rear,
+#endif
             .disp = &disp,
         };
 
