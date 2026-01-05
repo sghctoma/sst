@@ -45,6 +45,7 @@
 static volatile enum state state;
 static volatile bool marker_pending = false;
 
+#if HAS_GPS
 #if GPS_MODULE == GPS_LC76G
 static void on_gps_fix(const struct gps_telemetry *t);
 struct gps_sensor gps = {
@@ -65,6 +66,7 @@ struct gps_sensor gps = {
 #else
 struct gps_sensor gps = {.available = false};
 #endif
+#endif // HAS_GPS
 
 static uint32_t scb_orig;
 static uint32_t clock0_orig;
