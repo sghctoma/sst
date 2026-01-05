@@ -1006,6 +1006,7 @@ int main() {
         if (!gps_sensor_configure(&gps, 100, true, true, true, true, false)) {
             LOG("INIT", "GPS configuration failed\n");
         }
+        sleep_ms(50);
         gps.power_off(&gps);
         LOG("INIT", "GPS powered off to save power\n");
     } else {
