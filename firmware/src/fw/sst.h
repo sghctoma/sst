@@ -64,11 +64,11 @@ struct gps_record {
     float speed;
     float heading;
 
-    uint8_t fix_mode; // 0 = none, 1 = 2D, 2 = rD
+    uint8_t fix_mode; // 0 = none, 1 = 2D, 2 = 3D
     uint8_t satellites;
     float epe_2d;
     float epe_3d;
-};
+} __attribute__((packed));
 
 enum command { OPEN, DUMP, DUMP_GPS, FINISH, MARKER };
 
