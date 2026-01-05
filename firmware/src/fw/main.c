@@ -45,8 +45,9 @@
 static volatile enum state state;
 static volatile bool marker_pending = false;
 #if HAS_GPS
-static volatile bool skip_gps_recording = false;   // Skip GPS fix wait, start recording without GPS
-static volatile bool cancel_gps_recording = false;  // Cancel GPS fix wait, return to IDLE without recording
+static volatile bool skip_gps_recording = false;    // Skip GPS fix wait, start recording without GPS
+static volatile bool gps_fix_ready = false;         // GPS fix is ready, waiting for user confirmation
+static volatile bool confirm_gps_recording = false; // 2
 static volatile uint8_t gps_last_satellites = 0;
 static volatile float gps_last_epe = 0.0f;
 #endif
@@ -635,14 +636,15 @@ static void on_rec_start() {
     gps_count = 0;
     gps_active_buffer = gps_databuffer1;
     skip_gps_recording = false;
-    cancel_gps_recording = false;
+    gps_fix_ready = false;
+    confirm_gps_recording = false;
     gps_last_satellites = 0;
     gps_last_epe = 0.0f;
 #endif
     multicore_fifo_drain();
 
     display_message(&disp, "INIT SENS");
-    if (false) { //!start_sensors()) {
+    if (false) { //! start_sensors()) {
         LOG("REC", "No sensors available\n");
         display_message(&disp, "NO SENS");
         sleep_ms(1000);
@@ -651,9 +653,11 @@ static void on_rec_start() {
     }
 
 #if HAS_GPS
-    if (gps.available && !gps.fix_tracker.ready) {
-        LOG("REC", "Powering on GPS and waiting for fix\n");
-        gps.power_on(&gps);
+    if (gps.available) {
+        LOG("REC", "GPS available, entering GPS wait state\n");
+        if (!gps.fix_tracker.ready) {
+            gps.power_on(&gps);
+        }
         add_repeating_timer_ms(-50, gps_timer_cb, NULL, &gps_timer);
         state = GPS_WAIT;
         return;
@@ -667,33 +671,47 @@ static void on_rec_start() {
 static void on_gps_wait() {
     static absolute_time_t display_timeout = {0};
 
-    if (cancel_gps_recording) {
-        LOG("REC", "GPS wait cancelled\n");
+    // User pressed left while waiting for fix - skip GPS and record without it
+    if (skip_gps_recording) {
+        LOG("REC", "GPS skipped, starting recording without GPS\n");
         cancel_repeating_timer(&gps_timer);
         gps.power_off(&gps);
-        state = IDLE;
-        return;
-    }
-
-    if (gps.fix_tracker.ready || skip_gps_recording) {
-        LOG("REC", "GPS %s, starting recording\n", skip_gps_recording ? "skipped" : "fix ready");
-        cancel_repeating_timer(&gps_timer);
-        if (skip_gps_recording) {
-            gps.power_off(&gps);
-        }
+        LOG("REC", "GPS powered off\n");
         start_recording_session();
         return;
     }
 
+    // Check if fix just became ready
+    if (gps.fix_tracker.ready && !gps_fix_ready) {
+        LOG("REC", "GPS fix ready, waiting for user confirmation\n");
+        gps_fix_ready = true;
+    }
+
+    // User confirmed GPS fix - start recording with GPS
+    if (gps_fix_ready && confirm_gps_recording) {
+        LOG("REC", "GPS confirmed, starting recording with GPS\n");
+        cancel_repeating_timer(&gps_timer);
+        start_recording_session();
+        return;
+    }
+
+    // Update display
     if (absolute_time_diff_us(get_absolute_time(), display_timeout) < 0) {
         display_timeout = make_timeout_time_ms(200);
 
         ssd1306_clear(&disp);
-        ssd1306_draw_string(&disp, 0, 0, 2, "GPS...");
 
-        char status[20];
-        sprintf(status, "SAT:%d EPE:%.1f", gps_last_satellites, gps_last_epe);
-        ssd1306_draw_string(&disp, 0, 24, 1, status);
+        if (gps_fix_ready) {
+            // Fix ready, waiting for confirmation
+            ssd1306_draw_string(&disp, 0, 0, 2, "GPS OK");
+            ssd1306_draw_string(&disp, 0, 24, 1, "press to start");
+        } else {
+            // Still waiting for fix
+            ssd1306_draw_string(&disp, 0, 0, 2, "GPS...");
+            char status[20];
+            sprintf(status, "SAT:%d EPE:%.1f", gps_last_satellites, gps_last_epe);
+            ssd1306_draw_string(&disp, 0, 24, 1, status);
+        }
 
         ssd1306_show(&disp);
     }
@@ -896,9 +914,9 @@ static void (*state_handlers[STATES_COUNT])() = {
     on_waking,    /* WAKING */
     on_rec_start, /* REC_START */
 #if HAS_GPS
-    on_gps_wait,  /* GPS_WAIT */
+    on_gps_wait, /* GPS_WAIT */
 #else
-    dummy,        /* GPS_WAIT */
+    dummy, /* GPS_WAIT */
 #endif
     dummy,        /* RECORD */
     on_rec_stop,  /* REC_STOP */
@@ -930,7 +948,11 @@ static void on_left_press(void *user_data) {
             break;
 #if HAS_GPS
         case GPS_WAIT:
-            cancel_gps_recording = true;
+            if (gps_fix_ready) {
+                confirm_gps_recording = true;
+            } else {
+                skip_gps_recording = true;
+            }
             break;
 #endif
         default:
@@ -960,11 +982,6 @@ static void on_right_press(void *user_data) {
             tcpserver_finish(&server);
             state = IDLE;
             break;
-#if HAS_GPS
-        case GPS_WAIT:
-            skip_gps_recording = true;
-            break;
-#endif
         default:
             break;
     }
