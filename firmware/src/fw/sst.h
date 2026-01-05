@@ -24,10 +24,24 @@ enum state {
 };
 #define STATES_COUNT 13
 
+#define CHUNK_TYPE_RATES 0x00
+#define CHUNK_TYPE_TELEMETRY 0x01
+#define CHUNK_TYPE_MARKER 0x02
+
+struct chunk_header {
+    uint8_t type;
+    uint16_t length;
+} __attribute__((packed));
+
+struct rate_entry {
+    uint8_t type;
+    uint16_t rate;
+} __attribute__((packed));
+
 struct header {
     char magic[3];
     uint8_t version;
-    uint16_t sample_rate;
+    uint32_t padding;
     time_t timestamp;
 };
 
@@ -36,7 +50,7 @@ struct record {
     uint16_t shock_angle;
 };
 
-enum command { OPEN, DUMP, FINISH };
+enum command { OPEN, DUMP, FINISH, MARKER };
 
 #define BUFFER_SIZE 2048
 #define FILENAME_LENGTH                                                                                                \

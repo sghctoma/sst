@@ -38,6 +38,7 @@
 #include "hardware_config.h"
 
 static volatile enum state state;
+static volatile bool marker_pending = false;
 
 static uint32_t scb_orig;
 static uint32_t clock0_orig;
@@ -167,18 +168,31 @@ struct record databuffer2[BUFFER_SIZE];
 struct record *active_buffer = databuffer1;
 uint16_t count = 0;
 
+static void dump_active_buffer(uint16_t size) {
+    multicore_fifo_push_blocking(DUMP);
+    multicore_fifo_push_blocking(size);
+    multicore_fifo_push_blocking((uintptr_t)active_buffer);
+    active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
+}
+
 static bool data_acquisition_cb(repeating_timer_t *rt) {
     if (count == BUFFER_SIZE) {
+        dump_active_buffer(BUFFER_SIZE);
         count = 0;
-        multicore_fifo_push_blocking(DUMP);
-        multicore_fifo_push_blocking((uintptr_t)active_buffer);
-        active_buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
     }
 
     active_buffer[count].fork_angle = fork_sensor.measure(&fork_sensor);
     active_buffer[count].shock_angle = shock_sensor.measure(&shock_sensor);
 
     count += 1;
+
+    if (marker_pending) {
+        dump_active_buffer(count);
+        multicore_fifo_push_blocking(MARKER);
+
+        count = 0;
+        marker_pending = false;
+    }
 
     return state == RECORD; // keep repeating if we are still recording
 }
@@ -283,10 +297,24 @@ static int open_datafile() {
         return fr;
     }
 
-    struct header h = {"SST", 3, SAMPLE_RATE, rtc_timestamp()};
+    struct header h = {"SST", 4, 0, rtc_timestamp()};
     f_write(&recording, &h, sizeof(struct header), NULL);
 
+    struct chunk_header ch = {CHUNK_TYPE_RATES, sizeof(struct rate_entry)};
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    struct rate_entry re = {CHUNK_TYPE_TELEMETRY, SAMPLE_RATE};
+    f_write(&recording, &re, sizeof(struct rate_entry), NULL);
+
     return index;
+}
+
+static void write_telemetry_chunk(uint16_t size, struct record *buffer) {
+    struct chunk_header ch;
+    ch.type = CHUNK_TYPE_TELEMETRY;
+    ch.length = size * sizeof(struct record);
+    f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
+    f_write(&recording, buffer, ch.length, NULL);
+    f_sync(&recording);
 }
 
 static void data_storage_core1() {
@@ -297,6 +325,8 @@ static void data_storage_core1() {
     enum command cmd;
     uint16_t size;
     struct record *buffer;
+    struct chunk_header ch;
+
     while (true) {
         cmd = (enum command)multicore_fifo_pop_blocking();
         switch (cmd) {
@@ -307,16 +337,21 @@ static void data_storage_core1() {
                 multicore_fifo_push_blocking((uintptr_t)databuffer2);
                 break;
             case DUMP:
+                size = (uint16_t)multicore_fifo_pop_blocking();
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
                 multicore_fifo_push_blocking((uintptr_t)buffer);
-                f_write(&recording, buffer, sizeof(struct record) * BUFFER_SIZE, NULL);
+                write_telemetry_chunk(size, buffer);
+                break;
+            case MARKER:
+                ch.type = CHUNK_TYPE_MARKER;
+                ch.length = 0;
+                f_write(&recording, &ch, sizeof(struct chunk_header), NULL);
                 f_sync(&recording);
                 break;
             case FINISH:
                 size = (uint16_t)multicore_fifo_pop_blocking();
                 buffer = (struct record *)((uintptr_t)multicore_fifo_pop_blocking());
-                f_write(&recording, buffer, sizeof(struct record) * size, NULL);
-                f_sync(&recording);
+                write_telemetry_chunk(size, buffer);
                 f_close(&recording);
                 break;
         }
@@ -714,6 +749,9 @@ static void on_right_press(void *user_data) {
     switch (state) {
         case IDLE:
             state = SLEEP;
+            break;
+        case RECORD:
+            marker_pending = true;
             break;
         case SERVE_TCP:
             tcpserver_finish(&server);
