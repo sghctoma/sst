@@ -92,7 +92,9 @@
 #define GPS_MODULE GPS_NONE
 #endif
 
-#if GPS_MODULE != GPS_NONE
+#define HAS_GPS (GPS_MODULE != GPS_NONE)
+
+#if HAS_GPS
 #define GPS_UART_NUM  0
 #define GPS_UART_INST uart0
 #define GPS_PIN_TX    0
