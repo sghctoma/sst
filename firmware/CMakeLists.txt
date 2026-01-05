@@ -117,6 +117,29 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         -DSNTP_DEBUG=LWIP_DBG_ON -DUSE_PRINTF=1 -DUSE_DBG_PRINTF=1)
 endif()
 
+# GPS Module
+if(NOT GPS_MODULE)
+    set(GPS_MODULE "NONE")
+endif()
+
+if(NOT GPS_MODULE STREQUAL "NONE")
+    target_sources(sufni-suspension-telemetry PRIVATE
+        src/sensor/gps/gps_sensor.c
+        src/sensor/gps/nmea_util.c
+        src/sensor/gps/lc76g.c
+    )
+
+    set(LWGPS_OPTS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/sensor/gps/lwgps_opts.h)
+    add_subdirectory(external/lwgps/lwgps ${CMAKE_CURRENT_BINARY_DIR}/lwgps)
+    target_link_libraries(sufni-suspension-telemetry lwgps)
+endif()
+
+if(GPS_MODULE STREQUAL "LC76G")
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC GPS_MODULE=GPS_LC76G)
+else()
+    target_compile_definitions(sufni-suspension-telemetry PUBLIC GPS_MODULE=GPS_NONE)
+endif()
+
 if(USB_UART_DEBUG)
     target_compile_definitions(sufni-suspension-telemetry PRIVATE
         USB_UART_DEBUG=1

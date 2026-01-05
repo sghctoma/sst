@@ -82,4 +82,28 @@
 #define SHOCK_PIN_SCL 15
 #endif // SHOCK_LINEAR
 
+// ----------------------------------------------------------------------------
+// GPS Definitions
+
+#define GPS_NONE  0
+#define GPS_LC76G 1
+
+#ifndef GPS_MODULE
+#define GPS_MODULE GPS_NONE
+#endif
+
+#define HAS_GPS (GPS_MODULE != GPS_NONE)
+
+#if HAS_GPS
+#define GPS_UART_NUM  0
+#define GPS_UART_INST uart0
+#define GPS_PIN_TX    0
+#define GPS_PIN_RX    1
+#if GPS_UART_NUM == 0
+#define GPS_IRQ UART0_IRQ
+#else
+#define GPS_IRQ UART1_IRQ
+#endif
+#endif
+
 #endif // _HARDWARE_CONFIG_H
